@@ -1,0 +1,1 @@
+"""Fashion Agent application package."""
