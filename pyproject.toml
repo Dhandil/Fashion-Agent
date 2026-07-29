@@ -19,7 +19,7 @@ dependencies = [
     "python-dotenv>=1.2,<2.0",
 
     # Web API 框架
-    "astapi>=0.140,<0.141",
+    "fastapi>=0.140,<0.141",
 
     # ASGI 应用服务器及常用扩展
     "uvicorn[standard]>=0.51,<0.52",
@@ -42,6 +42,15 @@ dependencies = [
     # LangChain 文档切分工具
     "langchain-text-splitters>=1.1,<2.0",
 
+    # SQLAlchemy 2.x ORM 和异步数据库会话管理
+    "sqlalchemy>=2.0,<2.1",
+
+    # PostgreSQL 高性能异步驱动
+    "asyncpg>=0.31,<0.32",
+
+    # 数据库表结构版本与迁移管理
+    "alembic>=1.18,<2.0",
+
 ]
 
 [project.optional-dependencies]
@@ -53,7 +62,7 @@ dev = [
     "ruff>=0.16,<0.17",
 
     # Python静态类型检查工具
-    "mupy>=2.3,<3.0",
+    "mypy>=2.3,<3.0",
 
     # FastAPI 测试客户端使用的 HTTP 客户端
     "httpx>=0.28,<0.29",

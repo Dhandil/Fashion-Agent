@@ -15,7 +15,7 @@ class InMemoryProductRepository:
 
         self._products = tuple(prodcts)
 
-    def search(
+    async def search(
         self,
         query: str,
         category: str | None = None,

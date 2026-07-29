@@ -1,3 +1,5 @@
+import pytest
+
 from decimal import Decimal
 
 from app.db.repositories.in_memory_product import (
@@ -6,7 +8,8 @@ from app.db.repositories.in_memory_product import (
 from app.domain.entities.product import Product
 
 
-def test_repository_filters_products() -> None:
+@pytest.mark.anyio
+async def test_repository_filters_products() -> None:
     """验证商品搜索的关键词、预算和库存过滤。"""
 
     products = [
@@ -42,7 +45,7 @@ def test_repository_filters_products() -> None:
 
     repository = InMemoryProductRepository(products)
 
-    results = repository.search(
+    results = await repository.search(
         query="衬衫",
         category="衬衫",
         max_price=Decimal("350.00"),

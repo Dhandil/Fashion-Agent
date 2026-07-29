@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -19,14 +19,16 @@ def test_chat_returns_agent_response() -> None:
     fake_graph = Mock()
 
     # 指定假工作流执行后的最终状态
-    fake_graph.invoke.return_value = {
-        "messages": [
-            AIMessage(content="请告诉我你的预算"),
-        ],
-        "knowledge_sources": [
-            "data/samples/fabrics.md",
-        ],
-    }
+    fake_graph.ainvoke = AsyncMock(
+        return_value = {
+            "messages": [
+                AIMessage(content="请告诉我你的预算"),
+            ],
+            "knowledge_sources": [
+                "data/samples/fabrics.md",
+            ],
+        },
+    )
 
     # 替换聊天路由中使用的真实 Agent Graph
     with patch(
@@ -54,15 +56,15 @@ def test_chat_returns_agent_response() -> None:
     }
 
     # 验证工作流只执行了一次
-    fake_graph.invoke.assert_called_once()
+    fake_graph.ainvoke.assert_called_once()
 
     # 读取传给工作流的初始状态
-    input_state = fake_graph.invoke.call_args.args[0]
+    input_state = fake_graph.ainvoke.call_args.args[0]
 
     assert input_state["messages"][0].content == "我想买一件衬衫"
 
     # 读取传给工作流的执行配置
-    graph_config = fake_graph.invoke.call_args.kwargs["config"]
+    graph_config = fake_graph.ainvoke.call_args.kwargs["config"]
 
     # 验证会话 ID 被作为 Langgraph thread_id 传入
     assert graph_config == {
@@ -122,11 +124,15 @@ def test_chat_generates_conversation_id() -> None:
 
     # 创建假的 Agent Graph
     fake_graph = Mock()
-    fake_graph.invoke.return_value = {
-        "messages": [
-            AIMessage(content="请告诉我你的预算"),
-        ],
-    }
+    fake_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [
+                AIMessage(
+                    content="请告诉我你的预算",
+                ),
+            ],
+        },
+    )
 
     # 替换真实 Agent Graph，避免调用 LLM
     with patch(
@@ -153,5 +159,5 @@ def test_chat_generates_conversation_id() -> None:
     assert response_data["message"] == "请告诉我你的预算"
 
     # 验证生成的 ID 被传给 Langgraph
-    graph_config = fake_graph.invoke.call_args.kwargs["config"]
+    graph_config = fake_graph.ainvoke.call_args.kwargs["config"]
     assert graph_config["configurable"]["thread_id"] == conversation_id

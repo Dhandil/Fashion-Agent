@@ -47,7 +47,7 @@ def create_product_search_tool(
     @tool(
         args_schema=ProductSearchInput,
     )
-    def search_products(
+    async def search_products(
         query: str,
         category: str | None = None,
         max_price: Decimal | None = None,
@@ -55,8 +55,8 @@ def create_product_search_tool(
     ) -> str:
         """根据关键词、品类和预算搜索有库存的服装商品。"""
 
-        # 使用已经通过 Pydantic 校验的参数查询仓储
-        products = repository.search(
+        # 异步等待商品仓库完成查询
+        products = await repository.search(
             query=query,
             category=category,
             max_price=max_price,

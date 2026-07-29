@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from app.core.config import Settings
 
 
@@ -49,3 +52,58 @@ def test_llm_api_key_is_masked(monkeypatch) -> None:
 
     # 直接转成字符串时，真实密钥不应该出现
     assert "test-secret-key" not in str(settings.llm_api_key)
+
+
+def test_settings_read_database_environment_variables(
+    monkeypatch,
+) -> None:
+    """验证数据库配置能够从环境变量读取并转换类型。"""
+
+    # 模拟生产环境提供的数据库配置
+    monkeypatch.setenv(
+        "PRODUCT_REPOSITORY_BACKEND",
+        "postgres",
+    )
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        (
+            "postgresql+asyncpg://"
+            "fashion_agent:secret@localhost:5432/fashion_agent"
+        ),
+    )
+    monkeypatch.setenv(
+        "DATABASE_ECHO",
+        "true",
+    )
+
+    # 不读取项目的 .env，只验证测试设置的环境变量
+    settings = Settings(_env_file=None)
+
+    # 仓库后端应该切换为 PostgreSQL
+    assert settings.product_repository_backend == "postgres"
+
+    # SecretStr 需要显式调用方法才能取得真实内容
+    assert settings.database_url is not None
+    assert settings.database_url.get_secret_value() == (
+        "postgresql+asyncpg://"
+        "fashion_agent:secret@localhost:5432/fashion_agent"
+    )
+
+    # Pydantic 应将字符串 true 转换为布尔值
+    assert settings.database_echo is True
+
+
+def test_settings_reject_invalid_repository_backend(
+    monkeypatch,
+) -> None:
+    """验证不支持的商品仓库类型会触发配置校验错误。"""
+
+    # 设置一个不在 Literal 允许范围内的仓库类型
+    monkeypatch.setenv(
+        "PRODUCT_REPOSITORY_BACKEND",
+        "mongodb",
+    )
+
+    # Settings 初始化时应该立即拒绝无效配置
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

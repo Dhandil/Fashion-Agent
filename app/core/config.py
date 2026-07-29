@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,19 @@ class Settings(BaseSettings):
 
     # 日志输出级别
     log_level: str = "INFO"
+
+    # 商品仓库实现类型：当前默认使用内存仓库
+    product_repository_backend: Literal[
+        "memory",
+        "postgres",
+    ] = "memory"
+
+    # PostgreSQL 异步连接地址
+    # SecretStr 可以避免连接地址中的密码被日志直接打印
+    database_url: SecretStr | None = None
+
+    # 是否输出 SQLAlchemy 执行的 SQL，生产环境应保持关闭
+    database_echo: bool = False
 
     # OpenAI 兼容接口的基础地址
     llm_base_url: str | None = None

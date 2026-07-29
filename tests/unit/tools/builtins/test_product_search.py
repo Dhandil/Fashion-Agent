@@ -1,4 +1,4 @@
-import json
+import json, pytest
 from decimal import Decimal
 from unittest.mock import Mock
 
@@ -9,7 +9,8 @@ from app.tools.builtins.product_search import (
 )
 
 
-def test_product_search_tool_returns_json_products() -> None:
+@pytest.mark.anyio
+async def test_product_search_tool_returns_json_products() -> None:
     """验证商品搜索 Tool 的参数转换和 JSON 输出。"""
 
     # 创建符合商品仓储接口的假对象
@@ -34,7 +35,7 @@ def test_product_search_tool_returns_json_products() -> None:
     )
 
     # 使用类似 LLM Tool Call 的字典参数执行工具
-    result = product_search.invoke(
+    result = await product_search.ainvoke(
         {
             "query": "衬衫",
             "category": "衬衫",
@@ -67,7 +68,9 @@ def test_product_search_tool_returns_json_products() -> None:
         },
     ]
 
-def test_product_search_tool_returns_empty_json_list() -> None:
+
+@pytest.mark.anyio
+async def test_product_search_tool_returns_empty_json_list() -> None:
     """验证没有匹配商品时工具返回空 JSON 列表。"""
 
     # 创建假的商品仓库
@@ -82,7 +85,7 @@ def test_product_search_tool_returns_empty_json_list() -> None:
     )
 
     # 查询一个不存在的商品
-    result = product_search.invoke(
+    result = await product_search.ainvoke(
         {
             "query": "宇航服",
             "max_price": "100.00",

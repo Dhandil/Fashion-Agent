@@ -18,7 +18,9 @@ router = APIRouter(
     response_model=ChatResponse,
     summary="与购物助手聊天",
 )
-def chat(request: ChatRequest) -> ChatResponse:
+async def chat(
+    request: ChatRequest
+) -> ChatResponse:
     """将用户消息发给购物 Agent 并返回回复。"""
 
     # 获取已经装配并缓存的购物 Agent 工作流
@@ -28,7 +30,7 @@ def chat(request: ChatRequest) -> ChatResponse:
     conversation_id = request.conversation_id or str(uuid4())
 
     # 将 API 请求转换为 LangChain 消息并执行工作流
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {
             "messages": [
                 HumanMessage(content=request.message),
