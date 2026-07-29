@@ -66,3 +66,36 @@ def test_product_search_tool_returns_json_products() -> None:
             "in_stock": True,
         },
     ]
+
+def test_product_search_tool_returns_empty_json_list() -> None:
+    """验证没有匹配商品时工具返回空 JSON 列表。"""
+
+    # 创建假的商品仓库
+    repository = Mock(spec=ProductRepository)
+
+    # 模拟仓库没有找到任何匹配商品
+    repository.search.return_value = []
+
+    # 创建绑定假仓库的商品搜索工具
+    product_search = create_product_search_tool(
+        repository,
+    )
+
+    # 查询一个不存在的商品
+    result = product_search.invoke(
+        {
+            "query": "宇航服",
+            "max_price": "100.00",
+        },
+    )
+
+    # 验证工具正确地把查询条件传给仓库
+    repository.search.assert_called_once_with(
+        query="宇航服",
+        category=None,
+        max_price=Decimal("100.00"),
+        limit=5,
+    )
+
+    # JSON 空数组解析后应该是 Python 空列表
+    assert json.loads(result) == []
