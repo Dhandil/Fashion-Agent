@@ -15,6 +15,12 @@ def test_get_shopping_graph_builds_and_caches_graph() -> None:
     fake_retriever = Mock()
     fake_graph = Mock()
 
+    # 创建假的工具注册表及工具集合
+    fake_tool = Mock()
+    fake_tools = (fake_tool,)
+    fake_tool_registry = Mock()
+    fake_tool_registry.list_tools.return_value = fake_tools
+
     with (
         patch(
             "app.services.agent.create_chat_model",
@@ -28,6 +34,10 @@ def test_get_shopping_graph_builds_and_caches_graph() -> None:
             "app.services.agent.get_knowledge_retriever",
             return_value=fake_retriever,
         ) as mocked_get_retriever,
+        patch(
+            "app.services.agent.get_tool_registry",
+            return_value=fake_tool_registry,
+        ) as mocked_get_tool_registry,
         patch(
             "app.services.agent.create_shopping_graph",
             return_value=fake_graph,
@@ -48,10 +58,17 @@ def test_get_shopping_graph_builds_and_caches_graph() -> None:
     mocked_get_checkpointer.assert_called_once_with()
     mocked_get_retriever.assert_called_once_with()
 
+    # 工具注册表应该只获取一次
+    mocked_get_tool_registry.assert_called_once_with()
+
+    # 服务层应该从注册表读取一次工具集合
+    fake_tool_registry.list_tools.assert_called_once_with()
+
     mocked_create_graph.assert_called_once_with(
         model=fake_model,
         checkpointer=fake_checkpointer,
         retriever=fake_retriever,
+        tools=fake_tools,
     )
 
     # 测试结束后清楚缓存，避免影响其他测试

@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
+from langchain_core.tools import tool
 
 from app.agents.graphs.shopping import create_shopping_graph
 
@@ -158,4 +159,79 @@ def test_shopping_graph_uses_retrieved_knowledge() -> None:
     # Graph 应返回模型回复
     assert result["messages"][-1].content == (
         "建议选择亚麻面料。"
+    )
+
+def test_shopping_graph_executes_tool_call() -> None:
+    """验证工作流能够执行模型请求的工具并返回最终回答。"""
+
+    # 用 Mock 记录商品搜索函数是否被执行
+    search_function = Mock(
+        return_value='[{"name": "亚麻通勤衬衫"}]',
+    )
+
+    @tool
+    def search_products(query: str) -> str:
+        """根据关键词搜索服装商品。"""
+
+        # 测试工具内部调用可监控的假搜索函数
+        return search_function(query)
+
+    # 原始模型负责执行 bind_tools()
+    model = Mock(spec=BaseChatModel)
+
+    # 绑定工具后返回的模型负责实际生成消息
+    tool_enabled_model = Mock(spec=BaseChatModel)
+    model.bind_tools.return_value = tool_enabled_model
+
+    # 第一次回复请求调用工具，第二次回复生成最终答案
+    tool_enabled_model.invoke.side_effect = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "search_products",
+                    "args": {
+                        "query": "亚麻衬衫",
+                    },
+                    "id": "call-1",
+                    "type": "tool_call",
+                },
+            ],
+        ),
+        AIMessage(
+            content="推荐亚麻通勤衬衫。",
+        ),
+    ]
+
+    # 创建启用商品搜索工具的工作流
+    graph = create_shopping_graph(
+        model=model,
+        tools=[search_products],
+    )
+
+    # 执行一次用户请求
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(
+                    content="帮我找一件亚麻衬衫。",
+                ),
+            ],
+        },
+    )
+
+    # 原始模型应该接收到工具定义
+    model.bind_tools.assert_called_once()
+
+    # 工作流应该使用模型提供的参数执行商品搜索
+    search_function.assert_called_once_with(
+        "亚麻衬衫",
+    )
+
+    # 模型会在工具执行前后各调用一次
+    assert tool_enabled_model.invoke.call_count == 2
+
+    # 第二次模型回复是工作流的最终结果
+    assert result["messages"][-1].content == (
+        "推荐亚麻通勤衬衫。"
     )

@@ -1,0 +1,42 @@
+[
+  {
+    "product_id": "shirt-001",
+    "name": "亚麻通勤衬衫",
+    "category": "衬衫",
+    "price": "299.00",
+    "currency": "CNY",
+    "colors": ["白色", "浅蓝色"],
+    "sizes": ["S", "M", "L"],
+    "in_stock": true
+  },
+  {
+    "product_id": "shirt-002",
+    "name": "纯棉休闲衬衫",
+    "category": "衬衫",
+    "price": "199.00",
+    "currency": "CNY",
+    "colors": ["白色", "米色"],
+    "sizes": ["M", "L", "XL"],
+    "in_stock": true
+  },
+  {
+    "product_id": "shirt-003",
+    "name": "轻薄聚酯通勤衬衫",
+    "category": "衬衫",
+    "price": "159.00",
+    "currency": "CNY",
+    "colors": ["浅蓝色", "灰色"],
+    "sizes": ["S", "M", "L"],
+    "in_stock": false
+  },
+  {
+    "product_id": "coat-001",
+    "name": "羊毛通勤外套",
+    "category": "外套",
+    "price": "599.00",
+    "currency": "CNY",
+    "colors": ["黑色", "驼色"],
+    "sizes": ["M", "L"],
+    "in_stock": true
+  }
+]
