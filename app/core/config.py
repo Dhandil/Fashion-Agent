@@ -40,6 +40,27 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # 本地 Embedding 模型名称
+    embedding_model: str = "BAAI/bge-small-zh-v1.5"
+
+    # Embedding 运行设备，开发环境默认使用 CPU
+    embedding_device: str = "cpu"
+
+    # Chroma 持久化数据保存目录
+    chroma_persist_directory: str = "./data/chroma"
+
+    # Chroma 中保存服装知识的集合名称
+    chroma_collection_name: str = "fashion_knowledge"
+
+    # 每个知识片段允许的最大字符数
+    rag_chunk_size: int = 400
+
+    # 相邻知识片段之间保留的重叠字符数
+    rag_chunk_overlap: int = 50
+
+    # 每次语义检索返回的知识片段数量
+    rag_top_k: int = 3
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -11,3 +11,10 @@ class ConfigurationError(FashionAgentError):
     
     当必要的环境变量缺失或配置值不合法时抛出。
     """
+
+
+class ToolRegistryError(FashionAgentError):
+    """工具注册表错误。
+    
+    当工具重复注册、工具不存在或注册信息不合法时抛出。
+    """

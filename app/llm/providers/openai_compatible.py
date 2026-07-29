@@ -4,7 +4,9 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import ConfigurationError
 
 
-def create_chat_model(settings: Settings | None) -> ChatOpenAI:
+def create_chat_model(
+    settings: Settings | None = None
+) -> ChatOpenAI:
     """根据项目配置创建 OpenAI 兼容发聊天模型。"""
 
     # 如果调用者没有传入配置，则读取项目全局配置

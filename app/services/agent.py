@@ -4,7 +4,10 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.agents.graphs.shopping import create_shopping_graph
 from app.llm.providers.openai_compatible import create_chat_model
-
+from app.memory.short_term.checkpointer import get_short_term_checkpointer
+from app.rag.retrievers.provider import (
+    get_knowledge_retriever
+)
 
 @lru_cache
 def get_shopping_graph() -> CompiledStateGraph:
@@ -13,5 +16,15 @@ def get_shopping_graph() -> CompiledStateGraph:
     # 根据环境配置创建聊天模型
     model = create_chat_model()
 
-    # 将模型注入购物工作流并返回编译后的图
-    return create_shopping_graph(model)
+    # 获取应用共享的短期记忆存储器
+    checkpointer = get_short_term_checkpointer()
+
+    # 获取服装知识检索器
+    retriever = get_knowledge_retriever()
+
+    # 将模型和 Checkpointer 注入购物工作流
+    return create_shopping_graph(
+        model=model,
+        checkpointer=checkpointer,
+        retriever=retriever,
+    )

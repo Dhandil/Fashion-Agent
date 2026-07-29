@@ -3,7 +3,8 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.api.router import api_router
-
+from app.api.exception_handlers import configuration_error_handler
+from app.core.exceptions import ConfigurationError
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
@@ -24,6 +25,12 @@ def create_app() -> FastAPI:
     application.include_router(
         api_router,
         prefix="/api/v1",
+    )
+
+    # 注册配置异常处理器
+    application.add_exception_handler(
+        ConfigurationError,
+        configuration_error_handler,
     )
 
     return application
