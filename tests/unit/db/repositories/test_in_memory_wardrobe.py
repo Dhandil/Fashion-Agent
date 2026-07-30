@@ -27,9 +27,9 @@ async def test_repository_filters_user_category_and_status() -> None:
             WardrobeItem(
                 wardrobe_item_id="pants-001",
                 user_id="user-001",
-                name="黑色直筒西裤",
+                name="暂不可用的黑色直筒西裤",
                 category="长裤",
-                status="laundry",
+                status="unavailable",
             ),
             WardrobeItem(
                 wardrobe_item_id="shoes-001",
@@ -59,24 +59,18 @@ async def test_repository_filters_user_category_and_status() -> None:
         user_id="user-001",
         status=WardrobeItemStatus.AVAILABLE,
     )
-    assert {
-        item.wardrobe_item_id
-        for item in available_items
-    } == {
+    assert {item.wardrobe_item_id for item in available_items} == {
         "shirt-001",
         "shoes-001",
     }
 
-    # 清洗中的衣物可以被衣橱管理功能单独查询
-    laundry_items = await repository.search(
+    # 暂不可用衣物可以被衣橱管理功能单独查询
+    unavailable_items = await repository.search(
         user_id="user-001",
-        status=WardrobeItemStatus.LAUNDRY,
+        status=WardrobeItemStatus.UNAVAILABLE,
     )
-    assert len(laundry_items) == 1
-    assert (
-        laundry_items[0].wardrobe_item_id
-        == "pants-001"
-    )
+    assert len(unavailable_items) == 1
+    assert unavailable_items[0].wardrobe_item_id == "pants-001"
 
     # 品类和数量限制可以同时使用
     shirts = await repository.search(

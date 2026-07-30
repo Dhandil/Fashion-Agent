@@ -292,6 +292,11 @@ FastAPI 请求
 - 绑定请求 Session 的 Repository
 - 绑定请求 Session 的工具实例
 
+当前实现把模型、RAG Retriever 和 Checkpointer 组成无请求状态的共享运行资源。
+每次聊天请求单独创建 Tool Registry，将当前用户身份和衣橱 Repository
+绑定到 `search_wardrobe`，再编译本次请求使用的 Graph。
+不同请求可以共享对话 Checkpointer，但不能共享绑定数据库 Session 的衣橱工具。
+
 ### 7.2 商品数据流
 
 开发阶段：
@@ -369,7 +374,11 @@ START
 → chat
 → 判断工具调用
     ├── END
-    └── tools → chat
+    └── tools
+          ├── search_wardrobe（请求级、当前用户）
+          └── search_products（共享、按需购物）
+              ↓
+            chat
 ```
 
 该工作流可以继续作为 P0 基础，不进行一次性大规模重命名。

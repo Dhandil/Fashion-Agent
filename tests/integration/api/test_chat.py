@@ -4,11 +4,53 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from app.main import create_app
+from app.api.dependencies.database import (
+    get_fashion_repositories,
+)
+from app.core.config import (
+    Settings,
+    get_settings,
+)
 from app.core.exceptions import ConfigurationError
+from app.db.repositories.fashion_provider import (
+    FashionRepositories,
+)
+from app.domain.repositories.wardrobe import (
+    WardrobeRepository,
+)
+from app.main import create_app
 
-# 创建测试应用和客户端
+# 创建测试使用的请求级仓库集合
+wardrobe_repository = Mock(
+    spec=WardrobeRepository,
+)
+repositories = FashionRepositories(
+    style_profiles=Mock(),
+    wardrobe=wardrobe_repository,
+    outfits=Mock(),
+)
+
+
+async def override_repositories() -> FashionRepositories:
+    """为聊天接口测试提供假的请求级仓库。"""
+
+    return repositories
+
+
+def override_settings() -> Settings:
+    """确保测试不读取本地 .env 中的运行环境。"""
+
+    return Settings(
+        _env_file=None,
+        app_env="test",
+        debug=False,
+    )
+
+
+# 创建测试应用，替换数据库仓库和环境配置
 application = create_app()
+application.dependency_overrides[get_fashion_repositories] = override_repositories
+application.dependency_overrides[get_settings] = override_settings
 client = TestClient(application)
 
 
@@ -20,7 +62,7 @@ def test_chat_returns_agent_response() -> None:
 
     # 指定假工作流执行后的最终状态
     fake_graph.ainvoke = AsyncMock(
-        return_value = {
+        return_value={
             "messages": [
                 AIMessage(content="请告诉我你的预算"),
             ],
@@ -32,11 +74,14 @@ def test_chat_returns_agent_response() -> None:
 
     # 替换聊天路由中使用的真实 Agent Graph
     with patch(
-        "app.api.routers.chat.get_shopping_graph",
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
         return_value=fake_graph,
-    ):
+    ) as mocked_create_graph:
         response = client.post(
             "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
             json={
                 "message": "我想买一件衬衫",
                 "conversation_id": "test-conversation-id",
@@ -58,6 +103,12 @@ def test_chat_returns_agent_response() -> None:
     # 验证工作流只执行了一次
     fake_graph.ainvoke.assert_called_once()
 
+    # 当前用户和请求级衣橱仓库被绑定到本次 Agent Graph
+    mocked_create_graph.assert_called_once_with(
+        wardrobe_repository=wardrobe_repository,
+        user_id="user-001",
+    )
+
     # 读取传给工作流的初始状态
     input_state = fake_graph.ainvoke.call_args.args[0]
 
@@ -69,19 +120,27 @@ def test_chat_returns_agent_response() -> None:
     # 验证会话 ID 被作为 Langgraph thread_id 传入
     assert graph_config == {
         "configurable": {
-            "thread_id": "test-conversation-id",
+            "thread_id": ("user:user-001:conversation:test-conversation-id"),
         },
     }
+
 
 def test_chat_rejects_empty_message() -> None:
     """验证聊天接口拒绝空消息。"""
 
-    # 监控 Agent 服务，确认校验失败时不会调用它
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock()
+
+    # 即使依赖已经完成装配，非法请求也不能执行 Agent Graph
     with patch(
-        "app.api.routers.chat.get_shopping_graph",
-    ) as mocked_get_graph:
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
+        return_value=fake_graph,
+    ):
         response = client.post(
             "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
             json={
                 "message": "",
             },
@@ -90,8 +149,31 @@ def test_chat_rejects_empty_message() -> None:
     # 422 表示请求数据不符合 Pydantic 模型要求
     assert response.status_code == 422
 
-    # 请求校验失败后，路由函数不应该被执行
-    mocked_get_graph.assert_not_called()
+    # 请求校验失败后，工作流不应该被执行
+    fake_graph.ainvoke.assert_not_awaited()
+
+
+def test_chat_requires_current_user_header() -> None:
+    """验证聊天接口必须具有当前用户身份。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock()
+
+    with patch(
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "message": "请使用我的衣橱生成通勤搭配",
+            },
+        )
+
+    assert response.status_code == 422
+
+    # 缺少身份时不能执行可能读取用户衣橱的工作流
+    fake_graph.ainvoke.assert_not_awaited()
 
 
 def test_chat_returns_structured_configuration_error() -> None:
@@ -99,11 +181,14 @@ def test_chat_returns_structured_configuration_error() -> None:
 
     # 模拟 Agent 服务在创建工作流时抛出配置异常
     with patch(
-        "app.api.routers.chat.get_shopping_graph",
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
         side_effect=ConfigurationError("缺少 LLM_API_KEY 配置"),
     ):
         response = client.post(
             "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
             json={
                 "message": "我想买一件衬衫",
             },
@@ -136,11 +221,14 @@ def test_chat_generates_conversation_id() -> None:
 
     # 替换真实 Agent Graph，避免调用 LLM
     with patch(
-        "app.api.routers.chat.get_shopping_graph",
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
         return_value=fake_graph,
     ):
         response = client.post(
             "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
             json={
                 "message": "我想买一件衬衫",
             },
@@ -160,4 +248,6 @@ def test_chat_generates_conversation_id() -> None:
 
     # 验证生成的 ID 被传给 Langgraph
     graph_config = fake_graph.ainvoke.call_args.kwargs["config"]
-    assert graph_config["configurable"]["thread_id"] == conversation_id
+    assert graph_config["configurable"]["thread_id"] == (
+        f"user:user-001:conversation:{conversation_id}"
+    )

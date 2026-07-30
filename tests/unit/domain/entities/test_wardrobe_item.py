@@ -37,9 +37,7 @@ def test_wardrobe_item_converts_collection_fields() -> None:
         ],
     )
 
-    assert item.colors == (
-        "浅蓝色",
-    )
+    assert item.colors == ("浅蓝色",)
     assert item.materials == (
         "亚麻",
         "棉",
@@ -48,9 +46,7 @@ def test_wardrobe_item_converts_collection_fields() -> None:
         "简约",
         "通勤",
     )
-    assert item.seasons == (
-        "夏季",
-    )
+    assert item.seasons == ("夏季",)
     assert item.scenarios == (
         "通勤",
         "休闲",
@@ -81,10 +77,10 @@ def test_wardrobe_item_accepts_string_status() -> None:
         user_id="user-001",
         name="白色棉质衬衫",
         category="衬衫",
-        status="laundry",
+        status="unavailable",
     )
 
-    assert item.status is WardrobeItemStatus.LAUNDRY
+    assert item.status is WardrobeItemStatus.UNAVAILABLE
 
 
 def test_wardrobe_item_rejects_unknown_status() -> None:
@@ -97,4 +93,17 @@ def test_wardrobe_item_rejects_unknown_status() -> None:
             name="白色棉质衬衫",
             category="衬衫",
             status="lost",
+        )
+
+
+def test_wardrobe_item_rejects_removed_laundry_status() -> None:
+    """验证清洗场景统一使用 unavailable，不再接受独立状态。"""
+
+    with pytest.raises(ValidationError):
+        WardrobeItem(
+            wardrobe_item_id="wardrobe-001",
+            user_id="user-001",
+            name="待清洗的白色衬衫",
+            category="衬衫",
+            status="laundry",
         )

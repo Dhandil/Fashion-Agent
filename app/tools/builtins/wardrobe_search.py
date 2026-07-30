@@ -57,7 +57,13 @@ def create_wardrobe_search_tool(
 
         # 将领域实体转换为模型可以读取的 JSON 数据
         wardrobe_data = [
-            wardrobe_item.model_dump(mode="json")
+            wardrobe_item.model_dump(
+                mode="json",
+                # 工具已经绑定当前用户，模型不需要接触内部用户 ID
+                exclude={
+                    "user_id",
+                },
+            )
             for wardrobe_item in wardrobe_items
         ]
 

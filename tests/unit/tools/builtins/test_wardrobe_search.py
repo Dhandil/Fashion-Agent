@@ -29,9 +29,9 @@ async def test_wardrobe_tool_returns_only_user_available_items() -> None:
             WardrobeItem(
                 wardrobe_item_id="pants-001",
                 user_id="user-001",
-                name="清洗中的黑色西裤",
+                name="暂不可用的黑色西裤",
                 category="长裤",
-                status="laundry",
+                status="unavailable",
             ),
             WardrobeItem(
                 wardrobe_item_id="shirt-002",
@@ -60,11 +60,9 @@ async def test_wardrobe_tool_returns_only_user_available_items() -> None:
 
     # 只应返回用户一当前可用的衬衫
     assert len(wardrobe_data) == 1
-    assert (
-        wardrobe_data[0]["wardrobe_item_id"]
-        == "shirt-001"
-    )
-    assert wardrobe_data[0]["user_id"] == "user-001"
+    assert wardrobe_data[0]["wardrobe_item_id"] == "shirt-001"
+    # 用户 ID 是内部身份信息，不需要暴露给模型
+    assert "user_id" not in wardrobe_data[0]
     assert wardrobe_data[0]["status"] == "available"
 
 

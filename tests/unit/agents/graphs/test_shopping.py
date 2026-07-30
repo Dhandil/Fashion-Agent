@@ -1,11 +1,11 @@
 from unittest.mock import Mock
 
+from langchain_core.documents import Document
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
-from langgraph.checkpoint.memory import InMemorySaver
-from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.tools import tool
+from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agents.graphs.shopping import create_shopping_graph
 
@@ -25,9 +25,7 @@ def test_shopping_graph_runs_chat_node() -> None:
     # 使用用户消息作为工作流的初始状态
     result = graph.invoke(
         {
-            "messages": [
-                HumanMessage(content="我想买一件衬衫")
-            ],
+            "messages": [HumanMessage(content="我想买一件衬衫")],
         }
     )
 
@@ -100,6 +98,58 @@ def test_shopping_graph_remembers_messages_in_same_thread() -> None:
     assert second_call_messages[3].content == "预算 300 元"
 
 
+def test_separately_compiled_graphs_share_checkpointer_history() -> None:
+    """验证请求级重新编译 Graph 后仍能恢复同一会话。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.side_effect = [
+        AIMessage(content="第一轮回复"),
+        AIMessage(content="第二轮回复"),
+    ]
+
+    # 两个请求级 Graph 共享不包含数据库 Session 的 Checkpointer
+    checkpointer = InMemorySaver()
+    first_graph = create_shopping_graph(
+        model=model,
+        checkpointer=checkpointer,
+    )
+    second_graph = create_shopping_graph(
+        model=model,
+        checkpointer=checkpointer,
+    )
+
+    config = {
+        "configurable": {
+            "thread_id": "user:user-001:conversation:test-thread",
+        },
+    }
+
+    first_graph.invoke(
+        {
+            "messages": [
+                HumanMessage(content="第一轮问题"),
+            ],
+        },
+        config=config,
+    )
+    result = second_graph.invoke(
+        {
+            "messages": [
+                HumanMessage(content="第二轮问题"),
+            ],
+        },
+        config=config,
+    )
+
+    # 新 Graph 应从共享 Checkpointer 中恢复第一轮消息
+    assert [message.content for message in result["messages"]] == [
+        "第一轮问题",
+        "第一轮回复",
+        "第二轮问题",
+        "第二轮回复",
+    ]
+
+
 def test_shopping_graph_uses_retrieved_knowledge() -> None:
     """验证 RAG Graph 先检索知识再调用聊天模型。"""
 
@@ -107,10 +157,7 @@ def test_shopping_graph_uses_retrieved_knowledge() -> None:
     retriever = Mock(spec=BaseRetriever)
     retriever.invoke.return_value = [
         Document(
-            page_content=(
-                "亚麻面料透气性和吸湿性较好，"
-                "适合炎热天气穿着。"
-            ),
+            page_content=("亚麻面料透气性和吸湿性较好，适合炎热天气穿着。"),
         ),
     ]
 
@@ -143,23 +190,18 @@ def test_shopping_graph_uses_retrieved_knowledge() -> None:
     )
 
     # 最终 State 应保存检索到的知识
-    assert "亚麻面料透气性和吸湿性较好" in (
-        result["knowledge_context"]
-    )
+    assert "亚麻面料透气性和吸湿性较好" in (result["knowledge_context"])
 
     # 读取 Chat Node 实际发送给模型的 System Message
     sent_messages = model.invoke.call_args.args[0]
     system_message = sent_messages[0]
 
     # System Message 应包含 RAG 知识
-    assert "亚麻面料透气性和吸湿性较好" in (
-        system_message.content
-    )
+    assert "亚麻面料透气性和吸湿性较好" in (system_message.content)
 
     # Graph 应返回模型回复
-    assert result["messages"][-1].content == (
-        "建议选择亚麻面料。"
-    )
+    assert result["messages"][-1].content == ("建议选择亚麻面料。")
+
 
 def test_shopping_graph_executes_tool_call() -> None:
     """验证工作流能够执行模型请求的工具并返回最终回答。"""
@@ -232,6 +274,4 @@ def test_shopping_graph_executes_tool_call() -> None:
     assert tool_enabled_model.invoke.call_count == 2
 
     # 第二次模型回复是工作流的最终结果
-    assert result["messages"][-1].content == (
-        "推荐亚麻通勤衬衫。"
-    )
+    assert result["messages"][-1].content == ("推荐亚麻通勤衬衫。")

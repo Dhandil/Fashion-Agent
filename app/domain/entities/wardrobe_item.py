@@ -15,10 +15,7 @@ class WardrobeItemStatus(StrEnum):
     # 当前可以参与穿搭推荐
     AVAILABLE = "available"
 
-    # 正在清洗，暂时不能使用
-    LAUNDRY = "laundry"
-
-    # 因损坏、丢失等原因暂时不可使用
+    # 待洗、清洗、晾晒、损坏或丢失等情况都属于暂不可用
     UNAVAILABLE = "unavailable"
 
 
@@ -83,9 +80,7 @@ class WardrobeItem(BaseModel):
     )
 
     # 单品当前是否可以参与穿搭
-    status: WardrobeItemStatus = (
-        WardrobeItemStatus.AVAILABLE
-    )
+    status: WardrobeItemStatus = WardrobeItemStatus.AVAILABLE
 
     # 用户主动提供的必要补充说明
     notes: str | None = Field(

@@ -3,10 +3,10 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     Index,
-    JSON,
     String,
     Text,
     func,
@@ -22,12 +22,9 @@ class WardrobeItemModel(Base):
     __tablename__ = "wardrobe_items"
 
     __table_args__ = (
-        # 数据库层限制只能保存领域中定义的三种状态
+        # 数据库层限制只能保存领域中定义的两种状态
         CheckConstraint(
-            (
-                "status IN "
-                "('available', 'laundry', 'unavailable')"
-            ),
+            ("status IN ('available', 'unavailable')"),
             name="ck_wardrobe_items_status",
         ),
         # 常用查询是某个用户当前可以穿的衣物
@@ -111,7 +108,7 @@ class WardrobeItemModel(Base):
         nullable=True,
     )
 
-    # 保存枚举的字符串值，例如 available 或 laundry
+    # 保存枚举的字符串值：available 或 unavailable
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,

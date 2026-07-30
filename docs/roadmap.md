@@ -66,7 +66,7 @@ Fashion-Agent 的核心业务闭环是：
 - Docker Compose PostgreSQL 服务
 - PostgreSQL Repository 集成测试
 
-### 3.4 当前工作区中已实现、待提交的能力
+### 3.4 已完成的请求级基础能力
 
 - 请求级数据库 Session
 - 请求成功后提交事务、异常时回滚事务
@@ -76,11 +76,23 @@ Fashion-Agent 的核心业务闭环是：
 - 创建衣橱单品接口 `POST /api/v1/wardrobe`
 - LangGraph、Mapper 和 LLM Provider 类型标注完善
 
+### 3.5 当前工作区中已实现、待提交的能力
+
+- 请求级 Tool Registry
+- `search_wardrobe` 接入聊天 Agent
+- 衣橱 Tool 自动绑定当前用户和请求级 Repository
+- 模型不能指定或读取内部 `user_id`
+- 用户 ID 加入 Checkpointer 线程键，隔离不同用户的同名会话
+- 模型、RAG 和 Checkpointer 跨请求复用
+- 包含数据库 Session 的衣橱 Tool 和 Graph 不进入全局缓存
+- 衣物状态简化为 `available` 和 `unavailable`
+- 旧 `laundry` 状态归一为 `unavailable` 的 Alembic 迁移
+
 当前验证基线：
 
-- 全部测试通过
+- 全部不依赖真实 PostgreSQL 的自动化测试通过
 - Mypy 检查通过
-- Ruff 检查通过
+- 本阶段变更的 Ruff 检查通过
 
 ---
 
@@ -102,13 +114,13 @@ Fashion-Agent 的核心业务闭环是：
 
 ### 4.2 实施顺序
 
-1. 创建当前用户衣橱查询能力。
-2. 将衣橱查询封装为 Agent Tool。
-3. 在请求级数据库 Session 中创建衣橱 Tool。
-4. 将请求级 Tool 安全地注入 LangGraph，避免缓存数据库 Session。
-5. 让 Agent 优先根据查询到的衣物生成 Outfit。
-6. 为 Outfit 回复定义稳定的结构。
-7. 增加 Tool、Graph 和 API 测试。
+1. [已完成] 创建当前用户衣橱查询能力。
+2. [已完成] 将衣橱查询封装为 Agent Tool。
+3. [已完成] 在请求级数据库 Session 中创建衣橱 Tool。
+4. [已完成] 将请求级 Tool 安全地注入 LangGraph，避免缓存数据库 Session。
+5. [进行中] 让 Agent 优先根据查询到的衣物生成 Outfit。
+6. [待开始] 为 Outfit 回复定义稳定的结构。
+7. [进行中] 增加 Tool、Graph、API 和真实数据库链路测试。
 
 ### 4.3 Outfit 最小输出
 
@@ -260,8 +272,8 @@ Multi-Agent 是扩展方案，不是当前 MVP 的前置条件。
 
 当前只推进以下两项：
 
-1. 提交当前已经完成并验证通过的请求级数据库、身份边界和衣橱创建接口。
-2. 开发“查询当前用户可用衣橱”的 Tool，并为接入 Agent 做好请求级依赖装配。
+1. 应用新的衣物状态迁移，并使用真实 PostgreSQL 完成一次衣橱到 Agent 的本地端到端验证。
+2. 为 Outfit 定义稳定的结构，并让 Agent 基于衣橱工具结果生成可验证的完整搭配。
 
 完成后再更新本路线图，并决定下一项任务。
 

@@ -64,16 +64,24 @@ def test_wardrobe_item_model_defines_constraints_and_indexes() -> None:
         )
     }
 
-    assert (
-        "ck_wardrobe_items_status"
-        in check_constraint_names
+    assert "ck_wardrobe_items_status" in check_constraint_names
+
+    status_constraint = next(
+        constraint
+        for constraint in wardrobe_table.constraints
+        if constraint.name == "ck_wardrobe_items_status"
+    )
+    status_constraint_sql = str(
+        status_constraint.sqltext,
     )
 
+    # 数据库只允许可用和不可用两种状态
+    assert "available" in status_constraint_sql
+    assert "unavailable" in status_constraint_sql
+    assert "laundry" not in status_constraint_sql
+
     # 收集所有显式索引名称
-    index_names = {
-        index.name
-        for index in wardrobe_table.indexes
-    }
+    index_names = {index.name for index in wardrobe_table.indexes}
 
     assert index_names == {
         "ix_wardrobe_items_user_status",

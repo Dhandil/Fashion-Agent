@@ -32,15 +32,13 @@ def test_wardrobe_item_mapper_preserves_item_data() -> None:
             "简约",
             "通勤",
         ),
-        seasons=(
-            "夏季",
-        ),
+        seasons=("夏季",),
         scenarios=(
             "通勤",
             "休闲",
         ),
         image_url="images/wardrobe-001.jpg",
-        status=WardrobeItemStatus.LAUNDRY,
+        status=WardrobeItemStatus.UNAVAILABLE,
         notes="需要低温清洗",
     )
 
@@ -64,7 +62,7 @@ def test_wardrobe_item_mapper_preserves_item_data() -> None:
     ]
 
     # 枚举在数据库中保存为字符串
-    assert item_model.status == "laundry"
+    assert item_model.status == "unavailable"
 
     # 模拟从数据库读取后的转换
     restored_item = wardrobe_item_model_to_entity(
@@ -75,10 +73,7 @@ def test_wardrobe_item_mapper_preserves_item_data() -> None:
     assert restored_item == item
 
     # 状态字符串应该恢复为领域枚举
-    assert (
-        restored_item.status
-        is WardrobeItemStatus.LAUNDRY
-    )
+    assert restored_item.status is WardrobeItemStatus.UNAVAILABLE
 
     # JSON 列表应该恢复为元组
     assert restored_item.scenarios == (

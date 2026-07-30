@@ -1,10 +1,15 @@
-from fastapi import APIRouter
-from langchain_core.messages import HumanMessage
 from uuid import uuid4
 
-from app.api.schemas.chat import ChatRequest, ChatResponse
-from app.services.agent import get_shopping_graph
+from fastapi import APIRouter
+from langchain_core.messages import HumanMessage
 
+from app.api.dependencies.agent import (
+    RequestShoppingGraph,
+)
+from app.api.dependencies.identity import (
+    CurrentUserDependency,
+)
+from app.api.schemas.chat import ChatRequest, ChatResponse
 
 # 创建聊天接口路由
 router = APIRouter(
@@ -16,18 +21,20 @@ router = APIRouter(
 @router.post(
     "",
     response_model=ChatResponse,
-    summary="与购物助手聊天",
+    summary="与个人穿搭助手聊天",
 )
 async def chat(
-    request: ChatRequest
+    request: ChatRequest,
+    current_user: CurrentUserDependency,
+    graph: RequestShoppingGraph,
 ) -> ChatResponse:
-    """将用户消息发给购物 Agent 并返回回复。"""
-
-    # 获取已经装配并缓存的购物 Agent 工作流
-    graph = get_shopping_graph()
+    """将用户消息发给当前用户的 Fashion Agent 并返回回复。"""
 
     # 首次对话生成新 ID，后续对话继续使用客户端传入的 ID
     conversation_id = request.conversation_id or str(uuid4())
+
+    # 用户 ID 加入 Checkpointer 的线程键，避免不同用户复用会话 ID
+    thread_id = f"user:{current_user.user_id}:conversation:{conversation_id}"
 
     # 将 API 请求转换为 LangChain 消息并执行工作流
     result = await graph.ainvoke(
@@ -38,7 +45,7 @@ async def chat(
         },
         config={
             "configurable": {
-                "thread_id": conversation_id,
+                "thread_id": thread_id,
             },
         },
     )

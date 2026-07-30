@@ -15,7 +15,7 @@ class ChatRequest(BaseModel):
     message: str = Field(
         min_length=1,
         max_length=2000,
-        description="用户发送给购物助手的消息",
+        description="用户发送给个人穿搭助手的消息",
     )
 
 
@@ -24,7 +24,7 @@ class ChatResponse(BaseModel):
 
     # 当前对话的会话 ID，客户端应在下一轮请求中继续传入
     conversation_id: str
-    
+
     # Agent 返回给用户的文本回复
     message: str
 
