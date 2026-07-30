@@ -1,12 +1,21 @@
 """数据库连接与会话管理测试。"""
 
-from unittest.mock import Mock, patch
-from sqlalchemy.ext.asyncio import AsyncEngine
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+)
 
 from app.core.config import Settings
 from app.core.exceptions import ConfigurationError
-from app.db.session import get_database_engine
+from app.db.session import (
+    get_database_engine,
+    get_database_session,
+)
 
 
 def test_get_database_engine_requires_database_url() -> None:
@@ -21,17 +30,18 @@ def test_get_database_engine_requires_database_url() -> None:
     # 清除其他测试可能创建的 Engine 缓存
     get_database_engine.cache_clear()
 
-    # 将数据库模块获取到的真实配置替换为测试配置
-    with patch(
-        "app.db.session.get_settings",
-        return_value=settings,
-    ):
-        # 没有 DATABASE_URL 时必须明确报告配置错误
-        with pytest.raises(
+    # 替换真实配置，并验证缺少数据库地址时报告明确错误
+    with (
+        patch(
+            "app.db.session.get_settings",
+            return_value=settings,
+        ),
+        pytest.raises(
             ConfigurationError,
             match="DATABASE_URL",
-        ):
-            get_database_engine()
+        ),
+    ):
+        get_database_engine()
 
     # 测试结束后再次清理缓存，避免影响其他测试
     get_database_engine.cache_clear()
@@ -43,10 +53,7 @@ def test_get_database_engine_uses_project_settings() -> None:
     # 创建包含测试数据库地址的配置
     settings = Settings(
         _env_file=None,
-        database_url=(
-            "postgresql+asyncpg://"
-            "fashion_agent:secret@localhost:5432/fashion_agent"
-        ),
+        database_url=("postgresql+asyncpg://fashion_agent:secret@localhost:5432/fashion_agent"),
         database_echo=True,
     )
 
@@ -73,13 +80,81 @@ def test_get_database_engine_uses_project_settings() -> None:
 
     # 验证连接地址和 Engine 参数传递正确
     mocked_create_engine.assert_called_once_with(
-        (
-            "postgresql+asyncpg://"
-            "fashion_agent:secret@localhost:5432/fashion_agent"
-        ),
+        ("postgresql+asyncpg://fashion_agent:secret@localhost:5432/fashion_agent"),
         echo=True,
         pool_pre_ping=True,
     )
 
     # 防止假的 Engine 留在函数缓存中
     get_database_engine.cache_clear()
+
+
+@pytest.mark.anyio
+async def test_database_session_commits_successful_request() -> None:
+    """验证请求正常完成后提交数据库事务。"""
+
+    fake_session = AsyncMock(spec=AsyncSession)
+
+    # 模拟 session_factory() 返回的异步上下文管理器
+    @asynccontextmanager
+    async def session_context() -> AsyncIterator[AsyncSession]:
+        yield fake_session
+
+    fake_session_factory = Mock(
+        return_value=session_context(),
+    )
+
+    with patch(
+        "app.db.session.get_session_factory",
+        return_value=fake_session_factory,
+    ):
+        session_generator = get_database_session()
+
+        # 第一次执行到 yield，取得路由使用的 Session
+        yielded_session = await anext(
+            session_generator,
+        )
+
+        assert yielded_session is fake_session
+
+        # 第二次继续生成器，模拟路由正常结束
+        with pytest.raises(StopAsyncIteration):
+            await anext(session_generator)
+
+    fake_session.commit.assert_awaited_once()
+    fake_session.rollback.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_database_session_rolls_back_failed_request() -> None:
+    """验证请求抛出异常时回滚数据库事务。"""
+
+    fake_session = AsyncMock(spec=AsyncSession)
+
+    @asynccontextmanager
+    async def session_context() -> AsyncIterator[AsyncSession]:
+        yield fake_session
+
+    fake_session_factory = Mock(
+        return_value=session_context(),
+    )
+
+    with patch(
+        "app.db.session.get_session_factory",
+        return_value=fake_session_factory,
+    ):
+        session_generator = get_database_session()
+
+        await anext(session_generator)
+
+        # 把路由异常送回生成器，模拟请求执行失败
+        with pytest.raises(
+            RuntimeError,
+            match="测试业务异常",
+        ):
+            await session_generator.athrow(
+                RuntimeError("测试业务异常"),
+            )
+
+    fake_session.rollback.assert_awaited_once()
+    fake_session.commit.assert_not_awaited()

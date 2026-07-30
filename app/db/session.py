@@ -53,11 +53,23 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_database_session() -> AsyncIterator[AsyncSession]:
-    """为一次业务操作提供独立的异步数据库 Session。"""
+    """为一次请求提供带事务管理的异步数据库 Session。"""
 
-    # 每次调用工厂都会创建一个新的 Session
+    # 每次调用工厂都会创建一个新的请求级 Session
     session_factory = get_session_factory()
 
-    # async with 会在使用完成后自动关闭 Session
+    # async with 保证请求结束后关闭 Session
     async with session_factory() as session:
-        yield session
+        try:
+            # 把 Session 交给 FastAPI 路由及其依赖使用
+            yield session
+
+            # 路由及依赖正常结束后统一提交事务
+            await session.commit()
+
+        except Exception:
+            # 任意业务异常发生时撤销本次请求的全部数据库修改
+            await session.rollback()
+
+            # 保留原始异常，让 FastAPI 的异常处理器继续处理
+            raise
