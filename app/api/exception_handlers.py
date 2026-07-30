@@ -2,12 +2,11 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.schemas.error import ErrorResponse
-from app.core.exceptions import ConfigurationError
 
 
 async def configuration_error_handler(
     _request: Request,
-    exc: ConfigurationError,
+    exc: Exception,
 ) -> JSONResponse:
     """将配置异常转换成统一的 API 错误响应。"""
 

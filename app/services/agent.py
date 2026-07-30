@@ -1,17 +1,17 @@
 from functools import lru_cache
 
-from langgraph.graph.state import CompiledStateGraph
-
-from app.agents.graphs.shopping import create_shopping_graph
+from app.agents.graphs.shopping import (
+    ShoppingGraph,
+    create_shopping_graph,
+)
 from app.llm.providers.openai_compatible import create_chat_model
 from app.memory.short_term.checkpointer import get_short_term_checkpointer
-from app.rag.retrievers.provider import (
-    get_knowledge_retriever
-)
+from app.rag.retrievers.provider import get_knowledge_retriever
 from app.tools.registry.provider import get_tool_registry
 
+
 @lru_cache
-def get_shopping_graph() -> CompiledStateGraph:
+def get_shopping_graph() -> ShoppingGraph:
     """创建并缓存购物 Agent 工作流。"""
 
     # 根据环境配置创建聊天模型

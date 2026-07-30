@@ -34,12 +34,8 @@ def style_profile_entity_to_model(
         common_scenarios=list(
             profile.common_scenarios,
         ),
-        typical_budget_min=(
-            profile.typical_budget_min
-        ),
-        typical_budget_max=(
-            profile.typical_budget_max
-        ),
+        typical_budget_min=(profile.typical_budget_min),
+        typical_budget_max=(profile.typical_budget_max),
         notes=profile.notes,
     )
 
@@ -51,30 +47,26 @@ def style_profile_model_to_entity(
 
     return StyleProfile(
         user_id=profile_model.user_id,
-        # Pydantic 会将数据库列表转换回元组
-        preferred_styles=(
-            profile_model.preferred_styles
+        # 显式恢复成领域层使用的只读元组
+        preferred_styles=tuple(
+            profile_model.preferred_styles,
         ),
-        preferred_colors=(
-            profile_model.preferred_colors
+        preferred_colors=tuple(
+            profile_model.preferred_colors,
         ),
-        avoided_colors=(
-            profile_model.avoided_colors
+        avoided_colors=tuple(
+            profile_model.avoided_colors,
         ),
-        preferred_fits=(
-            profile_model.preferred_fits
+        preferred_fits=tuple(
+            profile_model.preferred_fits,
         ),
-        avoided_materials=(
-            profile_model.avoided_materials
+        avoided_materials=tuple(
+            profile_model.avoided_materials,
         ),
-        common_scenarios=(
-            profile_model.common_scenarios
+        common_scenarios=tuple(
+            profile_model.common_scenarios,
         ),
-        typical_budget_min=(
-            profile_model.typical_budget_min
-        ),
-        typical_budget_max=(
-            profile_model.typical_budget_max
-        ),
+        typical_budget_min=(profile_model.typical_budget_min),
+        typical_budget_max=(profile_model.typical_budget_max),
         notes=profile_model.notes,
     )

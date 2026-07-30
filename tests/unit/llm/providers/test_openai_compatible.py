@@ -1,6 +1,7 @@
+from unittest.mock import patch
+
 import pytest
 
-from unittest.mock import patch
 from app.core.config import Settings
 from app.core.exceptions import ConfigurationError
 from app.llm.providers.openai_compatible import create_chat_model
@@ -48,9 +49,7 @@ def test_ceate_chat_model_uses_settings() -> None:
     )
 
     # 临时替换 Provider 模块中的 ChatOpenAI
-    with patch(
-        "app.llm.providers.openai_compatible.ChatOpenAI"
-    ) as mocked_chat_openai:
+    with patch("app.llm.providers.openai_compatible.ChatOpenAI") as mocked_chat_openai:
         model = create_chat_model(settings)
 
     # 返回值应该是模拟 ChatOpenAI 创建出的对象
@@ -59,6 +58,6 @@ def test_ceate_chat_model_uses_settings() -> None:
     # 验证 ChatOpenAI 收到了正确配置
     mocked_chat_openai.assert_called_once_with(
         model="test-model",
-        api_key="test-secret-key",
+        api_key=settings.llm_api_key,
         base_url="https://example.com/v1",
     )

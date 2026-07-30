@@ -33,8 +33,8 @@ def product_model_to_entity(
         category=product_model.category,
         price=product_model.price,
         currency=product_model.currency,
-        # Product 会将输入列表转换成领域层使用的元组
-        colors=product_model.colors,
-        sizes=product_model.sizes,
+        # 显式恢复成领域层使用的只读元组
+        colors=tuple(product_model.colors),
+        sizes=tuple(product_model.sizes),
         in_stock=product_model.in_stock,
     )

@@ -5,6 +5,7 @@ from app.db.models.wardrobe_item import (
 )
 from app.domain.entities.wardrobe_item import (
     WardrobeItem,
+    WardrobeItemStatus,
 )
 
 
@@ -39,21 +40,21 @@ def wardrobe_item_model_to_entity(
 
     return WardrobeItem(
         user_id=item_model.user_id,
-        wardrobe_item_id=(
-            item_model.wardrobe_item_id
-        ),
+        wardrobe_item_id=(item_model.wardrobe_item_id),
         name=item_model.name,
         category=item_model.category,
         brand=item_model.brand,
-        # Pydantic 会将 JSON 列表转换回领域元组
-        colors=item_model.colors,
-        materials=item_model.materials,
+        # 显式恢复成领域层使用的只读元组
+        colors=tuple(item_model.colors),
+        materials=tuple(item_model.materials),
         size=item_model.size,
-        style_tags=item_model.style_tags,
-        seasons=item_model.seasons,
-        scenarios=item_model.scenarios,
+        style_tags=tuple(item_model.style_tags),
+        seasons=tuple(item_model.seasons),
+        scenarios=tuple(item_model.scenarios),
         image_url=item_model.image_url,
-        # Pydantic 会将字符串转换为 WardrobeItemStatus
-        status=item_model.status,
+        # 显式把数据库字符串恢复成领域枚举
+        status=WardrobeItemStatus(
+            item_model.status,
+        ),
         notes=item_model.notes,
     )

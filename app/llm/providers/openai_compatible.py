@@ -4,9 +4,7 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import ConfigurationError
 
 
-def create_chat_model(
-    settings: Settings | None = None
-) -> ChatOpenAI:
+def create_chat_model(settings: Settings | None = None) -> ChatOpenAI:
     """根据项目配置创建 OpenAI 兼容发聊天模型。"""
 
     # 如果调用者没有传入配置，则读取项目全局配置
@@ -23,6 +21,7 @@ def create_chat_model(
     # 创建 LangChain 聊天模型，但此时不会立即发送网络请求
     return ChatOpenAI(
         model=current_settings.llm_model,
-        api_key=current_settings.llm_api_key.get_secret_value(),
+        # ChatOpenAI 原生接受 SecretStr，无需在应用层解开密钥
+        api_key=current_settings.llm_api_key,
         base_url=current_settings.llm_base_url,
     )
