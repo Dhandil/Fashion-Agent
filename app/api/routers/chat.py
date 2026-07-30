@@ -59,9 +59,15 @@ async def chat(
         [],
     )
 
+    # 普通知识问答可能没有结构化穿搭推荐
+    outfit_recommendation = result.get(
+        "outfit_recommendation",
+    )
+
     # 将 Agent 消息转换成 API 响应
     return ChatResponse(
         conversation_id=conversation_id,
         message=str(last_message.content),
+        outfit=outfit_recommendation,
         sources=knowledge_sources,
     )

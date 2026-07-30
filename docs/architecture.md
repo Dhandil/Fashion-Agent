@@ -229,9 +229,19 @@ OutfitItem
 ├── Outfit 与单品的关联
 ├── 衣橱单品
 └── 外部待购买商品
+
+OutfitRecommendation
+├── Agent 本轮生成但尚未保存的结构化穿搭
+├── 不包含用户 ID、数据库 ID 或收藏状态
+├── 记录每个单品的来源和来源引用 ID
+└── 记录与具体搭配单品对应的衣橱缺口
 ```
 
 系统的核心产物是 `Outfit`，而不是 `Product`。
+
+`OutfitRecommendation` 是 Agent 与 API 之间的候选方案。
+只有用户明确保存时，应用服务才为它补充服务端生成的 `outfit_id` 和当前
+`user_id`，并转换为需要持久化的 `Outfit`。
 
 ### 6.2 辅助购物域
 

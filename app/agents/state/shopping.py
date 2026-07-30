@@ -1,7 +1,11 @@
-from typing import TypedDict, Annotated, NotRequired
+from typing import Annotated, NotRequired, TypedDict
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
+
+from app.domain.entities.outfit import (
+    OutfitRecommendation,
+)
 
 
 class ShoppingAgentState(TypedDict):
@@ -17,3 +21,6 @@ class ShoppingAgentState(TypedDict):
 
     # 本次 RAG 检索结果的来源文件
     knowledge_sources: NotRequired[list[str]]
+
+    # Agent 生成的结构化穿搭推荐；普通问答时可以不存在
+    outfit_recommendation: NotRequired[OutfitRecommendation]

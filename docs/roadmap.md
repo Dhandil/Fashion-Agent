@@ -76,7 +76,7 @@ Fashion-Agent 的核心业务闭环是：
 - 创建衣橱单品接口 `POST /api/v1/wardrobe`
 - LangGraph、Mapper 和 LLM Provider 类型标注完善
 
-### 3.5 当前工作区中已实现、待提交的能力
+### 3.5 已完成的衣橱 Agent 接入
 
 - 请求级 Tool Registry
 - `search_wardrobe` 接入聊天 Agent
@@ -87,6 +87,17 @@ Fashion-Agent 的核心业务闭环是：
 - 包含数据库 Session 的衣橱 Tool 和 Graph 不进入全局缓存
 - 衣物状态简化为 `available` 和 `unavailable`
 - 旧 `laundry` 状态归一为 `unavailable` 的 Alembic 迁移
+
+### 3.6 当前工作区中已实现、待提交的能力
+
+- 独立于数据库实体的 `OutfitRecommendation`
+- 衣橱、商品和通用建议单品的来源标识
+- `WardrobeGap` 衣橱缺口结构
+- 衣橱缺口必须对应 Outfit 中的建议单品
+- LLM 输出结构不包含 `user_id`、`outfit_id` 或收藏状态
+- Agent State 支持可选的结构化穿搭推荐
+- 聊天 API 增加可选 `outfit` 字段
+- 普通知识问答保持 `outfit=null`
 
 当前验证基线：
 
@@ -119,7 +130,7 @@ Fashion-Agent 的核心业务闭环是：
 3. [已完成] 在请求级数据库 Session 中创建衣橱 Tool。
 4. [已完成] 将请求级 Tool 安全地注入 LangGraph，避免缓存数据库 Session。
 5. [进行中] 让 Agent 优先根据查询到的衣物生成 Outfit。
-6. [待开始] 为 Outfit 回复定义稳定的结构。
+6. [已完成] 为 Outfit 回复定义稳定的结构。
 7. [进行中] 增加 Tool、Graph、API 和真实数据库链路测试。
 
 ### 4.3 Outfit 最小输出
@@ -272,8 +283,8 @@ Multi-Agent 是扩展方案，不是当前 MVP 的前置条件。
 
 当前只推进以下两项：
 
-1. 应用新的衣物状态迁移，并使用真实 PostgreSQL 完成一次衣橱到 Agent 的本地端到端验证。
-2. 为 Outfit 定义稳定的结构，并让 Agent 基于衣橱工具结果生成可验证的完整搭配。
+1. 增加结构化 Outfit 生成节点，并在适合生成完整穿搭时写入 Agent State。
+2. 校验 Outfit 中的衣橱和商品来源 ID 确实来自本轮工具结果。
 
 完成后再更新本路线图，并决定下一项任务。
 

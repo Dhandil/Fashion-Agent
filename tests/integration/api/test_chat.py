@@ -15,6 +15,11 @@ from app.core.exceptions import ConfigurationError
 from app.db.repositories.fashion_provider import (
     FashionRepositories,
 )
+from app.domain.entities.outfit import (
+    OutfitItem,
+    OutfitRecommendation,
+    WardrobeGap,
+)
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -95,6 +100,7 @@ def test_chat_returns_agent_response() -> None:
     assert response.json() == {
         "conversation_id": "test-conversation-id",
         "message": "请告诉我你的预算",
+        "outfit": None,
         "sources": [
             "data/samples/fabrics.md",
         ],
@@ -251,3 +257,78 @@ def test_chat_generates_conversation_id() -> None:
     assert graph_config["configurable"]["thread_id"] == (
         f"user:user-001:conversation:{conversation_id}"
     )
+
+
+def test_chat_returns_structured_outfit_when_graph_provides_one() -> None:
+    """验证聊天接口能够返回 Graph 生成的结构化 Outfit。"""
+
+    recommendation = OutfitRecommendation(
+        name="夏季通勤搭配",
+        scenario="通勤",
+        style_tags=[
+            "简约",
+        ],
+        season="夏季",
+        items=[
+            OutfitItem(
+                role="上装",
+                name="浅蓝色亚麻衬衫",
+                source="wardrobe",
+                source_reference_id="shirt-001",
+                reason="透气并适合通勤",
+            ),
+            OutfitItem(
+                role="鞋履",
+                name="黑色乐福鞋",
+                source="recommendation",
+                reason="补充通勤所需的利落鞋履",
+            ),
+        ],
+        recommendation_reason="使用当前衣橱中的透气上装。",
+        wardrobe_gaps=[
+            WardrobeGap(
+                role="鞋履",
+                suggested_item="黑色乐福鞋",
+                reason="当前衣橱结果中缺少通勤鞋履",
+            ),
+        ],
+    )
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [
+                AIMessage(
+                    content="我整理了一套夏季通勤搭配。",
+                ),
+            ],
+            "outfit_recommendation": recommendation,
+        },
+    )
+
+    with patch(
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "message": "请用我的衣橱搭配夏季通勤服装",
+            },
+        )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+    assert response_data["outfit"]["name"] == ("夏季通勤搭配")
+    assert response_data["outfit"]["items"][0] == {
+        "role": "上装",
+        "name": "浅蓝色亚麻衬衫",
+        "source": "wardrobe",
+        "source_reference_id": "shirt-001",
+        "reason": "透气并适合通勤",
+    }
+    assert response_data["outfit"]["wardrobe_gaps"][0]["suggested_item"] == "黑色乐福鞋"

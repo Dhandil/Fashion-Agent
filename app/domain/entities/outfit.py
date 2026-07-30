@@ -77,6 +77,105 @@ class OutfitItem(BaseModel):
         return self
 
 
+class WardrobeGap(BaseModel):
+    """一套推荐中暂时缺少的衣橱单品。"""
+
+    # 缺少单品在搭配中的作用，例如鞋履或外套
+    role: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    # 建议补充的单品描述，不代表真实商品
+    suggested_item: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+    # 解释为什么当前搭配需要该单品
+    reason: str = Field(
+        min_length=1,
+        max_length=500,
+    )
+
+    model_config = ConfigDict(
+        frozen=True,
+    )
+
+
+class OutfitRecommendation(BaseModel):
+    """Agent 生成但尚未持久化的一套穿搭推荐。"""
+
+    # 便于用户理解和识别的推荐名称
+    name: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+    # 本次穿搭主要适用场景
+    scenario: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    # 穿搭整体风格标签
+    style_tags: tuple[str, ...] = ()
+
+    # 适用季节、温度或天气条件
+    season: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
+    # 本次推荐实际采用的衣橱、商品或建议单品
+    items: tuple[OutfitItem, ...] = Field(
+        min_length=1,
+    )
+
+    # Agent 对整套穿搭的核心解释
+    recommendation_reason: str = Field(
+        min_length=1,
+        max_length=2000,
+    )
+
+    # 不改变整体思路时可以替换的单品
+    alternatives: tuple[OutfitItem, ...] = ()
+
+    # 当前衣橱缺少的单品，不等于已经获得用户购物授权
+    wardrobe_gaps: tuple[WardrobeGap, ...] = ()
+
+    # 天气、护理或使用限制等补充说明
+    notes: str | None = Field(
+        default=None,
+        max_length=1000,
+    )
+
+    model_config = ConfigDict(
+        frozen=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_wardrobe_gaps(self) -> Self:
+        """验证每个衣橱缺口都对应搭配中的建议单品。"""
+
+        recommendation_roles = {
+            item.role for item in self.items if item.source is OutfitItemSource.RECOMMENDATION
+        }
+        unmatched_gap_roles = {
+            gap.role for gap in self.wardrobe_gaps if gap.role not in recommendation_roles
+        }
+
+        if unmatched_gap_roles:
+            unmatched_roles = "、".join(
+                sorted(unmatched_gap_roles),
+            )
+            raise ValueError(
+                f"衣橱缺口必须对应搭配中的建议单品：{unmatched_roles}",
+            )
+
+        return self
+
+
 class Outfit(BaseModel):
     """一套完整且可执行的穿搭方案。"""
 

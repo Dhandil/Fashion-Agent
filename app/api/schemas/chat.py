@@ -1,5 +1,9 @@
 from pydantic import BaseModel, Field
 
+from app.domain.entities.outfit import (
+    OutfitRecommendation,
+)
+
 
 class ChatRequest(BaseModel):
     """聊天接口的请求模型。"""
@@ -27,6 +31,12 @@ class ChatResponse(BaseModel):
 
     # Agent 返回给用户的文本回复
     message: str
+
+    # 只有生成完整穿搭时才返回结构化 Outfit
+    outfit: OutfitRecommendation | None = Field(
+        default=None,
+        description="本次生成的结构化穿搭推荐",
+    )
 
     # RAG 回答引用的知识来源
     sources: list[str] = Field(
