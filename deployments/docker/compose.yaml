@@ -1,0 +1,38 @@
+name: fashion-agent
+
+services:
+  postgres:
+    # 固定 PostgreSQL 主版本，自动获得 17 系列的最新维护更新
+    image: postgres:17-alpine
+
+    # 本地开发数据库意外退出后自动恢复
+    restart: unless-stopped
+
+    environment:
+      # 这些是本地开发默认值，可由环境变量覆盖
+      POSTGRES_DB: ${POSTGRES_DB:-fashion_agent}
+      POSTGRES_USER: ${POSTGRES_USER:-fashion_agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fashion_agent_dev}
+
+    ports:
+      # Windows 本机 5432 映射到容器的 PostgreSQL 端口
+      - "5432:5432"
+
+    volumes:
+      # 即使容器重新创建，数据库数据仍保存在 Docker Volume 中
+      - fashion_agent_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      # 定期验证数据库是否已经可以接受连接
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  fashion_agent_postgres_data:
