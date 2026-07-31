@@ -24,3 +24,7 @@ class OutfitRecommendationNotFoundError(
     FashionAgentError,
 ):
     """当前会话中没有可确认保存的穿搭推荐。"""
+
+
+class OutfitNotFoundError(FashionAgentError):
+    """当前用户不存在指定的已保存穿搭。"""

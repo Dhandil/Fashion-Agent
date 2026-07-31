@@ -36,3 +36,14 @@ class OutfitResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class OutfitListResponse(BaseModel):
+    """已保存穿搭列表响应。"""
+
+    items: tuple[OutfitResponse, ...] = ()
+
+    # 当前响应实际返回的数量，不代表未实现分页前的总记录数
+    count: int = Field(
+        ge=0,
+    )

@@ -4,6 +4,7 @@ from uuid import UUID, uuid5
 
 from app.agents.graphs.shopping import ShoppingGraph
 from app.core.exceptions import (
+    OutfitNotFoundError,
     OutfitRecommendationNotFoundError,
 )
 from app.domain.entities.outfit import (
@@ -88,3 +89,41 @@ async def save_confirmed_outfit(
 
     # 仓库只执行 flush，事务由请求级数据库 Session 统一提交
     return await repository.save(outfit)
+
+
+async def list_saved_outfits(
+    repository: OutfitRepository,
+    user_id: str,
+    scenario: str | None = None,
+    favorite_only: bool = False,
+    limit: int = 50,
+) -> list[Outfit]:
+    """列出属于当前用户的已保存穿搭。"""
+
+    return await repository.search(
+        user_id=user_id,
+        scenario=scenario,
+        favorite_only=favorite_only,
+        limit=limit,
+    )
+
+
+async def get_saved_outfit(
+    repository: OutfitRepository,
+    user_id: str,
+    outfit_id: str,
+) -> Outfit:
+    """读取当前用户的一套已保存穿搭。"""
+
+    outfit = await repository.get_by_id(
+        user_id=user_id,
+        outfit_id=outfit_id,
+    )
+
+    if outfit is None:
+        # 对不存在和属于其他用户的 ID 返回相同结果，避免泄露数据
+        raise OutfitNotFoundError(
+            "未找到指定的穿搭方案",
+        )
+
+    return outfit

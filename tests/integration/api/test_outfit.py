@@ -22,6 +22,7 @@ from app.db.repositories.fashion_provider import (
     FashionRepositories,
 )
 from app.domain.entities.outfit import (
+    Outfit,
     OutfitItem,
     OutfitRecommendation,
 )
@@ -36,6 +37,30 @@ def override_settings() -> Settings:
         _env_file=None,
         app_env="test",
         debug=False,
+    )
+
+
+def create_saved_outfit() -> Outfit:
+    """创建 API 查询测试使用的已保存穿搭。"""
+
+    return Outfit(
+        outfit_id="outfit-001",
+        user_id="user-001",
+        name="夏季通勤搭配",
+        scenario="通勤",
+        style_tags=[
+            "简约",
+        ],
+        season="夏季",
+        items=[
+            OutfitItem(
+                role="上装",
+                name="浅蓝色亚麻衬衫",
+                source="wardrobe",
+                source_reference_id="shirt-001",
+            ),
+        ],
+        recommendation_reason="优先使用已有衣物。",
     )
 
 
@@ -183,3 +208,150 @@ def test_confirm_outfit_requires_current_recommendation() -> None:
         "message": "当前会话中没有可以保存的穿搭推荐",
     }
     outfit_repository.save.assert_not_awaited()
+
+
+def test_list_outfits_uses_filters_and_current_user() -> None:
+    """验证列表接口只查询当前用户并传递过滤条件。"""
+
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.search.return_value = [
+        create_saved_outfit(),
+    ]
+    repositories = FashionRepositories(
+        style_profiles=Mock(),
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供假的查询仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.get(
+            (
+                "/api/v1/outfits"
+                "?scenario=通勤"
+                "&favorite_only=true"
+                "&limit=10"
+            ),
+            headers={
+                "X-User-ID": "user-001",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert response.json()["items"][0][
+        "outfit_id"
+    ] == "outfit-001"
+    outfit_repository.search.assert_awaited_once_with(
+        user_id="user-001",
+        scenario="通勤",
+        favorite_only=True,
+        limit=10,
+    )
+
+
+def test_get_outfit_returns_current_user_record() -> None:
+    """验证详情接口返回当前用户指定的穿搭。"""
+
+    outfit = create_saved_outfit()
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_id.return_value = outfit
+    repositories = FashionRepositories(
+        style_profiles=Mock(),
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供假的详情查询仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.get(
+            "/api/v1/outfits/outfit-001",
+            headers={
+                "X-User-ID": "user-001",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "夏季通勤搭配"
+    outfit_repository.get_by_id.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id="outfit-001",
+    )
+
+
+def test_get_outfit_returns_structured_not_found() -> None:
+    """验证详情不存在时返回结构化 404。"""
+
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_id.return_value = None
+    repositories = FashionRepositories(
+        style_profiles=Mock(),
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供返回空结果的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.get(
+            "/api/v1/outfits/unknown-outfit",
+            headers={
+                "X-User-ID": "user-001",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "outfit_not_found",
+        "message": "未找到指定的穿搭方案",
+    }

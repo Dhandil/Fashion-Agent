@@ -9,6 +9,7 @@ from uuid import UUID
 import pytest
 
 from app.core.exceptions import (
+    OutfitNotFoundError,
     OutfitRecommendationNotFoundError,
 )
 from app.domain.entities.outfit import (
@@ -16,7 +17,12 @@ from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
 from app.domain.repositories.outfit import OutfitRepository
-from app.services.outfit import save_confirmed_outfit
+from app.services.outfit import (
+    create_confirmed_outfit,
+    get_saved_outfit,
+    list_saved_outfits,
+    save_confirmed_outfit,
+)
 
 
 def create_recommendation() -> OutfitRecommendation:
@@ -155,3 +161,85 @@ async def test_save_confirmed_outfit_requires_recommendation() -> None:
         )
 
     repository.save.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_list_saved_outfits_filters_current_user() -> None:
+    """验证列表服务把用户和筛选条件传给仓库。"""
+
+    outfit = create_confirmed_outfit(
+        recommendation=create_recommendation(),
+        user_id="user-001",
+        conversation_id="conversation-001",
+    )
+    repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    repository.search.return_value = [
+        outfit,
+    ]
+
+    result = await list_saved_outfits(
+        repository=repository,
+        user_id="user-001",
+        scenario="通勤",
+        favorite_only=True,
+        limit=10,
+    )
+
+    assert result == [
+        outfit,
+    ]
+    repository.search.assert_awaited_once_with(
+        user_id="user-001",
+        scenario="通勤",
+        favorite_only=True,
+        limit=10,
+    )
+
+
+@pytest.mark.anyio
+async def test_get_saved_outfit_uses_current_user() -> None:
+    """验证详情服务使用当前用户和 Outfit ID 查询。"""
+
+    outfit = create_confirmed_outfit(
+        recommendation=create_recommendation(),
+        user_id="user-001",
+        conversation_id="conversation-001",
+    )
+    repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    repository.get_by_id.return_value = outfit
+
+    result = await get_saved_outfit(
+        repository=repository,
+        user_id="user-001",
+        outfit_id=outfit.outfit_id,
+    )
+
+    assert result is outfit
+    repository.get_by_id.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id=outfit.outfit_id,
+    )
+
+
+@pytest.mark.anyio
+async def test_get_saved_outfit_hides_missing_record() -> None:
+    """验证不存在或属于其他用户的穿搭统一返回未找到。"""
+
+    repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    repository.get_by_id.return_value = None
+
+    with pytest.raises(
+        OutfitNotFoundError,
+        match="未找到指定的穿搭方案",
+    ):
+        await get_saved_outfit(
+            repository=repository,
+            user_id="user-001",
+            outfit_id="unknown-outfit",
+        )
