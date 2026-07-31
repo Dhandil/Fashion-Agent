@@ -151,6 +151,12 @@ def test_put_style_profile_uses_current_user() -> None:
     assert response_data["preferred_colors"] == [
         "浅蓝色",
     ]
+    assert response_data["typical_budget_min"] == (
+        "100.00"
+    )
+    assert response_data["typical_budget_max"] == (
+        "500.00"
+    )
     assert response_data["notes"] == "不要过于正式"
     assert "user_id" not in response_data
 

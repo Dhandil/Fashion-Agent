@@ -7,6 +7,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    field_serializer,
     model_validator,
 )
 
@@ -67,3 +68,19 @@ class StyleProfileResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+    @field_serializer(
+        "typical_budget_min",
+        "typical_budget_max",
+        when_used="json",
+    )
+    def serialize_budget(
+        self,
+        value: Decimal | None,
+    ) -> str | None:
+        """将 API 中的预算金额统一序列化为两位小数。"""
+
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
