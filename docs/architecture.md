@@ -264,9 +264,13 @@ POST /api/v1/outfits
 - `GET /api/v1/outfits`：查询当前用户的穿搭列表，支持场景、收藏状态和
   返回数量过滤。
 - `GET /api/v1/outfits/{outfit_id}`：查询当前用户的一套穿搭详情。
+- `PATCH /api/v1/outfits/{outfit_id}/favorite`：由用户明确收藏或取消收藏。
 
-两个接口都由服务端注入 `user_id`。不存在的 ID 和属于其他用户的 ID
+这些接口都由服务端注入 `user_id`。不存在的 ID 和属于其他用户的 ID
 统一返回 `outfit_not_found`，避免通过响应差异枚举其他用户数据。
+
+收藏操作先读取当前用户的完整 `Outfit`，再通过不可变对象复制更新
+`is_favorite`，最后由仓库保存。收藏状态不由 LLM 自动修改。
 
 ### 6.2 辅助购物域
 

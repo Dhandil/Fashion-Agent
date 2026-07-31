@@ -19,6 +19,14 @@ class OutfitConfirmRequest(BaseModel):
     )
 
 
+class OutfitFavoriteUpdate(BaseModel):
+    """修改一套已保存穿搭的收藏状态。"""
+
+    is_favorite: bool = Field(
+        description="是否收藏该穿搭",
+    )
+
+
 class OutfitResponse(BaseModel):
     """已持久化穿搭的 API 响应。"""
 

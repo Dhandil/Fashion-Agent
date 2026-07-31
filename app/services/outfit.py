@@ -127,3 +127,29 @@ async def get_saved_outfit(
         )
 
     return outfit
+
+
+async def update_outfit_favorite(
+    repository: OutfitRepository,
+    user_id: str,
+    outfit_id: str,
+    is_favorite: bool,
+) -> Outfit:
+    """更新当前用户已保存穿搭的收藏状态。"""
+
+    outfit = await get_saved_outfit(
+        repository=repository,
+        user_id=user_id,
+        outfit_id=outfit_id,
+    )
+
+    # Outfit 使用 frozen=True，通过复制产生新的不可变领域对象
+    updated_outfit = outfit.model_copy(
+        update={
+            "is_favorite": is_favorite,
+        },
+    )
+
+    return await repository.save(
+        updated_outfit,
+    )

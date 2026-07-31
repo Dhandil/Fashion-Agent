@@ -355,3 +355,61 @@ def test_get_outfit_returns_structured_not_found() -> None:
         "code": "outfit_not_found",
         "message": "未找到指定的穿搭方案",
     }
+
+
+def test_update_outfit_favorite_uses_current_user() -> None:
+    """验证收藏接口只更新当前用户的指定穿搭。"""
+
+    outfit = create_saved_outfit()
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_id.return_value = outfit
+    outfit_repository.save.side_effect = (
+        lambda updated_outfit: updated_outfit
+    )
+    repositories = FashionRepositories(
+        style_profiles=Mock(),
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供假的收藏更新仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/outfits/outfit-001/favorite",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "is_favorite": True,
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["is_favorite"] is True
+
+    outfit_repository.get_by_id.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id="outfit-001",
+    )
+    saved_outfit = (
+        outfit_repository.save.await_args.args[0]
+    )
+    assert saved_outfit.user_id == "user-001"
+    assert saved_outfit.is_favorite is True

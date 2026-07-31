@@ -22,6 +22,7 @@ from app.services.outfit import (
     get_saved_outfit,
     list_saved_outfits,
     save_confirmed_outfit,
+    update_outfit_favorite,
 )
 
 
@@ -243,3 +244,40 @@ async def test_get_saved_outfit_hides_missing_record() -> None:
             user_id="user-001",
             outfit_id="unknown-outfit",
         )
+
+
+@pytest.mark.anyio
+async def test_update_outfit_favorite_copies_and_saves() -> None:
+    """验证收藏操作创建新领域对象并交给仓库保存。"""
+
+    original_outfit = create_confirmed_outfit(
+        recommendation=create_recommendation(),
+        user_id="user-001",
+        conversation_id="conversation-001",
+    )
+    repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    repository.get_by_id.return_value = original_outfit
+    repository.save.side_effect = lambda outfit: outfit
+
+    updated_outfit = await update_outfit_favorite(
+        repository=repository,
+        user_id="user-001",
+        outfit_id=original_outfit.outfit_id,
+        is_favorite=True,
+    )
+
+    # 不可变原对象保持不变，新对象保存收藏状态
+    assert original_outfit.is_favorite is False
+    assert updated_outfit is not original_outfit
+    assert updated_outfit.is_favorite is True
+    assert updated_outfit.items == original_outfit.items
+
+    repository.get_by_id.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id=original_outfit.outfit_id,
+    )
+    repository.save.assert_awaited_once_with(
+        updated_outfit,
+    )

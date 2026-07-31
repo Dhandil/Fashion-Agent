@@ -19,6 +19,7 @@ from app.api.dependencies.identity import (
 )
 from app.api.schemas.outfit import (
     OutfitConfirmRequest,
+    OutfitFavoriteUpdate,
     OutfitListResponse,
     OutfitResponse,
 )
@@ -26,6 +27,7 @@ from app.services.outfit import (
     get_saved_outfit,
     list_saved_outfits,
     save_confirmed_outfit,
+    update_outfit_favorite,
 )
 
 router = APIRouter(
@@ -128,4 +130,29 @@ async def get_outfit(
 
     return OutfitResponse.model_validate(
         outfit,
+    )
+
+
+@router.patch(
+    "/{outfit_id}/favorite",
+    response_model=OutfitResponse,
+    summary="修改穿搭收藏状态",
+)
+async def set_outfit_favorite(
+    outfit_id: str,
+    request: OutfitFavoriteUpdate,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> OutfitResponse:
+    """收藏或取消收藏当前用户的一套穿搭。"""
+
+    updated_outfit = await update_outfit_favorite(
+        repository=repositories.outfits,
+        user_id=current_user.user_id,
+        outfit_id=outfit_id,
+        is_favorite=request.is_favorite,
+    )
+
+    return OutfitResponse.model_validate(
+        updated_outfit,
     )
