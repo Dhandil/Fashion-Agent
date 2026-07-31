@@ -26,8 +26,19 @@ class WardrobeRepository(Protocol):
         category: str | None = None,
         status: WardrobeItemStatus | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[WardrobeItem]:
-        """根据用户、品类和状态查询衣橱单品。"""
+        """根据用户、品类、状态和分页条件查询衣橱单品。"""
+
+        ...
+
+    async def count(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: WardrobeItemStatus | None = None,
+    ) -> int:
+        """统计符合当前用户和过滤条件的衣橱单品数量。"""
 
         ...
 

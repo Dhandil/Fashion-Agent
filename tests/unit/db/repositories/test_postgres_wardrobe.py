@@ -5,6 +5,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.mappers.wardrobe_item import (
+    wardrobe_item_entity_to_model,
+)
 from app.db.models.wardrobe_item import (
     WardrobeItemModel,
 )
@@ -14,9 +17,6 @@ from app.db.repositories.postgres_wardrobe import (
 from app.domain.entities.wardrobe_item import (
     WardrobeItem,
     WardrobeItemStatus,
-)
-from app.db.mappers.wardrobe_item import (
-    wardrobe_item_entity_to_model,
 )
 
 
@@ -164,6 +164,7 @@ async def test_postgres_wardrobe_repository_searches_available_items() -> None:
         category="衬衫",
         status=WardrobeItemStatus.AVAILABLE,
         limit=20,
+        offset=10,
     )
 
     session.execute.assert_awaited_once()
@@ -178,6 +179,7 @@ async def test_postgres_wardrobe_repository_searches_available_items() -> None:
     assert "衬衫" in parameter_values
     assert "available" in parameter_values
     assert 20 in parameter_values
+    assert 10 in parameter_values
 
     # 查询结果应该转换为领域实体
     assert len(items) == 1
@@ -187,6 +189,34 @@ async def test_postgres_wardrobe_repository_searches_available_items() -> None:
         items[0].status
         is WardrobeItemStatus.AVAILABLE
     )
+
+
+@pytest.mark.anyio
+async def test_postgres_wardrobe_repository_counts_filtered_items() -> None:
+    """验证仓库在数据库中统计当前用户的匹配衣物。"""
+
+    session = AsyncMock(spec=AsyncSession)
+    repository = PostgresWardrobeRepository(session)
+
+    database_result = Mock()
+    database_result.scalar_one.return_value = 4
+    session.execute.return_value = database_result
+
+    total = await repository.count(
+        user_id="user-001",
+        category="衬衫",
+        status=WardrobeItemStatus.AVAILABLE,
+    )
+
+    statement = session.execute.await_args.args[0]
+    parameter_values = set(
+        statement.compile().params.values(),
+    )
+
+    assert "user-001" in parameter_values
+    assert "衬衫" in parameter_values
+    assert "available" in parameter_values
+    assert total == 4
 
 
 @pytest.mark.anyio

@@ -81,6 +81,33 @@ async def test_repository_filters_user_category_and_status() -> None:
     assert len(shirts) == 1
     assert shirts[0].category == "衬衫"
 
+    # 分页偏移量应跳过第一件匹配衣物
+    second_page = await repository.search(
+        user_id="user-001",
+        limit=1,
+        offset=1,
+    )
+    assert len(second_page) == 1
+    assert (
+        second_page[0].wardrobe_item_id
+        == "pants-001"
+    )
+
+    # 总数不受 limit 和 offset 影响
+    assert (
+        await repository.count(
+            user_id="user-001",
+        )
+        == 3
+    )
+    assert (
+        await repository.count(
+            user_id="user-001",
+            status=WardrobeItemStatus.AVAILABLE,
+        )
+        == 2
+    )
+
 
 @pytest.mark.anyio
 async def test_repository_isolates_users_with_same_item_id() -> None:

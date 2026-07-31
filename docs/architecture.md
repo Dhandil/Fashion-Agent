@@ -260,6 +260,23 @@ PATCH 请求先与当前档案合并，再通过领域实体重新校验。若�
 候选确认接口不信任客户端提交的证据数量，而是重新读取当前反馈和 Outfit
 计算候选，避免过期或伪造的候选修改长期资料。
 
+Wardrobe 当前提供：
+
+- `POST /api/v1/wardrobe`：为当前用户新增衣橱单品。
+- `GET /api/v1/wardrobe`：按品类、可用状态和 `limit/offset` 查询衣橱，
+  同时返回相同过滤条件下的总数。
+- `GET /api/v1/wardrobe/{wardrobe_item_id}`：查询单品详情。
+- `PATCH /api/v1/wardrobe/{wardrobe_item_id}`：只修改请求中明确提供的字段。
+- `PATCH /api/v1/wardrobe/{wardrobe_item_id}/status`：为界面上的可用状态
+  开关提供明确入口。
+- `DELETE /api/v1/wardrobe/{wardrobe_item_id}`：删除当前用户的单品。
+
+所有衣橱接口都由身份依赖提供 `user_id`，请求体和 LLM 不能指定用户。
+详情、修改和删除统一使用 `user_id + wardrobe_item_id` 定位记录；不存在
+和属于其他用户的 ID 返回相同的 `wardrobe_item_not_found`，避免泄露
+其他用户的衣橱。PATCH 先合并当前领域实体，再执行完整校验；空 PATCH
+不会产生数据库写入。
+
 `OutfitRecommendation` 是 Agent 与 API 之间的候选方案。
 只有用户明确保存时，应用服务才为它补充服务端生成的 `outfit_id` 和当前
 `user_id`，并转换为需要持久化的 `Outfit`。

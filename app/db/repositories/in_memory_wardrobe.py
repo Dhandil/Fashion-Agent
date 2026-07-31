@@ -47,8 +47,9 @@ class InMemoryWardrobeRepository:
         category: str | None = None,
         status: WardrobeItemStatus | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[WardrobeItem]:
-        """根据用户、品类和状态查询衣橱。"""
+        """根据用户、品类、状态和分页条件查询衣橱。"""
 
         matched_items: list[WardrobeItem] = []
 
@@ -73,11 +74,27 @@ class InMemoryWardrobeRepository:
 
             matched_items.append(item)
 
-            # 达到数量限制后不再继续扫描
-            if len(matched_items) >= limit:
-                break
+        return matched_items[
+            offset : offset + limit
+        ]
 
-        return matched_items
+    async def count(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: WardrobeItemStatus | None = None,
+    ) -> int:
+        """统计符合用户、品类和状态条件的衣物数量。"""
+
+        matched_items = await self.search(
+            user_id=user_id,
+            category=category,
+            status=status,
+            # 内存仓库用于开发和测试，取完整匹配结果进行计数
+            limit=len(self._items),
+        )
+
+        return len(matched_items)
 
     async def save(
         self,

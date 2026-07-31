@@ -106,3 +106,20 @@ async def style_profile_update_conflict_handler(
         status_code=status.HTTP_409_CONFLICT,
         content=error_response.model_dump(),
     )
+
+
+async def wardrobe_item_not_found_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将找不到衣橱单品转换成统一的 404 响应。"""
+
+    error_response = ErrorResponse(
+        code="wardrobe_item_not_found",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=error_response.model_dump(),
+    )

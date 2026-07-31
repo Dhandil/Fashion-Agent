@@ -1,6 +1,9 @@
 """PostgreSQL 用户衣橱仓库实现。"""
 
-from sqlalchemy import select
+from sqlalchemy import (
+    func,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.mappers.wardrobe_item import (
@@ -58,8 +61,9 @@ class PostgresWardrobeRepository:
         category: str | None = None,
         status: WardrobeItemStatus | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[WardrobeItem]:
-        """根据用户、品类和状态查询衣橱单品。"""
+        """根据用户、品类、状态和分页条件查询衣橱单品。"""
 
         # 所有衣橱查询必须包含用户隔离条件
         statement = select(
@@ -83,7 +87,7 @@ class PostgresWardrobeRepository:
         statement = statement.order_by(
             WardrobeItemModel.updated_at.desc(),
             WardrobeItemModel.wardrobe_item_id.asc(),
-        ).limit(limit)
+        ).offset(offset).limit(limit)
 
         result = await self._session.execute(statement)
         item_models = result.scalars().all()
@@ -92,6 +96,37 @@ class PostgresWardrobeRepository:
             wardrobe_item_model_to_entity(item_model)
             for item_model in item_models
         ]
+
+    async def count(
+        self,
+        user_id: str,
+        category: str | None = None,
+        status: WardrobeItemStatus | None = None,
+    ) -> int:
+        """统计符合当前用户和过滤条件的衣橱单品数量。"""
+
+        statement = select(
+            func.count(),
+        ).select_from(
+            WardrobeItemModel,
+        ).where(
+            WardrobeItemModel.user_id == user_id,
+        )
+
+        if category is not None:
+            statement = statement.where(
+                WardrobeItemModel.category == category,
+            )
+
+        if status is not None:
+            statement = statement.where(
+                WardrobeItemModel.status
+                == status.value,
+            )
+
+        result = await self._session.execute(statement)
+
+        return result.scalar_one()
 
     async def save(
         self,

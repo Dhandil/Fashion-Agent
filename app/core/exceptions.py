@@ -44,3 +44,9 @@ class StyleProfileUpdateConflictError(
     FashionAgentError,
 ):
     """部分更新与当前长期穿搭档案产生冲突。"""
+
+
+class WardrobeItemNotFoundError(
+    FashionAgentError,
+):
+    """当前用户不存在指定的衣橱单品。"""
