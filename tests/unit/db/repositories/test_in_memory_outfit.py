@@ -100,9 +100,28 @@ async def test_repository_filters_scenario_and_favorite() -> None:
     limited_outfits = await repository.search(
         user_id="user-001",
         limit=1,
+        offset=1,
     )
 
     assert len(limited_outfits) == 1
+    assert limited_outfits[0].outfit_id == (
+        "outfit-002"
+    )
+
+    # 总数不受 limit 和 offset 影响
+    assert (
+        await repository.count(
+            user_id="user-001",
+        )
+        == 3
+    )
+    assert (
+        await repository.count(
+            user_id="user-001",
+            scenario="通勤",
+        )
+        == 2
+    )
 
 
 @pytest.mark.anyio

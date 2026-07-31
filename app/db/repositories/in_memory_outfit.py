@@ -43,6 +43,7 @@ class InMemoryOutfitRepository:
         scenario: str | None = None,
         favorite_only: bool = False,
         limit: int = 50,
+        offset: int = 0,
     ) -> list[Outfit]:
         """根据用户、场景和收藏状态查询穿搭。"""
 
@@ -69,11 +70,28 @@ class InMemoryOutfitRepository:
 
             matched_outfits.append(outfit)
 
-            # 达到数量限制后停止遍历
-            if len(matched_outfits) >= limit:
-                break
+        # 先过滤再切片，offset 表示跳过的匹配记录数
+        return matched_outfits[
+            offset : offset + limit
+        ]
 
-        return matched_outfits
+    async def count(
+        self,
+        user_id: str,
+        scenario: str | None = None,
+        favorite_only: bool = False,
+    ) -> int:
+        """统计符合用户和过滤条件的穿搭数量。"""
+
+        matched_outfits = await self.search(
+            user_id=user_id,
+            scenario=scenario,
+            favorite_only=favorite_only,
+            limit=len(self._outfits),
+            offset=0,
+        )
+
+        return len(matched_outfits)
 
     async def save(
         self,

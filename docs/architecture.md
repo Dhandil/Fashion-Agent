@@ -262,7 +262,7 @@ POST /api/v1/outfits
 已保存 Outfit 的读取接口包括：
 
 - `GET /api/v1/outfits`：查询当前用户的穿搭列表，支持场景、收藏状态和
-  返回数量过滤。
+  Offset 分页。
 - `GET /api/v1/outfits/{outfit_id}`：查询当前用户的一套穿搭详情。
 - `PATCH /api/v1/outfits/{outfit_id}/favorite`：由用户明确收藏或取消收藏。
 
@@ -271,6 +271,17 @@ POST /api/v1/outfits
 
 收藏操作先读取当前用户的完整 `Outfit`，再通过不可变对象复制更新
 `is_favorite`，最后由仓库保存。收藏状态不由 LLM 自动修改。
+
+列表分页响应包含：
+
+- `items`：当前页 Outfit。
+- `count`：当前页实际返回数量。
+- `total`：相同筛选条件下的总记录数。
+- `limit`：当前页最大数量。
+- `offset`：本次查询跳过的记录数。
+
+分页和总数统计都在仓库层执行。PostgreSQL 使用 `LIMIT/OFFSET` 和独立
+`COUNT(*)`，不会为了分页把当前用户的全部 Outfit 加载进应用内存。
 
 ### 6.2 辅助购物域
 

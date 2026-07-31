@@ -1,5 +1,6 @@
 """用户确认后保存穿搭推荐的应用服务。"""
 
+from dataclasses import dataclass
 from uuid import UUID, uuid5
 
 from app.agents.graphs.shopping import ShoppingGraph
@@ -17,6 +18,17 @@ from app.domain.repositories.outfit import OutfitRepository
 OUTFIT_ID_NAMESPACE = UUID(
     "3e18d4b2-d864-4c33-8aeb-33bb376e8817",
 )
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+)
+class SavedOutfitPage:
+    """一次已保存 Outfit 分页查询结果。"""
+
+    items: tuple[Outfit, ...]
+    total: int
 
 
 def create_confirmed_outfit(
@@ -97,14 +109,26 @@ async def list_saved_outfits(
     scenario: str | None = None,
     favorite_only: bool = False,
     limit: int = 50,
-) -> list[Outfit]:
+    offset: int = 0,
+) -> SavedOutfitPage:
     """列出属于当前用户的已保存穿搭。"""
 
-    return await repository.search(
+    outfits = await repository.search(
         user_id=user_id,
         scenario=scenario,
         favorite_only=favorite_only,
         limit=limit,
+        offset=offset,
+    )
+    total = await repository.count(
+        user_id=user_id,
+        scenario=scenario,
+        favorite_only=favorite_only,
+    )
+
+    return SavedOutfitPage(
+        items=tuple(outfits),
+        total=total,
     )
 
 

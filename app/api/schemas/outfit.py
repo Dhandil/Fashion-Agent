@@ -55,3 +55,16 @@ class OutfitListResponse(BaseModel):
     count: int = Field(
         ge=0,
     )
+
+    # 相同筛选条件下的全部记录数
+    total: int = Field(
+        ge=0,
+    )
+
+    limit: int = Field(
+        ge=1,
+    )
+
+    offset: int = Field(
+        ge=0,
+    )

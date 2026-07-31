@@ -219,6 +219,7 @@ def test_list_outfits_uses_filters_and_current_user() -> None:
     outfit_repository.search.return_value = [
         create_saved_outfit(),
     ]
+    outfit_repository.count.return_value = 12
     repositories = FashionRepositories(
         style_profiles=Mock(),
         wardrobe=Mock(),
@@ -246,6 +247,7 @@ def test_list_outfits_uses_filters_and_current_user() -> None:
                 "?scenario=通勤"
                 "&favorite_only=true"
                 "&limit=10"
+                "&offset=5"
             ),
             headers={
                 "X-User-ID": "user-001",
@@ -256,6 +258,9 @@ def test_list_outfits_uses_filters_and_current_user() -> None:
 
     assert response.status_code == 200
     assert response.json()["count"] == 1
+    assert response.json()["total"] == 12
+    assert response.json()["limit"] == 10
+    assert response.json()["offset"] == 5
     assert response.json()["items"][0][
         "outfit_id"
     ] == "outfit-001"
@@ -264,6 +269,12 @@ def test_list_outfits_uses_filters_and_current_user() -> None:
         scenario="通勤",
         favorite_only=True,
         limit=10,
+        offset=5,
+    )
+    outfit_repository.count.assert_awaited_once_with(
+        user_id="user-001",
+        scenario="通勤",
+        favorite_only=True,
     )
 
 

@@ -88,25 +88,36 @@ async def list_outfits(
             le=100,
         ),
     ] = 50,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+            le=100_000,
+        ),
+    ] = 0,
 ) -> OutfitListResponse:
     """根据当前用户和可选条件查询已保存穿搭。"""
 
-    outfits = await list_saved_outfits(
+    page = await list_saved_outfits(
         repository=repositories.outfits,
         user_id=current_user.user_id,
         scenario=scenario,
         favorite_only=favorite_only,
         limit=limit,
+        offset=offset,
     )
 
     response_items = tuple(
         OutfitResponse.model_validate(outfit)
-        for outfit in outfits
+        for outfit in page.items
     )
 
     return OutfitListResponse(
         items=response_items,
         count=len(response_items),
+        total=page.total,
+        limit=limit,
+        offset=offset,
     )
 
 

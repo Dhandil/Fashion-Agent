@@ -23,8 +23,19 @@ class OutfitRepository(Protocol):
         scenario: str | None = None,
         favorite_only: bool = False,
         limit: int = 50,
+        offset: int = 0,
     ) -> list[Outfit]:
         """根据用户、场景和收藏状态查询穿搭。"""
+
+        ...
+
+    async def count(
+        self,
+        user_id: str,
+        scenario: str | None = None,
+        favorite_only: bool = False,
+    ) -> int:
+        """统计符合用户和过滤条件的穿搭数量。"""
 
         ...
 

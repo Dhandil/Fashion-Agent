@@ -5,6 +5,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.mappers.outfit import (
+    outfit_entity_to_model,
+)
 from app.db.models.outfit import OutfitModel
 from app.db.repositories.postgres_outfit import (
     PostgresOutfitRepository,
@@ -13,9 +16,6 @@ from app.domain.entities.outfit import (
     Outfit,
     OutfitItem,
     OutfitItemSource,
-)
-from app.db.mappers.outfit import (
-    outfit_entity_to_model,
 )
 
 
@@ -172,6 +172,7 @@ async def test_postgres_outfit_repository_searches_outfits() -> None:
         scenario="通勤",
         favorite_only=True,
         limit=10,
+        offset=5,
     )
 
     session.execute.assert_awaited_once()
@@ -185,12 +186,42 @@ async def test_postgres_outfit_repository_searches_outfits() -> None:
     assert "user-001" in parameter_values
     assert "通勤" in parameter_values
     assert 10 in parameter_values
+    assert 5 in parameter_values
 
     # 数据库模型应该被转换成领域实体列表
     assert len(outfits) == 1
     assert outfits[0].outfit_id == "outfit-001"
     assert outfits[0].scenario == "通勤"
     assert outfits[0].is_favorite is True
+
+
+@pytest.mark.anyio
+async def test_postgres_outfit_repository_counts_outfits() -> None:
+    """验证仓库统计符合用户和过滤条件的记录数。"""
+
+    session = AsyncMock(spec=AsyncSession)
+    repository = PostgresOutfitRepository(session)
+
+    database_result = Mock()
+    database_result.scalar_one.return_value = 7
+    session.execute.return_value = database_result
+
+    count = await repository.count(
+        user_id="user-001",
+        scenario="通勤",
+        favorite_only=True,
+    )
+
+    assert count == 7
+    session.execute.assert_awaited_once()
+
+    statement = session.execute.await_args.args[0]
+    parameter_values = set(
+        statement.compile().params.values(),
+    )
+
+    assert "user-001" in parameter_values
+    assert "通勤" in parameter_values
 
 
 @pytest.mark.anyio

@@ -1,6 +1,9 @@
 """PostgreSQL 穿搭方案仓库实现。"""
 
-from sqlalchemy import select
+from sqlalchemy import (
+    func,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -56,6 +59,7 @@ class PostgresOutfitRepository:
         scenario: str | None = None,
         favorite_only: bool = False,
         limit: int = 50,
+        offset: int = 0,
     ) -> list[Outfit]:
         """根据用户、场景和收藏状态查询穿搭方案。"""
 
@@ -86,7 +90,7 @@ class PostgresOutfitRepository:
         statement = statement.order_by(
             OutfitModel.updated_at.desc(),
             OutfitModel.outfit_id.asc(),
-        ).limit(limit)
+        ).offset(offset).limit(limit)
 
         result = await self._session.execute(statement)
         outfit_models = result.scalars().all()
@@ -95,6 +99,36 @@ class PostgresOutfitRepository:
             outfit_model_to_entity(outfit_model)
             for outfit_model in outfit_models
         ]
+
+    async def count(
+        self,
+        user_id: str,
+        scenario: str | None = None,
+        favorite_only: bool = False,
+    ) -> int:
+        """统计符合用户和过滤条件的穿搭数量。"""
+
+        statement = select(
+            func.count(),
+        ).select_from(
+            OutfitModel,
+        ).where(
+            OutfitModel.user_id == user_id,
+        )
+
+        if scenario is not None:
+            statement = statement.where(
+                OutfitModel.scenario == scenario,
+            )
+
+        if favorite_only:
+            statement = statement.where(
+                OutfitModel.is_favorite.is_(True),
+            )
+
+        result = await self._session.execute(statement)
+
+        return result.scalar_one()
 
     async def save(
         self,

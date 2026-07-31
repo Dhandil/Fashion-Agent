@@ -179,6 +179,7 @@ async def test_list_saved_outfits_filters_current_user() -> None:
     repository.search.return_value = [
         outfit,
     ]
+    repository.count.return_value = 1
 
     result = await list_saved_outfits(
         repository=repository,
@@ -186,16 +187,24 @@ async def test_list_saved_outfits_filters_current_user() -> None:
         scenario="通勤",
         favorite_only=True,
         limit=10,
+        offset=5,
     )
 
-    assert result == [
+    assert result.items == (
         outfit,
-    ]
+    )
+    assert result.total == 1
     repository.search.assert_awaited_once_with(
         user_id="user-001",
         scenario="通勤",
         favorite_only=True,
         limit=10,
+        offset=5,
+    )
+    repository.count.assert_awaited_once_with(
+        user_id="user-001",
+        scenario="通勤",
+        favorite_only=True,
     )
 
 
