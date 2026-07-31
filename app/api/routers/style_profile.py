@@ -1,6 +1,8 @@
 """用户长期穿搭档案 API 路由。"""
 
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Query
 
 from app.api.dependencies.database import (
     FashionRepositoriesDependency,
@@ -9,10 +11,13 @@ from app.api.dependencies.identity import (
     CurrentUserDependency,
 )
 from app.api.schemas.style_profile import (
+    PreferenceCandidateListResponse,
+    PreferenceCandidateResponse,
     StyleProfileResponse,
     StyleProfileUpsertRequest,
 )
 from app.services.style_profile import (
+    analyze_style_preference_candidates,
     get_style_profile,
     replace_style_profile,
 )
@@ -21,6 +26,46 @@ router = APIRouter(
     prefix="/style-profile",
     tags=["style-profile"],
 )
+
+
+@router.get(
+    "/candidates",
+    response_model=PreferenceCandidateListResponse,
+    summary="分析长期偏好候选",
+)
+async def list_preference_candidates(
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    minimum_evidence: Annotated[
+        int,
+        Query(
+            ge=2,
+            le=20,
+        ),
+    ] = 2,
+) -> PreferenceCandidateListResponse:
+    """根据当前反馈动态分析风格偏好候选，不修改档案。"""
+
+    candidates = await analyze_style_preference_candidates(
+        outfit_repository=repositories.outfits,
+        feedback_repository=(
+            repositories.outfit_feedback
+        ),
+        user_id=current_user.user_id,
+        minimum_evidence=minimum_evidence,
+    )
+    response_items = tuple(
+        PreferenceCandidateResponse.model_validate(
+            candidate,
+        )
+        for candidate in candidates
+    )
+
+    return PreferenceCandidateListResponse(
+        items=response_items,
+        count=len(response_items),
+        minimum_evidence=minimum_evidence,
+    )
 
 
 @router.get(

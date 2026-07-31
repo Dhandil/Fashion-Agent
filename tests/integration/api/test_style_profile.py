@@ -17,6 +17,15 @@ from app.core.config import (
 from app.db.repositories.fashion_provider import (
     FashionRepositories,
 )
+from app.domain.entities.outfit import Outfit, OutfitItem
+from app.domain.entities.outfit_feedback import (
+    OutfitFeedback,
+    OutfitFeedbackSentiment,
+)
+from app.domain.repositories.outfit import OutfitRepository
+from app.domain.repositories.outfit_feedback import (
+    OutfitFeedbackRepository,
+)
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
 )
@@ -202,3 +211,104 @@ def test_put_style_profile_rejects_invalid_budget() -> None:
 
     assert response.status_code == 422
     repository.save.assert_not_awaited()
+
+
+def test_get_preference_candidates_returns_evidence() -> None:
+    """验证候选接口返回当前用户的动态风格证据。"""
+
+    style_profile_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        Outfit(
+            outfit_id=outfit_id,
+            user_id="user-001",
+            name=f"休闲穿搭 {outfit_id}",
+            scenario="日常",
+            style_tags=(
+                "休闲",
+            ),
+            items=(
+                OutfitItem(
+                    role="上装",
+                    name="测试上装",
+                    source="recommendation",
+                ),
+            ),
+            recommendation_reason="候选接口测试。",
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    feedback_repository.search.return_value = [
+        OutfitFeedback(
+            user_id="user-001",
+            outfit_id=outfit_id,
+            sentiment=OutfitFeedbackSentiment.LIKE,
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    repositories = FashionRepositories(
+        style_profiles=style_profile_repository,
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+        outfit_feedback=feedback_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供候选分析使用的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.get(
+            (
+                "/api/v1/style-profile/candidates"
+                "?minimum_evidence=2"
+            ),
+            headers={
+                "X-User-ID": "user-001",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "category": "style",
+                "value": "休闲",
+                "direction": "prefer",
+                "evidence_count": 2,
+                "opposing_evidence_count": 0,
+                "evidence_outfit_ids": [
+                    "outfit-001",
+                    "outfit-002",
+                ],
+            },
+        ],
+        "count": 1,
+        "minimum_evidence": 2,
+    }
+    style_profile_repository.save.assert_not_awaited()

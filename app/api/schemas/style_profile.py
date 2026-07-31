@@ -11,6 +11,42 @@ from pydantic import (
     model_validator,
 )
 
+from app.domain.entities.preference_candidate import (
+    PreferenceCandidateCategory,
+    PreferenceDirection,
+)
+
+
+class PreferenceCandidateResponse(BaseModel):
+    """一条由反馈推导的长期偏好候选。"""
+
+    category: PreferenceCandidateCategory
+    value: str
+    direction: PreferenceDirection
+    evidence_count: int = Field(
+        ge=1,
+    )
+    opposing_evidence_count: int = Field(
+        ge=0,
+    )
+    evidence_outfit_ids: tuple[str, ...]
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+
+class PreferenceCandidateListResponse(BaseModel):
+    """当前用户的动态长期偏好候选列表。"""
+
+    items: tuple[PreferenceCandidateResponse, ...] = ()
+    count: int = Field(
+        ge=0,
+    )
+    minimum_evidence: int = Field(
+        ge=2,
+    )
+
 
 class StyleProfileUpsertRequest(BaseModel):
     """完整新增或替换当前用户的长期穿搭偏好。"""
