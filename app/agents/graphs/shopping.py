@@ -10,6 +10,9 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
 from app.agents.nodes.chat import create_chat_node
+from app.agents.nodes.generate_outfit import (
+    create_outfit_generation_node,
+)
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
 )
@@ -81,9 +84,15 @@ def create_shopping_graph(
 
     # 提供工具时，创建工具执行节点和循环路由
     if tools:
+        outfit_generation_node = create_outfit_generation_node(model)
+
         graph_builder.add_node(
             "tools",
             ToolNode(list(tools)),
+        )
+        graph_builder.add_node(
+            "generate_outfit",
+            cast(Any, outfit_generation_node),
         )
 
         # 根据模型回复判断执行工具还是结束
@@ -92,6 +101,7 @@ def create_shopping_graph(
             route_after_chat,
             {
                 "tools": "tools",
+                "generate_outfit": "generate_outfit",
                 END: END,
             },
         )
@@ -100,6 +110,10 @@ def create_shopping_graph(
         graph_builder.add_edge(
             "tools",
             "chat",
+        )
+        graph_builder.add_edge(
+            "generate_outfit",
+            END,
         )
     else:
         # 没有提供工具时，聊天节点执行后直接结束

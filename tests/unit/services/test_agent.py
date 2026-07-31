@@ -15,6 +15,13 @@ from langchain_core.messages import (
 from langchain_core.retrievers import BaseRetriever
 from langgraph.checkpoint.memory import InMemorySaver
 
+from app.agents.schemas.outfit import (
+    OutfitGenerationResult,
+)
+from app.domain.entities.outfit import (
+    OutfitItem,
+    OutfitRecommendation,
+)
 from app.domain.entities.wardrobe_item import (
     WardrobeItem,
     WardrobeItemStatus,
@@ -142,6 +149,27 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
     tool_enabled_model = Mock(spec=BaseChatModel)
     model.bind_tools.return_value = tool_enabled_model
 
+    # 结构化输出模型负责把本轮文本回复整理为可追溯 Outfit
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    recommendation = OutfitRecommendation(
+        name="夏季通勤搭配",
+        scenario="通勤",
+        items=[
+            OutfitItem(
+                role="上装",
+                name="浅蓝色亚麻衬衫",
+                source="wardrobe",
+                source_reference_id="shirt-001",
+                reason="透气并适合通勤",
+            ),
+        ],
+        recommendation_reason="使用已有衬衫完成通勤搭配。",
+    )
+    structured_model.invoke.return_value = OutfitGenerationResult(
+        outfit=recommendation,
+    )
+
     # 第一条回复要求查询衣橱，第二条回复整理最终穿搭建议
     tool_enabled_model.invoke.side_effect = [
         AIMessage(
@@ -226,3 +254,4 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
         limit=20,
     )
     assert result["messages"][-1].content == ("可以使用浅蓝色亚麻衬衫完成通勤搭配。")
+    assert result["outfit_recommendation"] == recommendation

@@ -23,4 +23,4 @@ class ShoppingAgentState(TypedDict):
     knowledge_sources: NotRequired[list[str]]
 
     # Agent 生成的结构化穿搭推荐；普通问答时可以不存在
-    outfit_recommendation: NotRequired[OutfitRecommendation]
+    outfit_recommendation: NotRequired[OutfitRecommendation | None]

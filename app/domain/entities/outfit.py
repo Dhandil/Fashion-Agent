@@ -74,6 +74,14 @@ class OutfitItem(BaseModel):
                 "衣橱或商品单品必须提供来源 ID",
             )
 
+        if (
+            self.source is OutfitItemSource.RECOMMENDATION
+            and self.source_reference_id is not None
+        ):
+            raise ValueError(
+                "通用建议单品不能提供来源 ID",
+            )
+
         return self
 
 

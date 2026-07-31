@@ -38,10 +38,7 @@ def test_outfit_contains_wardrobe_and_recommended_items() -> None:
                 reason="与浅蓝色搭配稳重但不沉闷",
             ),
         ],
-        recommendation_reason=(
-            "浅蓝与深灰保持专业感，"
-            "同时适合炎热天气。"
-        ),
+        recommendation_reason=("浅蓝与深灰保持专业感，同时适合炎热天气。"),
     )
 
     # 列表输入应该转换为不可变元组
@@ -52,20 +49,11 @@ def test_outfit_contains_wardrobe_and_recommended_items() -> None:
     assert isinstance(outfit.items, tuple)
 
     # 第一件单品来自用户衣橱
-    assert (
-        outfit.items[0].source
-        is OutfitItemSource.WARDROBE
-    )
-    assert (
-        outfit.items[0].source_reference_id
-        == "wardrobe-001"
-    )
+    assert outfit.items[0].source is OutfitItemSource.WARDROBE
+    assert outfit.items[0].source_reference_id == "wardrobe-001"
 
     # 通用建议不需要伪造来源 ID
-    assert (
-        outfit.items[1].source
-        is OutfitItemSource.RECOMMENDATION
-    )
+    assert outfit.items[1].source is OutfitItemSource.RECOMMENDATION
     assert outfit.items[1].source_reference_id is None
 
     # 新穿搭默认没有被收藏
@@ -105,6 +93,21 @@ def test_recommended_item_does_not_require_source_id() -> None:
     )
 
     assert item.source_reference_id is None
+
+
+def test_recommended_item_rejects_source_id() -> None:
+    """验证通用建议不能伪装成可追溯衣物或商品。"""
+
+    with pytest.raises(
+        ValidationError,
+        match="通用建议单品不能提供来源 ID",
+    ):
+        OutfitItem(
+            role="鞋履",
+            name="黑色乐福鞋",
+            source=OutfitItemSource.RECOMMENDATION,
+            source_reference_id="invented-id",
+        )
 
 
 def test_outfit_rejects_empty_items() -> None:

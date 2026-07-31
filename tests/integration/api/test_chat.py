@@ -119,6 +119,7 @@ def test_chat_returns_agent_response() -> None:
     input_state = fake_graph.ainvoke.call_args.args[0]
 
     assert input_state["messages"][0].content == "我想买一件衬衫"
+    assert input_state["outfit_recommendation"] is None
 
     # 读取传给工作流的执行配置
     graph_config = fake_graph.ainvoke.call_args.kwargs["config"]

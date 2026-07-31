@@ -383,13 +383,31 @@ START
 → retrieve_knowledge
 → chat
 → 判断工具调用
-    ├── END
+    ├── 普通回答 → END
     └── tools
           ├── search_wardrobe（请求级、当前用户）
           └── search_products（共享、按需购物）
               ↓
             chat
+              ├── 当前轮未查询衣橱 → END
+              └── 当前轮已查询衣橱
+                    ↓
+              generate_outfit
+                    ↓
+                  END
 ```
+
+`generate_outfit` 使用结构化 LLM 输出生成 `OutfitRecommendation`。
+当前 DeepSeek 模型默认可能启用 Thinking Mode，因此该节点使用 JSON Output，
+不使用会强制指定 `tool_choice` 的 Function Calling。JSON 结果仍需经过
+Pydantic 结构校验和来源 ID 校验后才能进入 API 响应。
+
+衣橱和商品来源 ID 必须出现在当前轮对应工具的结果中；通用建议不能携带
+伪造 ID。每个新请求都会先清空旧的 `outfit_recommendation`，避免
+Checkpointer 中上一轮的推荐泄漏到当前响应。
+
+只有当前轮实际调用 `search_wardrobe` 才进入该节点，因此普通知识问答和
+单独的商品搜索不会额外执行结构化 Outfit 模型调用。
 
 该工作流可以继续作为 P0 基础，不进行一次性大规模重命名。
 
@@ -518,10 +536,12 @@ Fashion-Agent/
 │   │   ├── routers/           # HTTP 路由
 │   │   └── schemas/           # API 请求和响应模型
 │   ├── agents/
+│   │   ├── context.py         # 当前轮消息边界等对话上下文辅助函数
 │   │   ├── graphs/            # LangGraph 工作流
 │   │   ├── nodes/             # 可复用 Agent 节点
 │   │   ├── prompts/           # 系统提示词和提示模板
 │   │   ├── routing/           # 条件路由
+│   │   ├── schemas/           # Agent 内部结构化输出模型
 │   │   ├── state/             # Agent 状态模型
 │   │   └── multi_agent/       # Multi-Agent 扩展
 │   ├── core/                  # 配置、异常、日志和安全
