@@ -27,6 +27,10 @@ from app.domain.entities.outfit import (
     OutfitItemSource,
     OutfitRecommendation,
 )
+from app.domain.entities.weather import WeatherContext
+from app.domain.policies.weather import (
+    build_weather_outfit_guidance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,22 @@ def _validate_outfit_source_ids(
             )
 
 
+def _get_weather_from_records(
+    records: tuple[dict[str, Any], ...],
+) -> WeatherContext | None:
+    """从当前轮工具记录中取得最后一条有效天气。"""
+
+    for record in reversed(records):
+        try:
+            return WeatherContext.model_validate(
+                record,
+            )
+        except ValueError:
+            continue
+
+    return None
+
+
 def create_outfit_generation_node(
     model: BaseChatModel,
 ) -> Callable[
@@ -130,6 +150,12 @@ def create_outfit_generation_node(
         )
         weather_context = state.get(
             "weather_context",
+        )
+        active_weather = (
+            _get_weather_from_records(
+                weather_records,
+            )
+            or weather_context
         )
 
         generation_context = {
@@ -172,6 +198,13 @@ def create_outfit_generation_node(
                 else None
             ),
             "weather_tool_results": weather_records,
+            "weather_outfit_guidance": (
+                build_weather_outfit_guidance(
+                    active_weather,
+                )
+                if active_weather is not None
+                else ()
+            ),
             "style_profile_context": state.get(
                 "style_profile_context",
                 "",

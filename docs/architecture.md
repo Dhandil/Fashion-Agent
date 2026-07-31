@@ -514,14 +514,56 @@ Pydantic 结构校验和来源 ID 校验后才能进入 API 响应。
 
 `WeatherProvider` 是领域层协议，只规定按照地点和日期返回天气，不依赖
 具体 SDK。API 或 MCP 适配器可以替换，而 Agent 只接触 `get_weather` 工具
-和标准化结果。当前尚未配置真实 Provider，因此默认注册表不会出现天气
-工具；客户端已知天气仍可以随聊天请求提供。
+和标准化结果。当前已有 Open-Meteo 适配器：先通过 Geocoding API 把地点
+转换为经纬度和时区，再通过 Forecast API 读取目标日期的天气代码、温度、
+体感、降雨概率和最大风速。接口字段依据
+[Open-Meteo Forecast API](https://open-meteo.com/en/docs) 和
+[Geocoding API](https://open-meteo.com/en/docs/geocoding-api)。
+
+具体适配器由 `integrations/weather` 实现，并由配置工厂装配：
+
+```text
+WEATHER_PROVIDER_BACKEND=disabled
+→ 返回 None
+→ 请求级 Tool Registry 不注册 get_weather
+
+WEATHER_PROVIDER_BACKEND=open_meteo
+→ OpenMeteoWeatherProvider
+→ 请求级 Tool Registry 注册 get_weather
+→ Agent 按需查询
+```
+
+公共端点只作为非商业开发原型使用，默认保持关闭。商业生产环境必须显式
+配置 API Key，并切换到具有商业授权的客户端点或经许可的自托管端点。
+生产环境缺少 Key 时，Provider 工厂直接抛出配置错误，避免误用公共服务。
+Open-Meteo 数据还涉及署名要求，产品界面和正式部署需要按其最新授权条款
+提供归属说明。
+
+HTTP 超时、上游错误、地点不存在和响应字段缺失统一转换为项目天气异常。
+`get_weather` 捕获该异常并返回结构化不可用结果；该对象不是天气记录，
+因此不会进入结构化 Outfit 的天气事实列表，也不会中断整次 Agent 对话。
+此时 Agent 只能请求用户提供天气或给出明确标注条件的季节性建议。
 
 天气包含地点、目标日期、天气状况、最低/最高温、体感温度、降雨概率、
 湿度、风速、来源和更新时间。至少需要存在一项天气事实，最低温不能高于
 最高温。每个聊天请求都会明确写入天气或 `None`，防止 Checkpointer 把
 上一轮天气误用于新请求。天气只影响当前 Outfit，不保存到 Style Profile
 或 PostgreSQL。
+
+领域层的天气规则会把已知事实转换为额外的 `outfit_guidance`：
+
+- 高温或高体感温度：轻薄、透气、吸湿并减少厚重层次。
+- 低温：增加保暖内层和外层。
+- 昼夜温差较大：采用方便穿脱的分层。
+- 明显降水：考虑防水外层、耐水防滑鞋履或雨具。
+- 大风：考虑防风和单品固定性。
+- 高温高湿：考虑快干、透气和不易贴肤的材质。
+
+规则只读取实际存在的字段，缺失字段不会触发推测。客户端天气由 Chat Node
+计算约束；天气工具则把相同约束随结构化结果返回。结构化 Outfit 节点按照
+“天气工具结果优先于客户端天气”的顺序选择事实并重新计算约束。这样关键
+天气风险不是完全交给 LLM 临时判断，同时仍保留模型结合场景和衣橱选择
+具体单品的空间。
 
 只有当前轮实际调用 `search_wardrobe` 才进入该节点，因此普通知识问答和
 单独的商品搜索不会额外执行结构化 Outfit 模型调用。
@@ -674,10 +716,13 @@ Fashion-Agent/
 │   │   └── session.py         # Engine 和 Session 工厂
 │   ├── domain/
 │   │   ├── entities/          # 领域实体
+│   │   ├── policies/          # 天气等可测试的领域决策规则
 │   │   ├── repositories/      # Repository Protocol
 │   │   └── value_objects/     # 不可变值对象
 │   ├── llm/
 │   │   └── providers/         # LLM 适配器
+│   ├── integrations/
+│   │   └── weather/           # Open-Meteo 等第三方天气 API 适配器
 │   ├── memory/
 │   │   ├── short_term/        # 对话 Checkpointer
 │   │   └── long_term/         # 长期记忆编排

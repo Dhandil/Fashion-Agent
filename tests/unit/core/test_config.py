@@ -17,6 +17,8 @@ def test_settings_use_default_values() -> None:
     assert settings.app_port == 8000
     assert settings.debug is False
     assert settings.log_level == "INFO"
+    assert settings.weather_provider_backend == "disabled"
+    assert settings.weather_timeout_seconds == 10.0
 
 
 def test_settings_read_environment_variables(monkeypatch) -> None:
@@ -35,6 +37,7 @@ def test_settings_read_environment_variables(monkeypatch) -> None:
     assert settings.debug is True
     assert settings.log_level == "DEBUG"
 
+
 def test_llm_api_key_is_masked(monkeypatch) -> None:
     """验证 LLM API Key 使用敏感字符串保存。"""
 
@@ -47,7 +50,7 @@ def test_llm_api_key_is_masked(monkeypatch) -> None:
     # 确认配置中已经读取到密钥对象
     assert settings.llm_api_key is not None
 
-    #只有明确调用 get_secret_value() 才能取得原始密钥
+    # 只有明确调用 get_secret_value() 才能取得原始密钥
     assert settings.llm_api_key.get_secret_value() == "test-secret-key"
 
     # 直接转成字符串时，真实密钥不应该出现
@@ -66,10 +69,7 @@ def test_settings_read_database_environment_variables(
     )
     monkeypatch.setenv(
         "DATABASE_URL",
-        (
-            "postgresql+asyncpg://"
-            "fashion_agent:secret@localhost:5432/fashion_agent"
-        ),
+        ("postgresql+asyncpg://fashion_agent:secret@localhost:5432/fashion_agent"),
     )
     monkeypatch.setenv(
         "DATABASE_ECHO",
@@ -85,8 +85,7 @@ def test_settings_read_database_environment_variables(
     # SecretStr 需要显式调用方法才能取得真实内容
     assert settings.database_url is not None
     assert settings.database_url.get_secret_value() == (
-        "postgresql+asyncpg://"
-        "fashion_agent:secret@localhost:5432/fashion_agent"
+        "postgresql+asyncpg://fashion_agent:secret@localhost:5432/fashion_agent"
     )
 
     # Pydantic 应将字符串 true 转换为布尔值
@@ -105,5 +104,63 @@ def test_settings_reject_invalid_repository_backend(
     )
 
     # Settings 初始化时应该立即拒绝无效配置
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_settings_read_weather_environment_variables(
+    monkeypatch,
+) -> None:
+    """验证天气 Provider、端点、密钥和超时可以通过环境变量配置。"""
+
+    monkeypatch.setenv(
+        "WEATHER_PROVIDER_BACKEND",
+        "open_meteo",
+    )
+    monkeypatch.setenv(
+        "WEATHER_GEOCODING_BASE_URL",
+        "https://customer-geocoding-api.open-meteo.com",
+    )
+    monkeypatch.setenv(
+        "WEATHER_FORECAST_BASE_URL",
+        "https://customer-api.open-meteo.com",
+    )
+    monkeypatch.setenv(
+        "WEATHER_API_KEY",
+        "test-weather-key",
+    )
+    monkeypatch.setenv(
+        "WEATHER_TIMEOUT_SECONDS",
+        "15",
+    )
+
+    settings = Settings(_env_file=None)
+
+    assert settings.weather_provider_backend == "open_meteo"
+    assert settings.weather_geocoding_base_url == ("https://customer-geocoding-api.open-meteo.com")
+    assert settings.weather_forecast_base_url == ("https://customer-api.open-meteo.com")
+    assert settings.weather_api_key is not None
+    assert settings.weather_api_key.get_secret_value() == "test-weather-key"
+    assert settings.weather_timeout_seconds == 15.0
+
+
+@pytest.mark.parametrize(
+    "timeout",
+    (
+        "0",
+        "61",
+    ),
+)
+def test_settings_reject_invalid_weather_timeout(
+    monkeypatch,
+    timeout: str,
+) -> None:
+    """验证天气超时必须大于零且不超过六十秒。"""
+
+    monkeypatch.setenv(
+        "WEATHER_TIMEOUT_SECONDS",
+        timeout,
+    )
+
     with pytest.raises(ValidationError):
         Settings(_env_file=None)

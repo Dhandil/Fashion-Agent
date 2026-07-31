@@ -165,6 +165,12 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     assert '"precipitation_probability": 70' in (
         structured_messages[1].content
     )
+    assert '"weather_outfit_guidance"' in (
+        structured_messages[1].content
+    )
+    assert "高温或体感炎热" in (
+        structured_messages[1].content
+    )
     assert "output_schema" in (structured_messages[1].content)
 
 
@@ -241,6 +247,9 @@ def test_generate_outfit_includes_weather_tool_result() -> None:
         generation_message.content
     )
     assert '"condition": "阵雨"' in (
+        generation_message.content
+    )
+    assert "高温或体感炎热" in (
         generation_message.content
     )
 

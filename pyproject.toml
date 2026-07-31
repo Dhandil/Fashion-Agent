@@ -24,6 +24,9 @@ dependencies = [
     # ASGI 应用服务器及常用扩展
     "uvicorn[standard]>=0.51,<0.52",
 
+    # 天气等外部 HTTP API 使用的异步客户端
+    "httpx>=0.28,<0.29",
+
     # LangChain 的 OpenAI 兼容聊天模型适配器
     "langchain-openai>=1.4,<2.0",
     
@@ -64,8 +67,6 @@ dev = [
     # Python静态类型检查工具
     "mypy>=2.3,<3.0",
 
-    # FastAPI 测试客户端使用的 HTTP 客户端
-    "httpx>=0.28,<0.29",
 ]
 
 [tool.setuptools.packages.find]

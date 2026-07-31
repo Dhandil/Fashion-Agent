@@ -124,6 +124,7 @@ def test_chat_returns_agent_response() -> None:
             style_profile_repository
         ),
         user_id="user-001",
+        weather_provider=None,
     )
 
     # 读取传给工作流的初始状态

@@ -1,12 +1,19 @@
 """天气查询 Agent 工具。"""
 
 import json
+import logging
 from datetime import date
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+from app.core.exceptions import WeatherProviderError
+from app.domain.policies.weather import (
+    build_weather_outfit_guidance,
+)
 from app.domain.providers.weather import WeatherProvider
+
+logger = logging.getLogger(__name__)
 
 
 class WeatherLookupInput(BaseModel):
@@ -36,17 +43,38 @@ def create_weather_lookup_tool(
     ) -> str:
         """查询指定地点和日期的天气事实。"""
 
-        weather = await provider.get_forecast(
-            location=location,
-            target_date=target_date,
+        try:
+            weather = await provider.get_forecast(
+                location=location,
+                target_date=target_date,
+            )
+        except WeatherProviderError as exc:
+            # 外部服务失败不应中断整次穿搭对话；对象结构也不会被当成天气记录
+            logger.warning(
+                "天气查询失败，已降级为无实时天气：%s",
+                type(exc).__name__,
+            )
+            return json.dumps(
+                {
+                    "error": "weather_unavailable",
+                    "message": str(exc),
+                    "location": location,
+                    "target_date": target_date.isoformat(),
+                },
+                ensure_ascii=False,
+            )
+
+        weather_record = weather.model_dump(
+            mode="json",
+        )
+        weather_record["outfit_guidance"] = build_weather_outfit_guidance(
+            weather,
         )
 
         # 使用列表结构，便于复用 Agent 当前的工具结果解析逻辑
         return json.dumps(
             [
-                weather.model_dump(
-                    mode="json",
-                ),
+                weather_record,
             ],
             ensure_ascii=False,
         )

@@ -5,6 +5,9 @@ from langchain_core.messages import AnyMessage, SystemMessage
 
 from app.agents.prompts.shopping import SHOPPING_ASSISTANT_SYSTEM_PROMPT
 from app.agents.state.shopping import ShoppingAgentState
+from app.domain.policies.weather import (
+    build_weather_outfit_guidance,
+)
 
 
 def create_chat_node(
@@ -53,6 +56,9 @@ def create_chat_node(
             )
 
         if weather_context is not None:
+            weather_guidance = build_weather_outfit_guidance(
+                weather_context,
+            )
             system_prompt += (
                 "\n\n以下是当前请求明确提供的天气事实：\n"
                 "<weather_context>\n"
@@ -62,6 +68,17 @@ def create_chat_node(
                 "请根据温度、体感、降雨和风力等已提供字段调整穿搭，"
                 "不要补造缺失的实时天气。"
             )
+            if weather_guidance:
+                system_prompt += (
+                    "\n<weather_outfit_guidance>\n"
+                    + "\n".join(
+                        f"- {item}"
+                        for item in weather_guidance
+                    )
+                    + "\n</weather_outfit_guidance>\n"
+                    "以上约束由确定性规则根据天气事实生成，"
+                    "应在不违背当前明确需求的前提下落实。"
+                )
 
         if style_profile_context:
             system_prompt += (

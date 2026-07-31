@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +43,26 @@ class Settings(BaseSettings):
 
     # 使用的模型名称，例如 deepseek-chat
     llm_model: str | None = None
+
+    # 天气 Provider 默认关闭；启用后 Agent 才会注册天气查询工具
+    weather_provider_backend: Literal[
+        "disabled",
+        "open_meteo",
+    ] = "disabled"
+
+    # Open-Meteo 地点搜索和预报服务地址，允许生产环境切换客户或自托管端点
+    weather_geocoding_base_url: str = "https://geocoding-api.open-meteo.com"
+    weather_forecast_base_url: str = "https://api.open-meteo.com"
+
+    # 商业客户端点需要 API Key；本地非商业原型可以留空
+    weather_api_key: SecretStr | None = None
+
+    # 外部天气请求超时时间，避免请求长期占用 Agent 执行链路
+    weather_timeout_seconds: float = Field(
+        default=10.0,
+        gt=0,
+        le=60,
+    )
 
     # 配置 Pydantic Settings 读取项目根目录下的.env文件
     model_config = SettingsConfigDict(

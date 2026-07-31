@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.core.exceptions import WeatherProviderError
 from app.domain.entities.weather import WeatherContext
 from app.domain.providers.weather import WeatherProvider
 from app.tools.builtins.weather_lookup import (
@@ -20,16 +21,14 @@ async def test_weather_tool_returns_provider_result() -> None:
     provider = AsyncMock(
         spec=WeatherProvider,
     )
-    provider.get_forecast.return_value = (
-        WeatherContext(
-            location="上海",
-            target_date="2026-08-01",
-            condition="阵雨",
-            temperature_min_c=26,
-            temperature_max_c=33,
-            precipitation_probability=70,
-            source="api",
-        )
+    provider.get_forecast.return_value = WeatherContext(
+        location="上海",
+        target_date="2026-08-01",
+        condition="阵雨",
+        temperature_min_c=26,
+        temperature_max_c=33,
+        precipitation_probability=70,
+        source="api",
     )
     weather_tool = create_weather_lookup_tool(
         provider,
@@ -74,3 +73,32 @@ def test_weather_tool_exposes_only_location_and_date() -> None:
         "target_date",
     }
 
+
+@pytest.mark.anyio
+async def test_weather_tool_degrades_provider_error() -> None:
+    """验证外部天气服务失败时工具返回可识别错误，而不是中断 Agent。"""
+
+    provider = AsyncMock(
+        spec=WeatherProvider,
+    )
+    provider.get_forecast.side_effect = WeatherProviderError(
+        "天气服务暂时不可用。",
+    )
+    weather_tool = create_weather_lookup_tool(
+        provider,
+    )
+
+    result = await weather_tool.ainvoke(
+        {
+            "location": "上海",
+            "target_date": "2026-08-01",
+        },
+    )
+    error = json.loads(result)
+
+    assert error == {
+        "error": "weather_unavailable",
+        "message": "天气服务暂时不可用。",
+        "location": "上海",
+        "target_date": "2026-08-01",
+    }

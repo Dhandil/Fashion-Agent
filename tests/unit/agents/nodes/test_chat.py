@@ -287,3 +287,9 @@ def test_chat_node_includes_current_weather_context() -> None:
     assert "不要补造缺失的实时天气" in (
         system_message.content
     )
+    assert "高温或体感炎热" in (
+        system_message.content
+    )
+    assert "明显降水风险" in (
+        system_message.content
+    )

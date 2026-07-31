@@ -9,6 +9,7 @@ from app.api.dependencies.identity import CurrentUser
 from app.db.repositories.fashion_provider import (
     FashionRepositories,
 )
+from app.domain.providers.weather import WeatherProvider
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
@@ -34,14 +35,15 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
         spec=OutfitFeedbackRepository,
     )
     repositories = FashionRepositories(
-        style_profiles=(
-            style_profile_repository := Mock()
-        ),
+        style_profiles=(style_profile_repository := Mock()),
         wardrobe=wardrobe_repository,
         outfits=outfit_repository,
         outfit_feedback=feedback_repository,
     )
     fake_graph = Mock()
+    weather_provider = Mock(
+        spec=WeatherProvider,
+    )
 
     with patch(
         "app.api.dependencies.agent.create_user_shopping_graph",
@@ -50,6 +52,7 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
         graph = get_request_shopping_graph(
             current_user=current_user,
             repositories=repositories,
+            weather_provider=weather_provider,
         )
 
     assert graph is fake_graph
@@ -59,4 +62,5 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
         outfit_feedback_repository=feedback_repository,
         style_profile_repository=style_profile_repository,
         user_id="user-001",
+        weather_provider=weather_provider,
     )

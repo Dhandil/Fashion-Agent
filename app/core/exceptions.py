@@ -8,14 +8,14 @@ class FashionAgentError(Exception):
 
 class ConfigurationError(FashionAgentError):
     """配置错误。
-    
+
     当必要的环境变量缺失或配置值不合法时抛出。
     """
 
 
 class ToolRegistryError(FashionAgentError):
     """工具注册表错误。
-    
+
     当工具重复注册、工具不存在或注册信息不合法时抛出。
     """
 
@@ -50,3 +50,13 @@ class WardrobeItemNotFoundError(
     FashionAgentError,
 ):
     """当前用户不存在指定的衣橱单品。"""
+
+
+class WeatherProviderError(FashionAgentError):
+    """天气服务暂时无法提供可信结果。"""
+
+
+class WeatherLocationNotFoundError(
+    WeatherProviderError,
+):
+    """天气服务无法识别用户指定的地点。"""

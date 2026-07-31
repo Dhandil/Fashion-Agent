@@ -11,6 +11,9 @@ from app.api.dependencies.database import (
 from app.api.dependencies.identity import (
     CurrentUserDependency,
 )
+from app.api.dependencies.weather import (
+    WeatherProviderDependency,
+)
 from app.services.agent import (
     create_user_shopping_graph,
 )
@@ -19,19 +22,17 @@ from app.services.agent import (
 def get_request_shopping_graph(
     current_user: CurrentUserDependency,
     repositories: FashionRepositoriesDependency,
+    weather_provider: WeatherProviderDependency,
 ) -> ShoppingGraph:
     """为当前用户装配带衣橱访问能力的 Agent Graph。"""
 
     return create_user_shopping_graph(
         wardrobe_repository=repositories.wardrobe,
         outfit_repository=repositories.outfits,
-        outfit_feedback_repository=(
-            repositories.outfit_feedback
-        ),
-        style_profile_repository=(
-            repositories.style_profiles
-        ),
+        outfit_feedback_repository=(repositories.outfit_feedback),
+        style_profile_repository=(repositories.style_profiles),
         user_id=current_user.user_id,
+        weather_provider=weather_provider,
     )
 
 
