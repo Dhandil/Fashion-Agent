@@ -105,10 +105,13 @@ Fashion-Agent 的核心业务闭环是：
 - 上一轮的衣橱工具结果不会触发当前轮结构化生成
 - 已使用真实 PostgreSQL 衣橱和 DeepSeek API 验证完整链路
 - DeepSeek Thinking Mode 通过 JSON Output 返回结构化 Outfit
+- 用户通过独立确认接口保存当前会话中的最后一套 Outfit
+- 服务端生成稳定 Outfit ID，重复确认不会创建重复记录
+- 已使用真实 API 和 PostgreSQL 验证 Outfit 主表及 3 条单品记录
 
 当前验证基线：
 
-- 默认测试共 131 项通过，3 项 PostgreSQL 集成测试未在本轮启用
+- 默认测试共 136 项通过，3 项 PostgreSQL 集成测试未在本轮启用
 - Mypy 检查通过
 - 本阶段变更的 Ruff 检查通过
 
@@ -290,9 +293,8 @@ Multi-Agent 是扩展方案，不是当前 MVP 的前置条件。
 
 当前只推进以下两项：
 
-1. [已完成] 使用真实 DeepSeek/OpenAI 兼容模型和真实 PostgreSQL 衣橱，
-   手动验证完整穿搭链路。
-2. [下一步] 设计 Outfit 的“用户确认后保存”用例，生成推荐时不自动写入数据库。
+1. [已完成] 实现 Outfit 的“用户确认后保存”用例，生成推荐时不自动写入数据库。
+2. [下一步] 增加已保存 Outfit 的列表和详情查询接口。
 
 完成后再更新本路线图，并决定下一项任务。
 

@@ -18,3 +18,9 @@ class ToolRegistryError(FashionAgentError):
     
     当工具重复注册、工具不存在或注册信息不合法时抛出。
     """
+
+
+class OutfitRecommendationNotFoundError(
+    FashionAgentError,
+):
+    """当前会话中没有可确认保存的穿搭推荐。"""

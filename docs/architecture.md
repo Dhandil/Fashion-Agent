@@ -243,6 +243,22 @@ OutfitRecommendation
 只有用户明确保存时，应用服务才为它补充服务端生成的 `outfit_id` 和当前
 `user_id`，并转换为需要持久化的 `Outfit`。
 
+当前确认保存流程为：
+
+```text
+POST /api/v1/outfits
+→ 客户端只提交 conversation_id
+→ 服务端使用当前 user_id 读取对应 LangGraph State
+→ 取得最后一套已校验 OutfitRecommendation
+→ 根据 user_id + conversation_id 生成稳定 outfit_id
+→ OutfitRepository 保存到 PostgreSQL
+```
+
+客户端不能重新提交整套推荐内容，因此不能在确认阶段篡改 `user_id` 或
+来源引用 ID。同一用户重复确认同一会话时复用相同 `outfit_id`，避免网络
+重试产生重复记录。当前持久化模型保存正式采用的 `items`，不把备选项和
+衣橱缺口自动转换成已拥有衣物。
+
 ### 6.2 辅助购物域
 
 `Product` 表示来自样例数据、缓存或外部平台的候选商品。

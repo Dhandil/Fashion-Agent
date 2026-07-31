@@ -1,0 +1,90 @@
+"""用户确认后保存穿搭推荐的应用服务。"""
+
+from uuid import UUID, uuid5
+
+from app.agents.graphs.shopping import ShoppingGraph
+from app.core.exceptions import (
+    OutfitRecommendationNotFoundError,
+)
+from app.domain.entities.outfit import (
+    Outfit,
+    OutfitRecommendation,
+)
+from app.domain.repositories.outfit import OutfitRepository
+
+# 固定命名空间保证同一用户、同一会话重复确认时得到相同 Outfit ID
+OUTFIT_ID_NAMESPACE = UUID(
+    "3e18d4b2-d864-4c33-8aeb-33bb376e8817",
+)
+
+
+def create_confirmed_outfit(
+    recommendation: OutfitRecommendation,
+    user_id: str,
+    conversation_id: str,
+) -> Outfit:
+    """把已校验的临时推荐转换成可持久化 Outfit。"""
+
+    # uuid5 根据命名空间和业务键生成稳定 UUID
+    outfit_id = str(
+        uuid5(
+            OUTFIT_ID_NAMESPACE,
+            f"{user_id}:{conversation_id}",
+        ),
+    )
+
+    return Outfit(
+        outfit_id=outfit_id,
+        user_id=user_id,
+        name=recommendation.name,
+        scenario=recommendation.scenario,
+        style_tags=recommendation.style_tags,
+        season=recommendation.season,
+        items=recommendation.items,
+        recommendation_reason=(
+            recommendation.recommendation_reason
+        ),
+        notes=recommendation.notes,
+    )
+
+
+async def save_confirmed_outfit(
+    graph: ShoppingGraph,
+    repository: OutfitRepository,
+    user_id: str,
+    conversation_id: str,
+) -> Outfit:
+    """读取当前用户会话中的推荐并保存。"""
+
+    # thread_id 规则必须与聊天接口保持一致，且包含 user_id 隔离用户
+    thread_id = (
+        f"user:{user_id}:conversation:{conversation_id}"
+    )
+    state_snapshot = await graph.aget_state(
+        {
+            "configurable": {
+                "thread_id": thread_id,
+            },
+        },
+    )
+
+    recommendation = state_snapshot.values.get(
+        "outfit_recommendation",
+    )
+
+    if not isinstance(
+        recommendation,
+        OutfitRecommendation,
+    ):
+        raise OutfitRecommendationNotFoundError(
+            "当前会话中没有可以保存的穿搭推荐",
+        )
+
+    outfit = create_confirmed_outfit(
+        recommendation=recommendation,
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
+
+    # 仓库只执行 flush，事务由请求级数据库 Session 统一提交
+    return await repository.save(outfit)

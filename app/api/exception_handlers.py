@@ -21,3 +21,20 @@ async def configuration_error_handler(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=error_response.model_dump(),
     )
+
+
+async def outfit_recommendation_not_found_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将不存在的待确认推荐转换成 404 响应。"""
+
+    error_response = ErrorResponse(
+        code="outfit_recommendation_not_found",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=error_response.model_dump(),
+    )

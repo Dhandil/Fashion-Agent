@@ -1,10 +1,17 @@
 from fastapi import FastAPI
 
-from app.core.config import get_settings
-from app.core.logging import setup_logging
+from app.api.exception_handlers import (
+    configuration_error_handler,
+    outfit_recommendation_not_found_handler,
+)
 from app.api.router import api_router
-from app.api.exception_handlers import configuration_error_handler
-from app.core.exceptions import ConfigurationError
+from app.core.config import get_settings
+from app.core.exceptions import (
+    ConfigurationError,
+    OutfitRecommendationNotFoundError,
+)
+from app.core.logging import setup_logging
+
 
 def create_app() -> FastAPI:
     """创建并配置 FastAPI 应用实例。"""
@@ -31,6 +38,10 @@ def create_app() -> FastAPI:
     application.add_exception_handler(
         ConfigurationError,
         configuration_error_handler,
+    )
+    application.add_exception_handler(
+        OutfitRecommendationNotFoundError,
+        outfit_recommendation_not_found_handler,
     )
 
     return application
