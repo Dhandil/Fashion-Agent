@@ -55,3 +55,20 @@ async def outfit_not_found_handler(
         status_code=status.HTTP_404_NOT_FOUND,
         content=error_response.model_dump(),
     )
+
+
+async def outfit_feedback_not_found_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将找不到 Outfit 反馈转换成统一的 404 响应。"""
+
+    error_response = ErrorResponse(
+        code="outfit_feedback_not_found",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=error_response.model_dump(),
+    )

@@ -33,6 +33,7 @@ repositories = FashionRepositories(
     style_profiles=Mock(),
     wardrobe=wardrobe_repository,
     outfits=Mock(),
+    outfit_feedback=Mock(),
 )
 
 

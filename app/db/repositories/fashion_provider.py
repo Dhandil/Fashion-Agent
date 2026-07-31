@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.repositories.postgres_outfit import (
     PostgresOutfitRepository,
 )
+from app.db.repositories.postgres_outfit_feedback import (
+    PostgresOutfitFeedbackRepository,
+)
 from app.db.repositories.postgres_style_profile import (
     PostgresStyleProfileRepository,
 )
@@ -15,6 +18,9 @@ from app.db.repositories.postgres_wardrobe import (
 )
 from app.domain.repositories.outfit import (
     OutfitRepository,
+)
+from app.domain.repositories.outfit_feedback import (
+    OutfitFeedbackRepository,
 )
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
@@ -34,6 +40,7 @@ class FashionRepositories:
     style_profiles: StyleProfileRepository
     wardrobe: WardrobeRepository
     outfits: OutfitRepository
+    outfit_feedback: OutfitFeedbackRepository
 
 
 def create_postgres_fashion_repositories(
@@ -50,5 +57,10 @@ def create_postgres_fashion_repositories(
         ),
         outfits=PostgresOutfitRepository(
             session,
+        ),
+        outfit_feedback=(
+            PostgresOutfitFeedbackRepository(
+                session,
+            )
         ),
     )

@@ -27,6 +27,7 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
         style_profiles=Mock(),
         wardrobe=wardrobe_repository,
         outfits=Mock(),
+        outfit_feedback=Mock(),
     )
     fake_graph = Mock()
 

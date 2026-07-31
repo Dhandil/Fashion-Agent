@@ -23,11 +23,19 @@ from app.api.schemas.outfit import (
     OutfitListResponse,
     OutfitResponse,
 )
+from app.api.schemas.outfit_feedback import (
+    OutfitFeedbackResponse,
+    OutfitFeedbackUpsertRequest,
+)
 from app.services.outfit import (
     get_saved_outfit,
     list_saved_outfits,
     save_confirmed_outfit,
     update_outfit_favorite,
+)
+from app.services.outfit_feedback import (
+    get_saved_outfit_feedback,
+    save_outfit_feedback,
 )
 
 router = APIRouter(
@@ -166,4 +174,59 @@ async def set_outfit_favorite(
 
     return OutfitResponse.model_validate(
         updated_outfit,
+    )
+
+
+@router.put(
+    "/{outfit_id}/feedback",
+    response_model=OutfitFeedbackResponse,
+    summary="新增或更新穿搭反馈",
+)
+async def upsert_outfit_feedback(
+    outfit_id: str,
+    request: OutfitFeedbackUpsertRequest,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> OutfitFeedbackResponse:
+    """保存当前用户对一套已保存穿搭的最新反馈。"""
+
+    feedback = await save_outfit_feedback(
+        outfit_repository=repositories.outfits,
+        feedback_repository=(
+            repositories.outfit_feedback
+        ),
+        user_id=current_user.user_id,
+        outfit_id=outfit_id,
+        sentiment=request.sentiment,
+        comment=request.comment,
+    )
+
+    return OutfitFeedbackResponse.model_validate(
+        feedback,
+    )
+
+
+@router.get(
+    "/{outfit_id}/feedback",
+    response_model=OutfitFeedbackResponse,
+    summary="查询穿搭反馈",
+)
+async def get_outfit_feedback(
+    outfit_id: str,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> OutfitFeedbackResponse:
+    """读取当前用户对一套已保存穿搭的反馈。"""
+
+    feedback = await get_saved_outfit_feedback(
+        outfit_repository=repositories.outfits,
+        feedback_repository=(
+            repositories.outfit_feedback
+        ),
+        user_id=current_user.user_id,
+        outfit_id=outfit_id,
+    )
+
+    return OutfitFeedbackResponse.model_validate(
+        feedback,
     )

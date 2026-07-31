@@ -34,6 +34,7 @@ def test_create_wardrobe_item_uses_current_user() -> None:
         style_profiles=Mock(),
         wardrobe=wardrobe_repository,
         outfits=Mock(),
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:

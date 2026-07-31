@@ -10,6 +10,9 @@ from app.db.repositories.fashion_provider import (
 from app.db.repositories.postgres_outfit import (
     PostgresOutfitRepository,
 )
+from app.db.repositories.postgres_outfit_feedback import (
+    PostgresOutfitFeedbackRepository,
+)
 from app.db.repositories.postgres_style_profile import (
     PostgresStyleProfileRepository,
 )
@@ -41,8 +44,13 @@ def test_fashion_repositories_share_database_session() -> None:
         repositories.outfits,
         PostgresOutfitRepository,
     )
+    assert isinstance(
+        repositories.outfit_feedback,
+        PostgresOutfitFeedbackRepository,
+    )
 
-    # 三个仓库必须共享同一个请求级 Session
+    # 所有仓库必须共享同一个请求级 Session
     assert repositories.style_profiles._session is session
     assert repositories.wardrobe._session is session
     assert repositories.outfits._session is session
+    assert repositories.outfit_feedback._session is session

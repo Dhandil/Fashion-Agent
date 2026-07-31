@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.exception_handlers import (
     configuration_error_handler,
+    outfit_feedback_not_found_handler,
     outfit_not_found_handler,
     outfit_recommendation_not_found_handler,
 )
@@ -9,6 +10,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import (
     ConfigurationError,
+    OutfitFeedbackNotFoundError,
     OutfitNotFoundError,
     OutfitRecommendationNotFoundError,
 )
@@ -48,6 +50,10 @@ def create_app() -> FastAPI:
     application.add_exception_handler(
         OutfitNotFoundError,
         outfit_not_found_handler,
+    )
+    application.add_exception_handler(
+        OutfitFeedbackNotFoundError,
+        outfit_feedback_not_found_handler,
     )
 
     return application

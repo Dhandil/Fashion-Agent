@@ -100,6 +100,7 @@ def test_confirm_outfit_saves_current_recommendation() -> None:
         style_profiles=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:
@@ -169,6 +170,7 @@ def test_confirm_outfit_requires_current_recommendation() -> None:
         style_profiles=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:
@@ -224,6 +226,7 @@ def test_list_outfits_uses_filters_and_current_user() -> None:
         style_profiles=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:
@@ -290,6 +293,7 @@ def test_get_outfit_returns_current_user_record() -> None:
         style_profiles=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:
@@ -335,6 +339,7 @@ def test_get_outfit_returns_structured_not_found() -> None:
         style_profiles=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:
@@ -383,6 +388,7 @@ def test_update_outfit_favorite_uses_current_user() -> None:
         style_profiles=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
+        outfit_feedback=Mock(),
     )
 
     async def override_repositories() -> FashionRepositories:

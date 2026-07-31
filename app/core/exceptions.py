@@ -28,3 +28,7 @@ class OutfitRecommendationNotFoundError(
 
 class OutfitNotFoundError(FashionAgentError):
     """当前用户不存在指定的已保存穿搭。"""
+
+
+class OutfitFeedbackNotFoundError(FashionAgentError):
+    """当前用户尚未对指定的已保存穿搭提供反馈。"""
