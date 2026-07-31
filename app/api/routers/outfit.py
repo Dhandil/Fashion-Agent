@@ -24,8 +24,13 @@ from app.api.schemas.outfit import (
     OutfitResponse,
 )
 from app.api.schemas.outfit_feedback import (
+    OutfitFeedbackListItem,
+    OutfitFeedbackListResponse,
     OutfitFeedbackResponse,
     OutfitFeedbackUpsertRequest,
+)
+from app.domain.entities.outfit_feedback import (
+    OutfitFeedbackSentiment,
 )
 from app.services.outfit import (
     get_saved_outfit,
@@ -34,7 +39,9 @@ from app.services.outfit import (
     update_outfit_favorite,
 )
 from app.services.outfit_feedback import (
+    delete_saved_outfit_feedback,
     get_saved_outfit_feedback,
+    list_recent_outfit_feedback,
     save_outfit_feedback,
 )
 
@@ -126,6 +133,55 @@ async def list_outfits(
         total=page.total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get(
+    "/feedback/recent",
+    response_model=OutfitFeedbackListResponse,
+    summary="查询最近穿搭反馈",
+)
+async def list_outfit_feedback(
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    sentiment: Annotated[
+        OutfitFeedbackSentiment | None,
+        Query(),
+    ] = None,
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=100,
+        ),
+    ] = 20,
+) -> OutfitFeedbackListResponse:
+    """查询当前用户最近确认的反馈及对应 Outfit 摘要。"""
+
+    summaries = await list_recent_outfit_feedback(
+        outfit_repository=repositories.outfits,
+        feedback_repository=(
+            repositories.outfit_feedback
+        ),
+        user_id=current_user.user_id,
+        sentiment=sentiment,
+        limit=limit,
+    )
+    response_items = tuple(
+        OutfitFeedbackListItem(
+            outfit_id=summary.feedback.outfit_id,
+            outfit_name=summary.outfit.name,
+            scenario=summary.outfit.scenario,
+            sentiment=summary.feedback.sentiment,
+            comment=summary.feedback.comment,
+        )
+        for summary in summaries
+    )
+
+    return OutfitFeedbackListResponse(
+        items=response_items,
+        count=len(response_items),
+        limit=limit,
     )
 
 
@@ -229,4 +285,26 @@ async def get_outfit_feedback(
 
     return OutfitFeedbackResponse.model_validate(
         feedback,
+    )
+
+
+@router.delete(
+    "/{outfit_id}/feedback",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除穿搭反馈",
+)
+async def delete_outfit_feedback(
+    outfit_id: str,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> None:
+    """撤回当前用户对一套已保存穿搭的反馈。"""
+
+    await delete_saved_outfit_feedback(
+        outfit_repository=repositories.outfits,
+        feedback_repository=(
+            repositories.outfit_feedback
+        ),
+        user_id=current_user.user_id,
+        outfit_id=outfit_id,
     )

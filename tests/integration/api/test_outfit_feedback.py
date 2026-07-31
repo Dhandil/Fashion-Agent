@@ -288,3 +288,128 @@ def test_get_outfit_feedback_returns_structured_not_found() -> None:
         "code": "outfit_feedback_not_found",
         "message": "当前穿搭方案还没有用户反馈",
     }
+
+
+def test_list_recent_outfit_feedback_returns_outfit_summary() -> None:
+    """验证最近反馈接口返回原 Outfit 摘要并传递筛选条件。"""
+
+    outfit = create_saved_outfit()
+    feedback = OutfitFeedback(
+        user_id="user-001",
+        outfit_id="outfit-001",
+        sentiment=OutfitFeedbackSentiment.LIKE,
+        comment="喜欢清爽配色",
+    )
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        outfit,
+    ]
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = [
+        feedback,
+    ]
+    repositories = create_repositories(
+        outfit_repository,
+        feedback_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供最近反馈查询所需的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.get(
+            (
+                "/api/v1/outfits/feedback/recent"
+                "?sentiment=like&limit=10"
+            ),
+            headers={
+                "X-User-ID": "user-001",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "outfit_id": "outfit-001",
+                "outfit_name": "夏季通勤搭配",
+                "scenario": "通勤",
+                "sentiment": "like",
+                "comment": "喜欢清爽配色",
+            },
+        ],
+        "count": 1,
+        "limit": 10,
+    }
+    feedback_repository.search.assert_awaited_once_with(
+        user_id="user-001",
+        sentiment=OutfitFeedbackSentiment.LIKE,
+        limit=10,
+    )
+
+
+def test_delete_outfit_feedback_returns_no_content() -> None:
+    """验证撤回反馈接口删除当前用户记录并返回 204。"""
+
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_id.return_value = (
+        create_saved_outfit()
+    )
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.delete.return_value = True
+    repositories = create_repositories(
+        outfit_repository,
+        feedback_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供反馈删除所需的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.delete(
+            "/api/v1/outfits/outfit-001/feedback",
+            headers={
+                "X-User-ID": "user-001",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    assert response.content == b""
+    feedback_repository.delete.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id="outfit-001",
+    )

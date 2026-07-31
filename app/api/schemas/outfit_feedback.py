@@ -68,3 +68,25 @@ class OutfitFeedbackResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class OutfitFeedbackListItem(BaseModel):
+    """最近反馈列表中的一项，并附带原穿搭摘要。"""
+
+    outfit_id: str
+    outfit_name: str
+    scenario: str
+    sentiment: OutfitFeedbackSentiment | None = None
+    comment: str | None = None
+
+
+class OutfitFeedbackListResponse(BaseModel):
+    """当前用户最近 Outfit 反馈列表。"""
+
+    items: tuple[OutfitFeedbackListItem, ...] = ()
+    count: int = Field(
+        ge=0,
+    )
+    limit: int = Field(
+        ge=1,
+    )

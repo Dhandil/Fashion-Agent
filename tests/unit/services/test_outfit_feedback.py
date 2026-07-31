@@ -17,7 +17,9 @@ from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
 )
 from app.services.outfit_feedback import (
+    delete_saved_outfit_feedback,
     get_saved_outfit_feedback,
+    list_recent_outfit_feedback,
     save_outfit_feedback,
 )
 
@@ -140,6 +142,113 @@ async def test_get_saved_outfit_feedback_requires_feedback() -> None:
         match="还没有用户反馈",
     ):
         await get_saved_outfit_feedback(
+            outfit_repository=outfit_repository,
+            feedback_repository=feedback_repository,
+            user_id="user-001",
+            outfit_id="outfit-001",
+        )
+
+
+@pytest.mark.anyio
+async def test_list_recent_outfit_feedback_joins_outfits() -> None:
+    """验证最近反馈通过一次批量查询关联原 Outfit。"""
+
+    feedback = OutfitFeedback(
+        user_id="user-001",
+        outfit_id="outfit-001",
+        sentiment=OutfitFeedbackSentiment.LIKE,
+        comment="喜欢清爽配色",
+    )
+    outfit = create_saved_outfit()
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        outfit,
+    ]
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = [
+        feedback,
+    ]
+
+    summaries = await list_recent_outfit_feedback(
+        outfit_repository=outfit_repository,
+        feedback_repository=feedback_repository,
+        user_id="user-001",
+        sentiment=OutfitFeedbackSentiment.LIKE,
+        limit=10,
+    )
+
+    assert len(summaries) == 1
+    assert summaries[0].feedback is feedback
+    assert summaries[0].outfit is outfit
+    feedback_repository.search.assert_awaited_once_with(
+        user_id="user-001",
+        sentiment=OutfitFeedbackSentiment.LIKE,
+        limit=10,
+    )
+    outfit_repository.get_by_ids.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_ids=(
+            "outfit-001",
+        ),
+    )
+
+
+@pytest.mark.anyio
+async def test_delete_saved_outfit_feedback_deletes_record() -> None:
+    """验证撤回反馈前会校验 Outfit 归属。"""
+
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_id.return_value = (
+        create_saved_outfit()
+    )
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.delete.return_value = True
+
+    await delete_saved_outfit_feedback(
+        outfit_repository=outfit_repository,
+        feedback_repository=feedback_repository,
+        user_id="user-001",
+        outfit_id="outfit-001",
+    )
+
+    outfit_repository.get_by_id.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id="outfit-001",
+    )
+    feedback_repository.delete.assert_awaited_once_with(
+        user_id="user-001",
+        outfit_id="outfit-001",
+    )
+
+
+@pytest.mark.anyio
+async def test_delete_saved_outfit_feedback_requires_record() -> None:
+    """验证没有反馈时撤回操作返回明确错误。"""
+
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_id.return_value = (
+        create_saved_outfit()
+    )
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.delete.return_value = False
+
+    with pytest.raises(
+        OutfitFeedbackNotFoundError,
+        match="还没有用户反馈",
+    ):
+        await delete_saved_outfit_feedback(
             outfit_repository=outfit_repository,
             feedback_repository=feedback_repository,
             user_id="user-001",
