@@ -36,4 +36,8 @@ OUTFIT_GENERATION_SYSTEM_PROMPT = """
 22. previous_outfit 只代表调整基线，不代表其中的衣橱单品当前仍然可用；
     新输出引用的衣橱 ID 仍必须来自当前轮 wardrobe_items。
 23. 用户当前需求与 previous_outfit 冲突时，以当前需求为准。
+24. 天气事实优先级为：weather_tool_results > provided_weather > 季节性常识。
+25. 根据已提供的温度、体感、降雨概率和风力调整层次、材质及防护建议；
+    不得编造输入中不存在的实时天气。
+26. 天气数据只用于当前 Outfit，不得推断为用户的长期偏好。
 """.strip()

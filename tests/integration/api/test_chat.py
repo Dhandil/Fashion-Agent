@@ -132,6 +132,8 @@ def test_chat_returns_agent_response() -> None:
     assert input_state["messages"][0].content == "我想买一件衬衫"
     # 旧推荐由 Graph 的 prepare_turn 节点清理并保存为调整基线
     assert "outfit_recommendation" not in input_state
+    # 未提供天气时明确清空旧的本轮天气，避免跨轮使用过期数据
+    assert input_state["weather_context"] is None
 
     # 读取传给工作流的执行配置
     graph_config = fake_graph.ainvoke.call_args.kwargs["config"]
@@ -345,3 +347,79 @@ def test_chat_returns_structured_outfit_when_graph_provides_one() -> None:
         "reason": "透气并适合通勤",
     }
     assert response_data["outfit"]["wardrobe_gaps"][0]["suggested_item"] == "黑色乐福鞋"
+
+
+def test_chat_passes_user_provided_weather_to_graph() -> None:
+    """验证结构化天气只作为当前轮状态传给 Agent。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [
+                AIMessage(
+                    content="建议穿透气衣物并携带雨具。",
+                ),
+            ],
+        },
+    )
+
+    with patch(
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "message": "明天通勤怎么穿？",
+                "weather": {
+                    "location": "上海",
+                    "target_date": "2026-08-01",
+                    "condition": "阵雨",
+                    "temperature_min_c": 26,
+                    "temperature_max_c": 33,
+                    "precipitation_probability": 70,
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    input_state = fake_graph.ainvoke.call_args.args[0]
+    weather = input_state["weather_context"]
+    assert weather.location == "上海"
+    assert weather.target_date.isoformat() == (
+        "2026-08-01"
+    )
+    assert weather.source.value == "user_provided"
+
+
+def test_chat_rejects_invalid_weather_before_graph() -> None:
+    """验证无事实或温度范围错误的天气请求返回 422。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock()
+
+    with patch(
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "message": "明天怎么穿？",
+                "weather": {
+                    "location": "上海",
+                    "target_date": "2026-08-01",
+                    "temperature_min_c": 35,
+                    "temperature_max_c": 25,
+                },
+            },
+        )
+
+    assert response.status_code == 422
+    fake_graph.ainvoke.assert_not_awaited()

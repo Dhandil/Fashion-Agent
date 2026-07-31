@@ -498,6 +498,31 @@ Pydantic 结构校验和来源 ID 校验后才能进入 API 响应。
 当前条件的部分。历史推荐不提供新的来源授权；调整后的所有衣橱和商品 ID
 仍必须出现在当前轮工具结果中。
 
+天气通过两条路径进入同一个 `WeatherContext` 语义：
+
+```text
+客户端明确提供天气
+→ ChatRequest.weather
+→ WeatherContext(source=user_provided)
+→ ShoppingAgentState.weather_context
+
+第三方天气 API / MCP
+→ WeatherProvider
+→ get_weather Tool
+→ 当前轮 ToolMessage
+```
+
+`WeatherProvider` 是领域层协议，只规定按照地点和日期返回天气，不依赖
+具体 SDK。API 或 MCP 适配器可以替换，而 Agent 只接触 `get_weather` 工具
+和标准化结果。当前尚未配置真实 Provider，因此默认注册表不会出现天气
+工具；客户端已知天气仍可以随聊天请求提供。
+
+天气包含地点、目标日期、天气状况、最低/最高温、体感温度、降雨概率、
+湿度、风速、来源和更新时间。至少需要存在一项天气事实，最低温不能高于
+最高温。每个聊天请求都会明确写入天气或 `None`，防止 Checkpointer 把
+上一轮天气误用于新请求。天气只影响当前 Outfit，不保存到 Style Profile
+或 PostgreSQL。
+
 只有当前轮实际调用 `search_wardrobe` 才进入该节点，因此普通知识问答和
 单独的商品搜索不会额外执行结构化 Outfit 模型调用。
 
@@ -534,6 +559,11 @@ compare_products
 ```
 
 工具参数必须使用 Pydantic Schema，工具结果应优先返回结构化 JSON。
+
+当前默认注册 `search_products`，每个请求额外注册绑定当前用户的
+`search_wardrobe`。`get_weather` 已实现，但只有装配具体
+`WeatherProvider` 时才进入请求级注册表，避免在没有真实数据源时向模型
+暴露一个无法执行的工具。
 
 ---
 

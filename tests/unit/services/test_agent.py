@@ -156,6 +156,7 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
     mocked_create_registry.assert_called_with(
         wardrobe_repository=fake_repository,
         user_id="user-001",
+        weather_provider=None,
     )
     mocked_create_graph.assert_called_with(
         model=fake_runtime.model,

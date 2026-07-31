@@ -6,6 +6,7 @@ from langgraph.graph.message import add_messages
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
+from app.domain.entities.weather import WeatherContext
 
 
 class ShoppingAgentState(TypedDict):
@@ -21,6 +22,9 @@ class ShoppingAgentState(TypedDict):
 
     # 本次 RAG 检索结果的来源文件
     knowledge_sources: NotRequired[list[str]]
+
+    # 当前请求明确提供的天气，只对本轮穿搭决策有效
+    weather_context: NotRequired[WeatherContext | None]
 
     # 用户已确认的历史 Outfit 反馈形成的个性化参考
     outfit_feedback_context: NotRequired[str]

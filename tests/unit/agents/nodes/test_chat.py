@@ -10,6 +10,7 @@ from app.domain.entities.outfit import (
     OutfitItem,
     OutfitRecommendation,
 )
+from app.domain.entities.weather import WeatherContext
 
 
 def test_chat_node_invokes_bound_model() -> None:
@@ -246,5 +247,43 @@ def test_chat_node_includes_previous_outfit_for_adjustment() -> None:
         system_message.content
     )
     assert "仍需重新查询当前可用衣橱" in (
+        system_message.content
+    )
+
+
+def test_chat_node_includes_current_weather_context() -> None:
+    """验证当前轮天气作为事实而不是系统指令加入提示词。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="建议穿透气衣物并携带雨具。",
+    )
+    chat_node = create_chat_node(model)
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="明天通勤怎么穿？",
+            ),
+        ],
+        "weather_context": WeatherContext(
+            location="上海",
+            target_date="2026-08-01",
+            condition="阵雨",
+            temperature_max_c=33,
+            precipitation_probability=70,
+            source="user_provided",
+        ),
+    }
+
+    chat_node(state)
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert '"location":"上海"' in (
+        system_message.content
+    )
+    assert '"precipitation_probability":70' in (
+        system_message.content
+    )
+    assert "不要补造缺失的实时天气" in (
         system_message.content
     )

@@ -121,8 +121,15 @@ def create_outfit_generation_node(
             state["messages"],
             "search_products",
         )
+        weather_records = get_current_turn_tool_records(
+            state["messages"],
+            "get_weather",
+        )
         previous_outfit = state.get(
             "previous_outfit_recommendation",
+        )
+        weather_context = state.get(
+            "weather_context",
         )
 
         generation_context = {
@@ -157,6 +164,14 @@ def create_outfit_generation_node(
                 if previous_outfit is not None
                 else None
             ),
+            "provided_weather": (
+                weather_context.model_dump(
+                    mode="json",
+                )
+                if weather_context is not None
+                else None
+            ),
+            "weather_tool_results": weather_records,
             "style_profile_context": state.get(
                 "style_profile_context",
                 "",

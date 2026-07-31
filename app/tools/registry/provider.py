@@ -5,6 +5,7 @@ from functools import lru_cache
 from app.db.repositories.provider import (
     get_product_repository,
 )
+from app.domain.providers.weather import WeatherProvider
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -13,6 +14,9 @@ from app.tools.builtins.product_search import (
 )
 from app.tools.builtins.wardrobe_search import (
     create_wardrobe_search_tool,
+)
+from app.tools.builtins.weather_lookup import (
+    create_weather_lookup_tool,
 )
 from app.tools.registry.registry import ToolRegistry
 
@@ -39,6 +43,7 @@ def get_tool_registry() -> ToolRegistry:
 def create_request_tool_registry(
     wardrobe_repository: WardrobeRepository,
     user_id: str,
+    weather_provider: WeatherProvider | None = None,
 ) -> ToolRegistry:
     """为当前用户创建包含请求级衣橱工具的注册表。"""
 
@@ -55,5 +60,11 @@ def create_request_tool_registry(
         user_id=user_id,
     )
     request_registry.register(wardrobe_search_tool)
+
+    if weather_provider is not None:
+        weather_tool = create_weather_lookup_tool(
+            weather_provider,
+        )
+        request_registry.register(weather_tool)
 
     return request_registry

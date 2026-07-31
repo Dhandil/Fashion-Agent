@@ -23,6 +23,7 @@ from app.domain.entities.outfit import (
     OutfitItem,
     OutfitRecommendation,
 )
+from app.domain.entities.weather import WeatherContext
 
 
 def create_current_turn_messages() -> list[AnyMessage]:
@@ -118,6 +119,14 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
         "previous_outfit_recommendation": (
             create_recommendation()
         ),
+        "weather_context": WeatherContext(
+            location="上海",
+            target_date="2026-08-01",
+            condition="阵雨",
+            temperature_max_c=33,
+            precipitation_probability=70,
+            source="user_provided",
+        ),
     }
 
     result = generate_outfit(state)
@@ -150,6 +159,12 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     assert "清爽夏季通勤" in (
         structured_messages[1].content
     )
+    assert '"provided_weather"' in (
+        structured_messages[1].content
+    )
+    assert '"precipitation_probability": 70' in (
+        structured_messages[1].content
+    )
     assert "output_schema" in (structured_messages[1].content)
 
 
@@ -175,6 +190,59 @@ def test_generate_outfit_discards_unknown_wardrobe_id() -> None:
     assert generate_outfit(state) == {
         "outfit_recommendation": None,
     }
+
+
+def test_generate_outfit_includes_weather_tool_result() -> None:
+    """验证真实天气工具结果进入结构化生成上下文。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    structured_model.invoke.return_value = (
+        OutfitGenerationResult(
+            outfit=create_recommendation(),
+        )
+    )
+    messages = create_current_turn_messages()
+    messages.insert(
+        -1,
+        ToolMessage(
+            name="get_weather",
+            tool_call_id="weather-call-1",
+            content=json.dumps(
+                [
+                    {
+                        "location": "上海",
+                        "target_date": "2026-08-01",
+                        "condition": "阵雨",
+                        "temperature_max_c": 33,
+                        "source": "api",
+                    },
+                ],
+                ensure_ascii=False,
+            ),
+        ),
+    )
+    generate_outfit = create_outfit_generation_node(
+        model,
+    )
+
+    result = generate_outfit(
+        {
+            "messages": messages,
+        },
+    )
+
+    assert result["outfit_recommendation"] is not None
+    generation_message = (
+        structured_model.invoke.call_args.args[0][1]
+    )
+    assert '"weather_tool_results"' in (
+        generation_message.content
+    )
+    assert '"condition": "阵雨"' in (
+        generation_message.content
+    )
 
 
 def test_generate_outfit_discards_unknown_product_id() -> None:

@@ -10,6 +10,10 @@ from app.api.dependencies.identity import (
     CurrentUserDependency,
 )
 from app.api.schemas.chat import ChatRequest, ChatResponse
+from app.domain.entities.weather import (
+    WeatherContext,
+    WeatherDataSource,
+)
 
 # 创建聊天接口路由
 router = APIRouter(
@@ -36,12 +40,23 @@ async def chat(
     # 用户 ID 加入 Checkpointer 的线程键，避免不同用户复用会话 ID
     thread_id = f"user:{current_user.user_id}:conversation:{conversation_id}"
 
+    weather_context = (
+        WeatherContext(
+            **request.weather.model_dump(),
+            source=WeatherDataSource.USER_PROVIDED,
+        )
+        if request.weather is not None
+        else None
+    )
+
     # 将 API 请求转换为 LangChain 消息并执行工作流
     result = await graph.ainvoke(
         {
             "messages": [
                 HumanMessage(content=request.message),
             ],
+            # 每轮都明确写入天气；None 会清除 Checkpointer 中的过期天气
+            "weather_context": weather_context,
         },
         config={
             "configurable": {

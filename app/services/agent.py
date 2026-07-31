@@ -11,6 +11,7 @@ from app.agents.graphs.shopping import (
     ShoppingGraph,
     create_shopping_graph,
 )
+from app.domain.providers.weather import WeatherProvider
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
@@ -58,6 +59,7 @@ def create_user_shopping_graph(
     outfit_feedback_repository: OutfitFeedbackRepository,
     style_profile_repository: StyleProfileRepository,
     user_id: str,
+    weather_provider: WeatherProvider | None = None,
 ) -> ShoppingGraph:
     """为当前用户创建绑定请求级仓库和工具的工作流。"""
 
@@ -68,6 +70,7 @@ def create_user_shopping_graph(
     request_tool_registry = create_request_tool_registry(
         wardrobe_repository=wardrobe_repository,
         user_id=user_id,
+        weather_provider=weather_provider,
     )
 
     return create_shopping_graph(

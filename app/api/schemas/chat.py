@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from app.api.schemas.weather import WeatherContextInput
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
@@ -21,6 +22,9 @@ class ChatRequest(BaseModel):
         max_length=2000,
         description="用户发送给个人穿搭助手的消息",
     )
+
+    # 可由前端定位和天气服务明确提供；不提供时 Agent 不虚构实时天气
+    weather: WeatherContextInput | None = None
 
 
 class ChatResponse(BaseModel):
