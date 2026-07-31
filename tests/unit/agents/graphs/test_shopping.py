@@ -8,6 +8,10 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agents.graphs.shopping import create_shopping_graph
+from app.domain.entities.outfit import (
+    OutfitItem,
+    OutfitRecommendation,
+)
 
 
 def test_shopping_graph_runs_chat_node() -> None:
@@ -36,6 +40,46 @@ def test_shopping_graph_runs_chat_node() -> None:
     assert len(result["messages"]) == 2
     assert result["messages"][0].content == "我想买一件衬衫"
     assert result["messages"][1].content == "请告诉我你的预算"
+
+
+def test_shopping_graph_moves_previous_outfit_to_adjustment_baseline() -> None:
+    """验证工作流每轮清空旧输出但保留结构化调整基线。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="我会为你调整上衣。",
+    )
+    previous_outfit = OutfitRecommendation(
+        name="原通勤搭配",
+        scenario="通勤",
+        items=(
+            OutfitItem(
+                role="上装",
+                name="浅蓝色衬衫",
+                source="wardrobe",
+                source_reference_id="shirt-001",
+            ),
+        ),
+        recommendation_reason="原方案。",
+    )
+    graph = create_shopping_graph(model)
+
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(
+                    content="换一件上衣",
+                ),
+            ],
+            "outfit_recommendation": previous_outfit,
+        },
+    )
+
+    assert result["outfit_recommendation"] is None
+    assert (
+        result["previous_outfit_recommendation"]
+        == previous_outfit
+    )
 
 
 def test_shopping_graph_remembers_messages_in_same_thread() -> None:

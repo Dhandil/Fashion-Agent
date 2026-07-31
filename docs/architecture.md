@@ -458,6 +458,10 @@ START
 
 ```text
 START
+→ prepare_turn
+→ load_style_profile
+→ load_recent_outfits
+→ load_outfit_feedback
 → retrieve_knowledge
 → chat
 → 判断工具调用
@@ -481,8 +485,18 @@ START
 Pydantic 结构校验和来源 ID 校验后才能进入 API 响应。
 
 衣橱和商品来源 ID 必须出现在当前轮对应工具的结果中；通用建议不能携带
-伪造 ID。每个新请求都会先清空旧的 `outfit_recommendation`，避免
-Checkpointer 中上一轮的推荐泄漏到当前响应。
+伪造 ID。`prepare_turn` 会先把上一轮成功生成的
+`outfit_recommendation` 保存为 `previous_outfit_recommendation`，
+再清空本轮输出，避免 Checkpointer 中的旧推荐泄漏到当前响应。
+
+`load_recent_outfits` 读取当前用户最近保存的有限 Outfit，并整理场景、
+风格和衣橱单品组合。近期记录只是减少完全重复的软约束：衣橱选择有限、
+场景需要或用户明确要求时可以复用。它们属于数据，不作为系统指令执行。
+
+当用户提出“换一件上衣”或“更休闲一点”等调整要求时，聊天和结构化生成
+节点可以读取 `previous_outfit_recommendation`，保留未要求改变且仍符合
+当前条件的部分。历史推荐不提供新的来源授权；调整后的所有衣橱和商品 ID
+仍必须出现在当前轮工具结果中。
 
 只有当前轮实际调用 `search_wardrobe` 才进入该节点，因此普通知识问答和
 单独的商品搜索不会额外执行结构化 Outfit 模型调用。

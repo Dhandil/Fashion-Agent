@@ -112,6 +112,12 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
         "style_profile_context": (
             "用户明确维护的喜欢风格：休闲。"
         ),
+        "recent_outfits_context": (
+            "近期已经使用 shirt-002 完成通勤搭配。"
+        ),
+        "previous_outfit_recommendation": (
+            create_recommendation()
+        ),
     }
 
     result = generate_outfit(state)
@@ -133,6 +139,15 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
         structured_messages[1].content
     )
     assert "用户明确维护的喜欢风格" in (
+        structured_messages[1].content
+    )
+    assert "近期已经使用 shirt-002" in (
+        structured_messages[1].content
+    )
+    assert '"previous_outfit"' in (
+        structured_messages[1].content
+    )
+    assert "清爽夏季通勤" in (
         structured_messages[1].content
     )
     assert "output_schema" in (structured_messages[1].content)

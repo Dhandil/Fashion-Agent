@@ -16,8 +16,14 @@ from app.agents.nodes.generate_outfit import (
 from app.agents.nodes.load_outfit_feedback import (
     create_load_outfit_feedback_node,
 )
+from app.agents.nodes.load_recent_outfits import (
+    create_load_recent_outfits_node,
+)
 from app.agents.nodes.load_style_profile import (
     create_load_style_profile_node,
+)
+from app.agents.nodes.prepare_turn import (
+    create_prepare_turn_node,
 )
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
@@ -106,8 +112,19 @@ def create_shopping_graph(
         cast(Any, chat_node),
     )
 
+    # 每轮先保存上一套结构化推荐并清空本轮输出，避免返回过期 Outfit
+    prepare_turn_node = create_prepare_turn_node()
+    graph_builder.add_node(
+        "prepare_turn",
+        cast(Any, prepare_turn_node),
+    )
+    graph_builder.add_edge(
+        START,
+        "prepare_turn",
+    )
+
     # entry_node_name 记录个性化和检索链路中当前最后一个节点
-    entry_node_name: str | None = None
+    entry_node_name: str | None = "prepare_turn"
 
     if (
         style_profile_repository is not None
@@ -128,6 +145,37 @@ def create_shopping_graph(
             START,
             entry_node_name,
         )
+
+    if (
+        outfit_repository is not None
+        and user_id is not None
+    ):
+        load_recent_outfits_node = (
+            create_load_recent_outfits_node(
+                repository=outfit_repository,
+                user_id=user_id,
+            )
+        )
+        recent_outfits_node_name = (
+            "load_recent_outfits"
+        )
+        graph_builder.add_node(
+            recent_outfits_node_name,
+            cast(Any, load_recent_outfits_node),
+        )
+
+        if entry_node_name is None:
+            graph_builder.add_edge(
+                START,
+                recent_outfits_node_name,
+            )
+        else:
+            graph_builder.add_edge(
+                entry_node_name,
+                recent_outfits_node_name,
+            )
+
+        entry_node_name = recent_outfits_node_name
 
     if (
         outfit_repository is not None

@@ -42,8 +42,6 @@ async def chat(
             "messages": [
                 HumanMessage(content=request.message),
             ],
-            # 每轮请求先清空旧推荐，避免返回上一轮的 Outfit
-            "outfit_recommendation": None,
         },
         config={
             "configurable": {

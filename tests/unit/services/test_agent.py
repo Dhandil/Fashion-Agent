@@ -248,6 +248,9 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
     outfit_repository = Mock(
         spec=OutfitRepository,
     )
+    outfit_repository.search = AsyncMock(
+        return_value=[],
+    )
     outfit_repository.get_by_ids = AsyncMock(
         return_value=[],
     )
@@ -309,6 +312,13 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
         category="衬衫",
         status=WardrobeItemStatus.AVAILABLE,
         limit=20,
+    )
+    outfit_repository.search.assert_awaited_once_with(
+        user_id="user-001",
+        scenario=None,
+        favorite_only=False,
+        limit=5,
+        offset=0,
     )
     feedback_repository.search.assert_awaited_once_with(
         user_id="user-001",

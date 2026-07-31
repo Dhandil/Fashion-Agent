@@ -121,6 +121,9 @@ def create_outfit_generation_node(
             state["messages"],
             "search_products",
         )
+        previous_outfit = state.get(
+            "previous_outfit_recommendation",
+        )
 
         generation_context = {
             # JSON Mode 不会自动把 Schema 发给模型，因此显式提供
@@ -142,6 +145,17 @@ def create_outfit_generation_node(
             "outfit_feedback_context": state.get(
                 "outfit_feedback_context",
                 "",
+            ),
+            "recent_outfits_context": state.get(
+                "recent_outfits_context",
+                "",
+            ),
+            "previous_outfit": (
+                previous_outfit.model_dump(
+                    mode="json",
+                )
+                if previous_outfit is not None
+                else None
             ),
             "style_profile_context": state.get(
                 "style_profile_context",

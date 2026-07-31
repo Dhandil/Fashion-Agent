@@ -6,6 +6,10 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from app.agents.nodes.chat import create_chat_node
 from app.agents.prompts.shopping import SHOPPING_ASSISTANT_SYSTEM_PROMPT
 from app.agents.state.shopping import ShoppingAgentState
+from app.domain.entities.outfit import (
+    OutfitItem,
+    OutfitRecommendation,
+)
 
 
 def test_chat_node_invokes_bound_model() -> None:
@@ -166,5 +170,81 @@ def test_chat_node_includes_explicit_style_profile() -> None:
         system_message.content
     )
     assert "以当前需求为准" in (
+        system_message.content
+    )
+
+
+def test_chat_node_includes_recent_outfits_as_soft_constraint() -> None:
+    """验证近期 Outfit 只作为减少重复的软约束。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="这次会优先更换一件主要单品。",
+    )
+    chat_node = create_chat_node(model)
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="再帮我搭配一套通勤服装",
+            ),
+        ],
+        "recent_outfits_context": (
+            "- 近期穿搭：清爽通勤；"
+            "单品组合：上装：浅蓝色衬衫"
+        ),
+    }
+
+    chat_node(state)
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "清爽通勤" in system_message.content
+    assert "减少短期内重复相同衣物组合" in (
+        system_message.content
+    )
+    assert "可以合理复用近期单品" in (
+        system_message.content
+    )
+
+
+def test_chat_node_includes_previous_outfit_for_adjustment() -> None:
+    """验证上一套结构化 Outfit 会作为局部调整基线。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="我会保留下装并更换上衣。",
+    )
+    chat_node = create_chat_node(model)
+    previous_outfit = OutfitRecommendation(
+        name="清爽通勤",
+        scenario="通勤",
+        items=(
+            OutfitItem(
+                role="上装",
+                name="浅蓝色衬衫",
+                source="wardrobe",
+                source_reference_id="shirt-001",
+            ),
+        ),
+        recommendation_reason="适合通勤。",
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="换一件上衣",
+            ),
+        ],
+        "previous_outfit_recommendation": (
+            previous_outfit
+        ),
+    }
+
+    chat_node(state)
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "清爽通勤" in system_message.content
+    assert "局部调整要求" in (
+        system_message.content
+    )
+    assert "仍需重新查询当前可用衣橱" in (
         system_message.content
     )

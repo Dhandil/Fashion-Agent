@@ -130,7 +130,8 @@ def test_chat_returns_agent_response() -> None:
     input_state = fake_graph.ainvoke.call_args.args[0]
 
     assert input_state["messages"][0].content == "我想买一件衬衫"
-    assert input_state["outfit_recommendation"] is None
+    # 旧推荐由 Graph 的 prepare_turn 节点清理并保存为调整基线
+    assert "outfit_recommendation" not in input_state
 
     # 读取传给工作流的执行配置
     graph_config = fake_graph.ainvoke.call_args.kwargs["config"]
