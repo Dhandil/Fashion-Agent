@@ -34,7 +34,9 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
         spec=OutfitFeedbackRepository,
     )
     repositories = FashionRepositories(
-        style_profiles=Mock(),
+        style_profiles=(
+            style_profile_repository := Mock()
+        ),
         wardrobe=wardrobe_repository,
         outfits=outfit_repository,
         outfit_feedback=feedback_repository,
@@ -55,5 +57,6 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
         wardrobe_repository=wardrobe_repository,
         outfit_repository=outfit_repository,
         outfit_feedback_repository=feedback_repository,
+        style_profile_repository=style_profile_repository,
         user_id="user-001",
     )

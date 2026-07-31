@@ -15,6 +15,9 @@ from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
 )
+from app.domain.repositories.style_profile import (
+    StyleProfileRepository,
+)
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -53,6 +56,7 @@ def create_user_shopping_graph(
     wardrobe_repository: WardrobeRepository,
     outfit_repository: OutfitRepository,
     outfit_feedback_repository: OutfitFeedbackRepository,
+    style_profile_repository: StyleProfileRepository,
     user_id: str,
 ) -> ShoppingGraph:
     """为当前用户创建绑定请求级仓库和工具的工作流。"""
@@ -75,5 +79,6 @@ def create_user_shopping_graph(
         outfit_feedback_repository=(
             outfit_feedback_repository
         ),
+        style_profile_repository=style_profile_repository,
         user_id=user_id,
     )

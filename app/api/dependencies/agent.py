@@ -28,6 +28,9 @@ def get_request_shopping_graph(
         outfit_feedback_repository=(
             repositories.outfit_feedback
         ),
+        style_profile_repository=(
+            repositories.style_profiles
+        ),
         user_id=current_user.user_id,
     )
 

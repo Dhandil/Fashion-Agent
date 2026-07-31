@@ -31,8 +31,9 @@ wardrobe_repository = Mock(
 )
 outfit_repository = Mock()
 outfit_feedback_repository = Mock()
+style_profile_repository = Mock()
 repositories = FashionRepositories(
-    style_profiles=Mock(),
+    style_profiles=style_profile_repository,
     wardrobe=wardrobe_repository,
     outfits=outfit_repository,
     outfit_feedback=outfit_feedback_repository,
@@ -118,6 +119,9 @@ def test_chat_returns_agent_response() -> None:
         outfit_repository=outfit_repository,
         outfit_feedback_repository=(
             outfit_feedback_repository
+        ),
+        style_profile_repository=(
+            style_profile_repository
         ),
         user_id="user-001",
     )

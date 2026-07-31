@@ -131,3 +131,40 @@ def test_chat_node_includes_confirmed_feedback_context() -> None:
     assert "当前用户明确提出的新需求优先" in (
         system_message.content
     )
+
+
+def test_chat_node_includes_explicit_style_profile() -> None:
+    """验证明确维护的 Style Profile 高于历史反馈。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="按照你的长期偏好搭配。",
+    )
+    chat_node = create_chat_node(model)
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="这次想尝试正式风格",
+            ),
+        ],
+        "style_profile_context": (
+            "- 喜欢的风格：休闲\n"
+            "- 用户主动说明：平时不要过于正式"
+        ),
+        "outfit_feedback_context": (
+            "- 用户态度：喜欢；用户说明：喜欢简约"
+        ),
+    }
+
+    chat_node(state)
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "喜欢的风格：休闲" in (
+        system_message.content
+    )
+    assert "应优先于历史反馈使用" in (
+        system_message.content
+    )
+    assert "以当前需求为准" in (
+        system_message.content
+    )

@@ -109,6 +109,9 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
         "outfit_feedback_context": (
             "用户喜欢简约清爽的历史穿搭。"
         ),
+        "style_profile_context": (
+            "用户明确维护的喜欢风格：休闲。"
+        ),
     }
 
     result = generate_outfit(state)
@@ -127,6 +130,9 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     assert "shirt-001" in (structured_messages[1].content)
     assert "亚麻适合炎热天气" in (structured_messages[1].content)
     assert "用户喜欢简约清爽" in (
+        structured_messages[1].content
+    )
+    assert "用户明确维护的喜欢风格" in (
         structured_messages[1].content
     )
     assert "output_schema" in (structured_messages[1].content)

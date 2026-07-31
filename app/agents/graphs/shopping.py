@@ -16,6 +16,9 @@ from app.agents.nodes.generate_outfit import (
 from app.agents.nodes.load_outfit_feedback import (
     create_load_outfit_feedback_node,
 )
+from app.agents.nodes.load_style_profile import (
+    create_load_style_profile_node,
+)
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
 )
@@ -24,6 +27,9 @@ from app.agents.state.shopping import ShoppingAgentState
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
+)
+from app.domain.repositories.style_profile import (
+    StyleProfileRepository,
 )
 
 ShoppingGraph: TypeAlias = CompiledStateGraph[
@@ -42,6 +48,9 @@ def create_shopping_graph(
     outfit_repository: OutfitRepository | None = None,
     outfit_feedback_repository: (
         OutfitFeedbackRepository | None
+    ) = None,
+    style_profile_repository: (
+        StyleProfileRepository | None
     ) = None,
     user_id: str | None = None,
 ) -> ShoppingGraph:
@@ -67,6 +76,14 @@ def create_shopping_graph(
             "加载 Outfit 反馈需要同时提供两个仓库和 user_id",
         )
 
+    if (
+        style_profile_repository is not None
+        and user_id is None
+    ):
+        raise ValueError(
+            "加载 Style Profile 需要同时提供 user_id",
+        )
+
     # 创建以 ShoppingAgentState 为共享状态的图构建器
     graph_builder = StateGraph(ShoppingAgentState)
 
@@ -89,8 +106,28 @@ def create_shopping_graph(
         cast(Any, chat_node),
     )
 
-    # 用户请求级仓库齐全时，先加载已经确认的历史反馈
-    feedback_node_name: str | None = None
+    # entry_node_name 记录个性化和检索链路中当前最后一个节点
+    entry_node_name: str | None = None
+
+    if (
+        style_profile_repository is not None
+        and user_id is not None
+    ):
+        load_style_profile_node = (
+            create_load_style_profile_node(
+                repository=style_profile_repository,
+                user_id=user_id,
+            )
+        )
+        entry_node_name = "load_style_profile"
+        graph_builder.add_node(
+            entry_node_name,
+            cast(Any, load_style_profile_node),
+        )
+        graph_builder.add_edge(
+            START,
+            entry_node_name,
+        )
 
     if (
         outfit_repository is not None
@@ -111,10 +148,19 @@ def create_shopping_graph(
             feedback_node_name,
             cast(Any, load_outfit_feedback_node),
         )
-        graph_builder.add_edge(
-            START,
-            feedback_node_name,
-        )
+
+        if entry_node_name is None:
+            graph_builder.add_edge(
+                START,
+                feedback_node_name,
+            )
+        else:
+            graph_builder.add_edge(
+                entry_node_name,
+                feedback_node_name,
+            )
+
+        entry_node_name = feedback_node_name
 
     # 提供 Retriever 时，在个性化反馈之后检索知识
     if retriever is not None:
@@ -126,14 +172,14 @@ def create_shopping_graph(
             "retrieve_knowledge",
             cast(Any, retrieve_knowledge_node),
         )
-        if feedback_node_name is None:
+        if entry_node_name is None:
             graph_builder.add_edge(
                 START,
                 "retrieve_knowledge",
             )
         else:
             graph_builder.add_edge(
-                feedback_node_name,
+                entry_node_name,
                 "retrieve_knowledge",
             )
 
@@ -142,15 +188,15 @@ def create_shopping_graph(
             "chat",
         )
     else:
-        if feedback_node_name is None:
-            # 没有反馈仓库和 Retriever 时保持原来的单节点工作流
+        if entry_node_name is None:
+            # 没有个性化仓库和 Retriever 时保持原来的单节点工作流
             graph_builder.add_edge(
                 START,
                 "chat",
             )
         else:
             graph_builder.add_edge(
-                feedback_node_name,
+                entry_node_name,
                 "chat",
             )
 

@@ -143,6 +143,10 @@ def create_outfit_generation_node(
                 "outfit_feedback_context",
                 "",
             ),
+            "style_profile_context": state.get(
+                "style_profile_context",
+                "",
+            ),
             "wardrobe_items": wardrobe_records,
             "products": product_records,
         }

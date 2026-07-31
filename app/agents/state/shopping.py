@@ -25,5 +25,8 @@ class ShoppingAgentState(TypedDict):
     # 用户已确认的历史 Outfit 反馈形成的个性化参考
     outfit_feedback_context: NotRequired[str]
 
+    # 用户明确维护的长期穿搭档案
+    style_profile_context: NotRequired[str]
+
     # Agent 生成的结构化穿搭推荐；普通问答时可以不存在
     outfit_recommendation: NotRequired[OutfitRecommendation | None]
