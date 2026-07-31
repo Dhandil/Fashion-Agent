@@ -6,6 +6,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.mappers.style_profile import (
+    style_profile_entity_to_model,
+)
 from app.db.models.style_profile import (
     StyleProfileModel,
 )
@@ -14,9 +17,6 @@ from app.db.repositories.postgres_style_profile import (
 )
 from app.domain.entities.style_profile import (
     StyleProfile,
-)
-from app.db.mappers.style_profile import (
-    style_profile_entity_to_model,
 )
 
 
@@ -28,6 +28,9 @@ def create_test_style_profile() -> StyleProfile:
         preferred_styles=(
             "简约",
             "通勤",
+        ),
+        avoided_styles=(
+            "街头",
         ),
         preferred_colors=(
             "黑色",
@@ -76,6 +79,9 @@ async def test_postgres_style_profile_repository_saves_profile() -> None:
     assert merged_model.preferred_styles == [
         "简约",
         "通勤",
+    ]
+    assert merged_model.avoided_styles == [
+        "街头",
     ]
     assert (
         merged_model.typical_budget_max

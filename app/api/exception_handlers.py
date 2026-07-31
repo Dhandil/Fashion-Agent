@@ -72,3 +72,37 @@ async def outfit_feedback_not_found_handler(
         status_code=status.HTTP_404_NOT_FOUND,
         content=error_response.model_dump(),
     )
+
+
+async def preference_candidate_unavailable_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将不可确认的偏好候选转换成统一的 409 响应。"""
+
+    error_response = ErrorResponse(
+        code="preference_candidate_unavailable",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=error_response.model_dump(),
+    )
+
+
+async def style_profile_update_conflict_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将长期档案部分更新冲突转换成统一的 409 响应。"""
+
+    error_response = ErrorResponse(
+        code="style_profile_update_conflict",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=error_response.model_dump(),
+    )

@@ -32,3 +32,15 @@ class OutfitNotFoundError(FashionAgentError):
 
 class OutfitFeedbackNotFoundError(FashionAgentError):
     """当前用户尚未对指定的已保存穿搭提供反馈。"""
+
+
+class PreferenceCandidateUnavailableError(
+    FashionAgentError,
+):
+    """用户尝试确认的偏好候选已不存在或证据不足。"""
+
+
+class StyleProfileUpdateConflictError(
+    FashionAgentError,
+):
+    """部分更新与当前长期穿搭档案产生冲突。"""

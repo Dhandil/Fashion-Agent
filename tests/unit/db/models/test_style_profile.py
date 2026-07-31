@@ -21,6 +21,7 @@ def test_style_profile_model_defines_required_columns() -> None:
     assert column_names == {
         "user_id",
         "preferred_styles",
+        "avoided_styles",
         "preferred_colors",
         "avoided_colors",
         "preferred_fits",

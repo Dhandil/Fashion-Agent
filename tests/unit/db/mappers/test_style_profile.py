@@ -20,6 +20,9 @@ def test_style_profile_mapper_preserves_profile_data() -> None:
             "简约",
             "通勤",
         ),
+        avoided_styles=(
+            "街头",
+        ),
         preferred_colors=(
             "黑色",
             "灰色",
@@ -51,6 +54,9 @@ def test_style_profile_mapper_preserves_profile_data() -> None:
     assert profile_model.preferred_styles == [
         "简约",
         "通勤",
+    ]
+    assert profile_model.avoided_styles == [
+        "街头",
     ]
     assert profile_model.preferred_colors == [
         "黑色",

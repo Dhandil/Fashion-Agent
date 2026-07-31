@@ -4,6 +4,12 @@ from collections import defaultdict
 from collections.abc import Sequence
 from decimal import Decimal
 
+from pydantic import ValidationError
+
+from app.core.exceptions import (
+    PreferenceCandidateUnavailableError,
+    StyleProfileUpdateConflictError,
+)
 from app.domain.entities.outfit import Outfit
 from app.domain.entities.outfit_feedback import (
     OutfitFeedback,
@@ -186,6 +192,116 @@ async def analyze_style_preference_candidates(
     )
 
 
+def _append_unique_value(
+    values: tuple[str, ...],
+    new_value: str,
+) -> tuple[str, ...]:
+    """忽略大小写添加一个尚不存在的规范值。"""
+
+    normalized_value = new_value.casefold()
+
+    if any(
+        value.casefold() == normalized_value
+        for value in values
+    ):
+        return values
+
+    return (
+        *values,
+        new_value,
+    )
+
+
+def _remove_value(
+    values: tuple[str, ...],
+    removed_value: str,
+) -> tuple[str, ...]:
+    """忽略大小写从不可变字符串元组中移除指定值。"""
+
+    normalized_value = removed_value.casefold()
+
+    return tuple(
+        value
+        for value in values
+        if value.casefold() != normalized_value
+    )
+
+
+async def confirm_style_preference_candidate(
+    style_profile_repository: StyleProfileRepository,
+    outfit_repository: OutfitRepository,
+    feedback_repository: OutfitFeedbackRepository,
+    user_id: str,
+    value: str,
+    direction: PreferenceDirection,
+    minimum_evidence: int = 2,
+) -> StyleProfile:
+    """重新校验证据后把用户确认的风格候选合并进档案。"""
+
+    candidates = await analyze_style_preference_candidates(
+        outfit_repository=outfit_repository,
+        feedback_repository=feedback_repository,
+        user_id=user_id,
+        minimum_evidence=minimum_evidence,
+    )
+    normalized_value = value.strip().casefold()
+    matched_candidate = next(
+        (
+            candidate
+            for candidate in candidates
+            if (
+                candidate.value.casefold()
+                == normalized_value
+                and candidate.direction is direction
+                and candidate.category
+                is PreferenceCandidateCategory.STYLE
+            )
+        ),
+        None,
+    )
+
+    if matched_candidate is None:
+        raise PreferenceCandidateUnavailableError(
+            "候选偏好已不存在、方向已变化或证据不足",
+        )
+
+    profile = await get_style_profile(
+        repository=style_profile_repository,
+        user_id=user_id,
+    )
+    confirmed_value = matched_candidate.value
+
+    if direction is PreferenceDirection.PREFER:
+        preferred_styles = _append_unique_value(
+            profile.preferred_styles,
+            confirmed_value,
+        )
+        avoided_styles = _remove_value(
+            profile.avoided_styles,
+            confirmed_value,
+        )
+    else:
+        preferred_styles = _remove_value(
+            profile.preferred_styles,
+            confirmed_value,
+        )
+        avoided_styles = _append_unique_value(
+            profile.avoided_styles,
+            confirmed_value,
+        )
+
+    updated_profile = profile.model_copy(
+        update={
+            "preferred_styles": preferred_styles,
+            "avoided_styles": avoided_styles,
+        },
+    )
+
+    return await style_profile_repository.save(
+        updated_profile,
+    )
+
+
 async def get_style_profile(
     repository: StyleProfileRepository,
     user_id: str,
@@ -208,6 +324,7 @@ async def replace_style_profile(
     repository: StyleProfileRepository,
     user_id: str,
     preferred_styles: tuple[str, ...] = (),
+    avoided_styles: tuple[str, ...] = (),
     preferred_colors: tuple[str, ...] = (),
     avoided_colors: tuple[str, ...] = (),
     preferred_fits: tuple[str, ...] = (),
@@ -222,6 +339,7 @@ async def replace_style_profile(
     profile = StyleProfile(
         user_id=user_id,
         preferred_styles=preferred_styles,
+        avoided_styles=avoided_styles,
         preferred_colors=preferred_colors,
         avoided_colors=avoided_colors,
         preferred_fits=preferred_fits,
@@ -234,4 +352,36 @@ async def replace_style_profile(
 
     return await repository.save(
         profile,
+    )
+
+
+async def patch_style_profile(
+    repository: StyleProfileRepository,
+    user_id: str,
+    changes: dict[str, object],
+) -> StyleProfile:
+    """把明确提供的字段合并到当前长期档案。"""
+
+    profile = await get_style_profile(
+        repository=repository,
+        user_id=user_id,
+    )
+
+    if not changes:
+        return profile
+
+    merged_data = profile.model_dump()
+    merged_data.update(changes)
+
+    try:
+        updated_profile = StyleProfile.model_validate(
+            merged_data,
+        )
+    except ValidationError as exc:
+        raise StyleProfileUpdateConflictError(
+            "更新后的档案包含互相冲突的偏好或预算范围",
+        ) from exc
+
+    return await repository.save(
+        updated_profile,
     )

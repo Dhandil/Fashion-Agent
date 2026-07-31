@@ -11,14 +11,18 @@ from app.api.dependencies.identity import (
     CurrentUserDependency,
 )
 from app.api.schemas.style_profile import (
+    PreferenceCandidateConfirmRequest,
     PreferenceCandidateListResponse,
     PreferenceCandidateResponse,
+    StyleProfilePatchRequest,
     StyleProfileResponse,
     StyleProfileUpsertRequest,
 )
 from app.services.style_profile import (
     analyze_style_preference_candidates,
+    confirm_style_preference_candidate,
     get_style_profile,
+    patch_style_profile,
     replace_style_profile,
 )
 
@@ -68,6 +72,37 @@ async def list_preference_candidates(
     )
 
 
+@router.post(
+    "/candidates/confirm",
+    response_model=StyleProfileResponse,
+    summary="确认长期偏好候选",
+)
+async def confirm_preference_candidate(
+    request: PreferenceCandidateConfirmRequest,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> StyleProfileResponse:
+    """重新校验证据，并把用户确认的候选合并进长期档案。"""
+
+    profile = await confirm_style_preference_candidate(
+        style_profile_repository=(
+            repositories.style_profiles
+        ),
+        outfit_repository=repositories.outfits,
+        feedback_repository=(
+            repositories.outfit_feedback
+        ),
+        user_id=current_user.user_id,
+        value=request.value,
+        direction=request.direction,
+        minimum_evidence=request.minimum_evidence,
+    )
+
+    return StyleProfileResponse.model_validate(
+        profile,
+    )
+
+
 @router.get(
     "",
     response_model=StyleProfileResponse,
@@ -105,6 +140,7 @@ async def upsert_style_profile(
         repository=repositories.style_profiles,
         user_id=current_user.user_id,
         preferred_styles=request.preferred_styles,
+        avoided_styles=request.avoided_styles,
         preferred_colors=request.preferred_colors,
         avoided_colors=request.avoided_colors,
         preferred_fits=request.preferred_fits,
@@ -113,6 +149,31 @@ async def upsert_style_profile(
         typical_budget_min=request.typical_budget_min,
         typical_budget_max=request.typical_budget_max,
         notes=request.notes,
+    )
+
+    return StyleProfileResponse.model_validate(
+        profile,
+    )
+
+
+@router.patch(
+    "",
+    response_model=StyleProfileResponse,
+    summary="部分更新长期穿搭档案",
+)
+async def update_style_profile(
+    request: StyleProfilePatchRequest,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> StyleProfileResponse:
+    """只更新请求中明确提供的长期偏好字段。"""
+
+    profile = await patch_style_profile(
+        repository=repositories.style_profiles,
+        user_id=current_user.user_id,
+        changes=request.model_dump(
+            exclude_unset=True,
+        ),
     )
 
     return StyleProfileResponse.model_validate(

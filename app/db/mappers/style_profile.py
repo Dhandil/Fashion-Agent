@@ -19,6 +19,9 @@ def style_profile_entity_to_model(
         preferred_styles=list(
             profile.preferred_styles,
         ),
+        avoided_styles=list(
+            profile.avoided_styles,
+        ),
         preferred_colors=list(
             profile.preferred_colors,
         ),
@@ -50,6 +53,9 @@ def style_profile_model_to_entity(
         # 显式恢复成领域层使用的只读元组
         preferred_styles=tuple(
             profile_model.preferred_styles,
+        ),
+        avoided_styles=tuple(
+            profile_model.avoided_styles,
         ),
         preferred_colors=tuple(
             profile_model.preferred_colors,

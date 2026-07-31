@@ -22,6 +22,7 @@ from app.domain.entities.outfit_feedback import (
     OutfitFeedback,
     OutfitFeedbackSentiment,
 )
+from app.domain.entities.style_profile import StyleProfile
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
@@ -91,6 +92,7 @@ def test_get_style_profile_returns_empty_profile() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "preferred_styles": [],
+        "avoided_styles": [],
         "preferred_colors": [],
         "avoided_colors": [],
         "preferred_fits": [],
@@ -140,6 +142,9 @@ def test_put_style_profile_uses_current_user() -> None:
                     "简约",
                     "休闲",
                 ],
+                "avoided_styles": [
+                    "街头",
+                ],
                 "preferred_colors": [
                     "浅蓝色",
                 ],
@@ -156,6 +161,9 @@ def test_put_style_profile_uses_current_user() -> None:
     assert response_data["preferred_styles"] == [
         "简约",
         "休闲",
+    ]
+    assert response_data["avoided_styles"] == [
+        "街头",
     ]
     assert response_data["preferred_colors"] == [
         "浅蓝色",
@@ -210,6 +218,253 @@ def test_put_style_profile_rejects_invalid_budget() -> None:
         application.dependency_overrides.clear()
 
     assert response.status_code == 422
+    repository.save.assert_not_awaited()
+
+
+def test_put_style_profile_rejects_conflicting_preferences() -> None:
+    """验证完整替换请求不能同时喜欢和避免同一风格。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repositories = create_repositories(repository)
+
+    async def override_repositories() -> FashionRepositories:
+        """提供不应该收到冲突档案的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.put(
+            "/api/v1/style-profile",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "preferred_styles": [
+                    " 简约 ",
+                ],
+                "avoided_styles": [
+                    "简约",
+                ],
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    repository.save.assert_not_awaited()
+
+
+def test_patch_style_profile_preserves_omitted_fields() -> None:
+    """验证 PATCH 更新说明时保留已有偏好字段。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+            preferred_colors=(
+                "浅蓝色",
+            ),
+            notes="原说明",
+        )
+    )
+    repository.save.side_effect = (
+        lambda profile: profile
+    )
+    repositories = create_repositories(repository)
+
+    async def override_repositories() -> FashionRepositories:
+        """提供部分更新使用的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/style-profile",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "notes": "更新后的说明",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["preferred_styles"] == [
+        "简约",
+    ]
+    assert response.json()["preferred_colors"] == [
+        "浅蓝色",
+    ]
+    assert response.json()["notes"] == "更新后的说明"
+
+
+def test_patch_style_profile_empty_request_does_not_save() -> None:
+    """验证空 PATCH 返回当前档案且不写入数据库。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+        )
+    )
+    repositories = create_repositories(repository)
+
+    async def override_repositories() -> FashionRepositories:
+        """提供空 PATCH 使用的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/style-profile",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={},
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["preferred_styles"] == [
+        "简约",
+    ]
+    repository.save.assert_not_awaited()
+
+
+def test_patch_style_profile_rejects_null_sequence() -> None:
+    """验证偏好列表不能用 null 清空，应明确传空数组。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repositories = create_repositories(repository)
+
+    async def override_repositories() -> FashionRepositories:
+        """提供不应收到无效 PATCH 的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/style-profile",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "preferred_styles": None,
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    repository.get_by_user_id.assert_not_awaited()
+    repository.save.assert_not_awaited()
+
+
+def test_patch_style_profile_returns_conflict_for_stored_state() -> None:
+    """验证 PATCH 与已有档案冲突时返回结构化 409。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+        )
+    )
+    repositories = create_repositories(repository)
+
+    async def override_repositories() -> FashionRepositories:
+        """提供已有喜欢风格的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/style-profile",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "avoided_styles": [
+                    "简约",
+                ],
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "style_profile_update_conflict",
+        "message": (
+            "更新后的档案包含互相冲突的偏好或预算范围"
+        ),
+    }
     repository.save.assert_not_awaited()
 
 
@@ -310,5 +565,170 @@ def test_get_preference_candidates_returns_evidence() -> None:
         ],
         "count": 1,
         "minimum_evidence": 2,
+    }
+    style_profile_repository.save.assert_not_awaited()
+
+
+def test_confirm_preference_candidate_updates_profile() -> None:
+    """验证确认当前候选后合并长期档案并处理互斥风格。"""
+
+    style_profile_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    style_profile_repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+            avoided_styles=(
+                "休闲",
+            ),
+        )
+    )
+    style_profile_repository.save.side_effect = (
+        lambda profile: profile
+    )
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        Outfit(
+            outfit_id=outfit_id,
+            user_id="user-001",
+            name=f"休闲穿搭 {outfit_id}",
+            scenario="日常",
+            style_tags=(
+                "休闲",
+            ),
+            items=(
+                OutfitItem(
+                    role="上装",
+                    name="测试上装",
+                    source="recommendation",
+                ),
+            ),
+            recommendation_reason="候选确认测试。",
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    feedback_repository.search.return_value = [
+        OutfitFeedback(
+            user_id="user-001",
+            outfit_id=outfit_id,
+            sentiment=OutfitFeedbackSentiment.LIKE,
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    repositories = FashionRepositories(
+        style_profiles=style_profile_repository,
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+        outfit_feedback=feedback_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供候选确认所需的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.post(
+            "/api/v1/style-profile/candidates/confirm",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "category": "style",
+                "value": "休闲",
+                "direction": "prefer",
+                "minimum_evidence": 2,
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["preferred_styles"] == [
+        "简约",
+        "休闲",
+    ]
+    assert response.json()["avoided_styles"] == []
+    assert "user_id" not in response.json()
+
+
+def test_confirm_preference_candidate_rejects_stale_candidate() -> None:
+    """验证过期候选返回结构化 409 且不会保存档案。"""
+
+    style_profile_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = []
+    repositories = FashionRepositories(
+        style_profiles=style_profile_repository,
+        wardrobe=Mock(),
+        outfits=outfit_repository,
+        outfit_feedback=feedback_repository,
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供没有有效候选的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.post(
+            "/api/v1/style-profile/candidates/confirm",
+            headers={
+                "X-User-ID": "user-001",
+            },
+            json={
+                "category": "style",
+                "value": "休闲",
+                "direction": "prefer",
+            },
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "preference_candidate_unavailable",
+        "message": (
+            "候选偏好已不存在、方向已变化或证据不足"
+        ),
     }
     style_profile_repository.save.assert_not_awaited()

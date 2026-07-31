@@ -5,6 +5,8 @@ from app.api.exception_handlers import (
     outfit_feedback_not_found_handler,
     outfit_not_found_handler,
     outfit_recommendation_not_found_handler,
+    preference_candidate_unavailable_handler,
+    style_profile_update_conflict_handler,
 )
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -13,6 +15,8 @@ from app.core.exceptions import (
     OutfitFeedbackNotFoundError,
     OutfitNotFoundError,
     OutfitRecommendationNotFoundError,
+    PreferenceCandidateUnavailableError,
+    StyleProfileUpdateConflictError,
 )
 from app.core.logging import setup_logging
 
@@ -54,6 +58,14 @@ def create_app() -> FastAPI:
     application.add_exception_handler(
         OutfitFeedbackNotFoundError,
         outfit_feedback_not_found_handler,
+    )
+    application.add_exception_handler(
+        PreferenceCandidateUnavailableError,
+        preference_candidate_unavailable_handler,
+    )
+    application.add_exception_handler(
+        StyleProfileUpdateConflictError,
+        style_profile_update_conflict_handler,
     )
 
     return application

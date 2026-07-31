@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.core.exceptions import (
+    PreferenceCandidateUnavailableError,
+    StyleProfileUpdateConflictError,
+)
 from app.domain.entities.outfit import Outfit, OutfitItem
 from app.domain.entities.outfit_feedback import (
     OutfitFeedback,
@@ -24,7 +28,9 @@ from app.domain.repositories.style_profile import (
 from app.services.style_profile import (
     analyze_style_preference_candidates,
     build_style_preference_candidates,
+    confirm_style_preference_candidate,
     get_style_profile,
+    patch_style_profile,
     replace_style_profile,
 )
 
@@ -103,6 +109,9 @@ async def test_replace_style_profile_uses_current_user() -> None:
             "简约",
             "休闲",
         ),
+        avoided_styles=(
+            "街头",
+        ),
         preferred_colors=(
             "浅蓝色",
         ),
@@ -116,6 +125,9 @@ async def test_replace_style_profile_uses_current_user() -> None:
         "简约",
         "休闲",
     )
+    assert profile.avoided_styles == (
+        "街头",
+    )
     assert profile.preferred_colors == (
         "浅蓝色",
     )
@@ -123,6 +135,109 @@ async def test_replace_style_profile_uses_current_user() -> None:
     repository.save.assert_awaited_once_with(
         profile,
     )
+
+
+@pytest.mark.anyio
+async def test_patch_style_profile_preserves_omitted_fields() -> None:
+    """验证部分更新只替换明确提供的字段。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+            preferred_colors=(
+                "浅蓝色",
+            ),
+            notes="原说明",
+        )
+    )
+    repository.save.side_effect = (
+        lambda profile: profile
+    )
+
+    profile = await patch_style_profile(
+        repository=repository,
+        user_id="user-001",
+        changes={
+            "notes": "更新后的说明",
+        },
+    )
+
+    assert profile.preferred_styles == (
+        "简约",
+    )
+    assert profile.preferred_colors == (
+        "浅蓝色",
+    )
+    assert profile.notes == "更新后的说明"
+    repository.save.assert_awaited_once_with(
+        profile,
+    )
+
+
+@pytest.mark.anyio
+async def test_patch_style_profile_empty_changes_does_not_save() -> None:
+    """验证空 PATCH 只返回当前档案，不产生无意义写入。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    current_profile = StyleProfile(
+        user_id="user-001",
+        preferred_styles=(
+            "简约",
+        ),
+    )
+    repository.get_by_user_id.return_value = (
+        current_profile
+    )
+
+    profile = await patch_style_profile(
+        repository=repository,
+        user_id="user-001",
+        changes={},
+    )
+
+    assert profile is current_profile
+    repository.save.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_patch_style_profile_rejects_merged_conflict() -> None:
+    """验证局部更新与已有偏好冲突时不写入仓库。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+        )
+    )
+
+    with pytest.raises(
+        StyleProfileUpdateConflictError,
+        match="互相冲突",
+    ):
+        await patch_style_profile(
+            repository=repository,
+            user_id="user-001",
+            changes={
+                "avoided_styles": (
+                    "简约",
+                ),
+            },
+        )
+
+    repository.save.assert_not_awaited()
 
 
 def test_build_style_candidates_tracks_opposing_evidence() -> None:
@@ -296,3 +411,186 @@ async def test_analyze_style_candidates_uses_batch_queries() -> None:
             "outfit-002",
         ),
     )
+
+
+@pytest.mark.anyio
+async def test_confirm_preferred_style_updates_profile() -> None:
+    """验证确认偏好候选时加入喜欢并移除相同避免风格。"""
+
+    feedback_items = [
+        create_feedback(
+            outfit_id,
+            OutfitFeedbackSentiment.LIKE,
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    outfits = [
+        create_feedback_outfit(
+            outfit_id,
+            (
+                "休闲",
+            ),
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids.return_value = outfits
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = (
+        feedback_items
+    )
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    style_repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "简约",
+            ),
+            avoided_styles=(
+                "休闲",
+            ),
+        )
+    )
+    style_repository.save.side_effect = (
+        lambda profile: profile
+    )
+
+    profile = await confirm_style_preference_candidate(
+        style_profile_repository=style_repository,
+        outfit_repository=outfit_repository,
+        feedback_repository=feedback_repository,
+        user_id="user-001",
+        value=" 休闲 ",
+        direction=PreferenceDirection.PREFER,
+    )
+
+    assert profile.preferred_styles == (
+        "简约",
+        "休闲",
+    )
+    assert profile.avoided_styles == ()
+    style_repository.save.assert_awaited_once_with(
+        profile,
+    )
+
+
+@pytest.mark.anyio
+async def test_confirm_avoided_style_updates_profile() -> None:
+    """验证确认避免候选时移除相同喜欢风格。"""
+
+    feedback_items = [
+        create_feedback(
+            outfit_id,
+            OutfitFeedbackSentiment.DISLIKE,
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        create_feedback_outfit(
+            outfit_id,
+            (
+                "街头",
+            ),
+        )
+        for outfit_id in (
+            "outfit-001",
+            "outfit-002",
+        )
+    ]
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = (
+        feedback_items
+    )
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    style_repository.get_by_user_id.return_value = (
+        StyleProfile(
+            user_id="user-001",
+            preferred_styles=(
+                "街头",
+            ),
+        )
+    )
+    style_repository.save.side_effect = (
+        lambda profile: profile
+    )
+
+    profile = await confirm_style_preference_candidate(
+        style_profile_repository=style_repository,
+        outfit_repository=outfit_repository,
+        feedback_repository=feedback_repository,
+        user_id="user-001",
+        value="街头",
+        direction=PreferenceDirection.AVOID,
+    )
+
+    assert profile.preferred_styles == ()
+    assert profile.avoided_styles == (
+        "街头",
+    )
+
+
+@pytest.mark.anyio
+async def test_confirm_style_candidate_rejects_stale_evidence() -> None:
+    """验证证据不足的过期候选不能修改长期档案。"""
+
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        create_feedback_outfit(
+            "outfit-001",
+            (
+                "休闲",
+            ),
+        ),
+    ]
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = [
+        create_feedback(
+            "outfit-001",
+            OutfitFeedbackSentiment.LIKE,
+        ),
+    ]
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+
+    with pytest.raises(
+        PreferenceCandidateUnavailableError,
+        match="证据不足",
+    ):
+        await confirm_style_preference_candidate(
+            style_profile_repository=style_repository,
+            outfit_repository=outfit_repository,
+            feedback_repository=feedback_repository,
+            user_id="user-001",
+            value="休闲",
+            direction=PreferenceDirection.PREFER,
+        )
+
+    style_repository.get_by_user_id.assert_not_awaited()
+    style_repository.save.assert_not_awaited()

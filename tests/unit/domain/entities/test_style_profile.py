@@ -17,6 +17,9 @@ def test_style_profile_converts_preferences_to_tuples() -> None:
             "简约",
             "通勤",
         ],
+        avoided_styles=[
+            "街头",
+        ],
         preferred_colors=[
             "黑色",
             "灰色",
@@ -33,6 +36,9 @@ def test_style_profile_converts_preferences_to_tuples() -> None:
     assert profile.preferred_colors == (
         "黑色",
         "灰色",
+    )
+    assert profile.avoided_styles == (
+        "街头",
     )
 
     # 金额字符串应该转换为 Decimal
@@ -57,11 +63,7 @@ def test_style_profile_is_immutable() -> None:
 
     # frozen=True 应阻止直接修改字段
     with pytest.raises(ValidationError):
-        setattr(
-            profile,
-            "notes",
-            "用户不喜欢高领",
-        )
+        profile.notes = "用户不喜欢高领"
 
 
 def test_style_profile_rejects_invalid_budget_range() -> None:
@@ -75,6 +77,72 @@ def test_style_profile_rejects_invalid_budget_range() -> None:
             user_id="user-001",
             typical_budget_min="600.00",
             typical_budget_max="300.00",
+        )
+
+
+def test_style_profile_normalizes_preference_values() -> None:
+    """验证偏好值会去除空白、空项和大小写重复项。"""
+
+    profile = StyleProfile(
+        user_id="user-001",
+        preferred_styles=(
+            " 简约 ",
+            "简约",
+            "CASUAL",
+            " casual ",
+            "",
+            "   ",
+        ),
+    )
+
+    assert profile.preferred_styles == (
+        "简约",
+        "CASUAL",
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "preferred_field",
+        "avoided_field",
+        "error_message",
+    ),
+    (
+        (
+            "preferred_styles",
+            "avoided_styles",
+            "同一风格不能同时标记为喜欢和避免",
+        ),
+        (
+            "preferred_colors",
+            "avoided_colors",
+            "同一颜色不能同时标记为喜欢和避免",
+        ),
+    ),
+)
+def test_style_profile_rejects_conflicting_preferences(
+    preferred_field: str,
+    avoided_field: str,
+    error_message: str,
+) -> None:
+    """验证同一偏好不能同时存在于喜欢和避免列表。"""
+
+    profile_data: dict[str, object] = {
+        "user_id": "user-001",
+        preferred_field: (
+            " 浅蓝色 ",
+        ),
+        avoided_field: (
+            "浅蓝色",
+        ),
+    }
+
+    with pytest.raises(
+        ValidationError,
+        match=error_message,
+    ):
+        StyleProfile.model_validate(
+            profile_data,
         )
 
 

@@ -21,6 +21,10 @@ def build_style_profile_context(
             profile.preferred_styles,
         ),
         (
+            "希望避免的风格",
+            profile.avoided_styles,
+        ),
+        (
             "喜欢的颜色",
             profile.preferred_colors,
         ),

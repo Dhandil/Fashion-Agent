@@ -210,8 +210,9 @@ domain entities and protocols
 ```text
 StyleProfile
 ├── 用户长期风格偏好
+├── 用户明确避免的风格
 ├── 尺码和版型偏好
-├── 颜色与材质偏好
+├── 喜欢与避免的颜色、材质偏好
 └── 常见场景和预算
 
 WardrobeItem
@@ -238,6 +239,26 @@ OutfitRecommendation
 ```
 
 系统的核心产物是 `Outfit`，而不是 `Product`。
+
+`StyleProfile` 只保存用户主动提供或明确确认的长期偏好。喜欢和避免的
+风格、颜色必须互斥；序列字段在进入领域实体时统一去除首尾空格、空项和
+大小写重复项。
+
+Style Profile 当前提供：
+
+- `GET /api/v1/style-profile`：查询当前用户档案。
+- `PUT /api/v1/style-profile`：完整替换档案，未提供的字段会恢复默认值。
+- `PATCH /api/v1/style-profile`：只更新明确提供的字段，偏好列表使用空数组
+  表示清空，不能使用 `null`。
+- `GET /api/v1/style-profile/candidates`：根据 Outfit 反馈生成可追溯的风格
+  偏好候选，不写入档案。
+- `POST /api/v1/style-profile/candidates/confirm`：重新校验当前证据后，把
+  用户确认的候选写入档案。
+
+PATCH 请求先与当前档案合并，再通过领域实体重新校验。若局部修改与已有
+喜欢/避免项或预算范围冲突，API 返回结构化 409，且不会写入数据库。
+候选确认接口不信任客户端提交的证据数量，而是重新读取当前反馈和 Outfit
+计算候选，避免过期或伪造的候选修改长期资料。
 
 `OutfitRecommendation` 是 Agent 与 API 之间的候选方案。
 只有用户明确保存时，应用服务才为它补充服务端生成的 `outfit_id` 和当前

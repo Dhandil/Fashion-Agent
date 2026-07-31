@@ -4,9 +4,9 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
-    JSON,
     Numeric,
     String,
     Text,
@@ -43,6 +43,12 @@ class StyleProfileModel(Base):
     )
 
     preferred_styles: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+    )
+
+    avoided_styles: Mapped[list[str]] = mapped_column(
         JSON,
         nullable=False,
         default=list,

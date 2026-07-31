@@ -24,6 +24,9 @@ def create_style_profile() -> StyleProfile:
             "简约",
             "休闲",
         ),
+        avoided_styles=(
+            "街头",
+        ),
         preferred_colors=(
             "浅蓝色",
         ),
@@ -54,6 +57,7 @@ def test_build_style_profile_context_excludes_user_id() -> None:
     )
 
     assert "简约、休闲" in context
+    assert "希望避免的风格：街头" in context
     assert "浅蓝色" in context
     assert "100 至 500 元" in context
     assert "不需要过于正式" in context
