@@ -86,6 +86,16 @@ class Settings(BaseSettings):
     # Chroma 中保存服装知识的集合名称
     chroma_collection_name: str = "fashion_knowledge"
 
+    # 独立知识库根目录；其中的原文件只读，不由应用修改
+    knowledge_repository_path: str = (
+        "./data/raw/Fashion-Agent-Knowledge"
+    )
+
+    # 相对知识库根目录的正式发布 Manifest
+    knowledge_release_manifest: str = (
+        "releases/manifests/fashion-knowledge-2.8.0.yaml"
+    )
+
     # 每个知识片段允许的最大字符数
     rag_chunk_size: int = 400
 
@@ -94,6 +104,9 @@ class Settings(BaseSettings):
 
     # 每次语义检索返回的知识片段数量
     rag_top_k: int = 3
+
+    # 向量初筛候选数量，随后根据知识标题和标签执行本地重排
+    rag_candidate_k: int = 24
 
 
 @lru_cache

@@ -1,8 +1,29 @@
 from collections.abc import Callable
 
+from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
 from app.agents.state.shopping import ShoppingAgentState
+
+
+def _format_knowledge_source(
+    document: Document,
+) -> str | None:
+    """生成一条可追溯到具体命中片段的知识来源。"""
+
+    fragment_id = document.metadata.get("fragment_id")
+    source_path = (
+        document.metadata.get("source_path_or_url")
+        or document.metadata.get("source")
+    )
+
+    if fragment_id and source_path:
+        return f"{fragment_id} | {source_path}"
+    if fragment_id:
+        return str(fragment_id)
+    if source_path:
+        return str(source_path)
+    return None
 
 
 def create_retrieve_knowledge_node(
@@ -30,14 +51,16 @@ def create_retrieve_knowledge_node(
             for document in documents
         )
 
-        # 从文档 metadata 中提取来源，并保持顺序去重
-        knowledge_sources = list(
-            dict.fromkeys(
-                str(document.metadata["source"])
-                for document in documents
-                if document.metadata.get("source")
+        # 每个命中片段都输出一条来源，方便核对检索依据
+        knowledge_sources = [
+            source
+            for document in documents
+            if (
+                source := _format_knowledge_source(
+                    document,
+                )
             )
-        )
+        ]
 
         return {
             "knowledge_context": knowledge_context,

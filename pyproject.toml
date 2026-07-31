@@ -45,6 +45,9 @@ dependencies = [
     # LangChain 文档切分工具
     "langchain-text-splitters>=1.1,<2.0",
 
+    # 解析知识发布 Manifest 和 Markdown Frontmatter
+    "PyYAML>=6.0,<7.0",
+
     # SQLAlchemy 2.x ORM 和异步数据库会话管理
     "sqlalchemy>=2.0,<2.1",
 

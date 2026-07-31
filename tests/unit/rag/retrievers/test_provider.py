@@ -16,6 +16,7 @@ def test_get_knowledge_retriever_builds_and_caches_retriever() -> None:
     settings = Settings(
         _env_file=None,
         rag_top_k=5,
+        rag_candidate_k=30,
     )
 
     # 创建假的 Vector Store 和 Retriever
@@ -53,6 +54,7 @@ def test_get_knowledge_retriever_builds_and_caches_retriever() -> None:
     mocked_create_retriever.assert_called_once_with(
         vector_store=fake_vector_store,
         top_k=5,
+        candidate_k=30,
     )
 
     # 清除测试产生的缓存

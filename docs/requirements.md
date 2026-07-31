@@ -204,6 +204,18 @@ Agent 应识别或进一步询问：
 
 系统应通过 Chroma 检索面料、颜色、版型、季节和护理等非结构化知识。
 
+正式知识发布必须满足：
+
+1. 只读取发布 Manifest 明确列出的 Markdown 文档。
+2. 解析前按原始文件字节校验 Manifest 声明的 SHA-256。
+3. 只索引 `status: approved` 且 `runtime.publish_to_rag: true` 的知识。
+4. 按 S01、S02 等稳定章节切分，并生成可重复的稳定片段 ID。
+5. Chroma 片段保留知识身份、类型、版本、更新时间和来源元数据。
+6. `sources/`、`staging/`、`archive/` 和 `evaluation/` 不得作为知识正文
+   导入。
+7. 每个检索命中都应返回可核对的片段 ID 和知识来源。
+8. RAG 不得替代衣橱、商品、实时天气或 Memory 的权威数据源。
+
 ### FR-005：对话记忆
 
 系统应使用会话 ID 隔离并恢复短期对话状态。

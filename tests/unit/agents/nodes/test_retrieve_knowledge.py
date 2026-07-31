@@ -62,5 +62,60 @@ def test_retrieve_knowledge_node_builds_context() -> None:
         ),
         "knowledge_sources": [
             "data/samples/fabrics.md",
+            "data/samples/fabrics.md",
         ],
     }
+
+
+def test_retrieve_knowledge_node_outputs_every_fragment_source() -> None:
+    """验证每个 Manifest 知识命中都返回具体片段和来源路径。"""
+
+    retriever = Mock(spec=BaseRetriever)
+    retriever.invoke.return_value = [
+        Document(
+            page_content="亚麻适合高温通勤。",
+            metadata={
+                "fragment_id": (
+                    "fk-materials-linen-001::S04::001"
+                ),
+                "source_path_or_url": (
+                    "knowledge/01_materials/fibers/linen.md"
+                ),
+            },
+        ),
+        Document(
+            page_content="亚麻需要关注褶皱。",
+            metadata={
+                "fragment_id": (
+                    "fk-materials-linen-001::S06::001"
+                ),
+                "source_path_or_url": (
+                    "knowledge/01_materials/fibers/linen.md"
+                ),
+            },
+        ),
+    ]
+
+    retrieve_knowledge = create_retrieve_knowledge_node(
+        retriever,
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="亚麻适合夏天通勤吗？",
+            ),
+        ],
+    }
+
+    result = retrieve_knowledge(state)
+
+    assert result["knowledge_sources"] == [
+        (
+            "fk-materials-linen-001::S04::001 | "
+            "knowledge/01_materials/fibers/linen.md"
+        ),
+        (
+            "fk-materials-linen-001::S06::001 | "
+            "knowledge/01_materials/fibers/linen.md"
+        ),
+    ]

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from langchain_core.vectorstores import VectorStoreRetriever
+from langchain_core.retrievers import BaseRetriever
 
 from app.core.config import get_settings
 from app.rag.retrievers.knowledge import (
@@ -12,7 +12,7 @@ from app.rag.vectorstores.provider import (
 
 
 @lru_cache
-def get_knowledge_retriever() -> VectorStoreRetriever:
+def get_knowledge_retriever() -> BaseRetriever:
     """创建并缓存服装知识检索器。"""
 
     # 读取检索数量配置
@@ -25,4 +25,5 @@ def get_knowledge_retriever() -> VectorStoreRetriever:
     return create_knowledge_retriever(
         vector_store=vector_store,
         top_k=settings.rag_top_k,
+        candidate_k=settings.rag_candidate_k,
     )

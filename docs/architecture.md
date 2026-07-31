@@ -124,13 +124,20 @@ Agents 不应直接创建数据库 Engine、读取 `.env` 或硬编码具体外�
 
 职责：
 
-- 加载和切分知识文档。
+- 读取正式发布 Manifest，而不是递归扫描独立知识库。
+- 按原始文件字节校验 SHA-256。
+- 解析 Markdown Frontmatter 和 S01、S02 等稳定章节。
+- 只接收已批准并允许发布到 RAG 的知识。
+- 在稳定章节内执行二次切分。
 - 生成 Embedding。
 - 将向量写入 Chroma。
 - 根据用户问题检索相关知识。
 - 返回内容和来源元数据。
 
 RAG 只负责面料、颜色、版型、季节和护理等通用知识，不提供具体商品事实。
+独立知识库中的 `sources/`、`staging/`、`archive/` 和 `evaluation/`
+不进入 Chroma。用户衣橱、商品、实时天气和 Memory 继续由各自的数据源
+负责，不通过知识入库流程写入。
 
 ### 4.7 Memory 层
 
@@ -612,22 +619,49 @@ compare_products
 ## 10. RAG 架构
 
 ```text
-知识文件
-→ Loader
-→ Text Splitter
+发布 Manifest
+→ 文档路径白名单与 SHA-256 校验
+→ Frontmatter 发布门禁
+→ S01、S02 等稳定章节解析
+→ 章节内 Text Splitter
 → Embedding
 → Chroma
-→ Retriever
+→ 扩大候选集的向量召回
+→ 标题、标签和正文词面信息本地重排
 → Agent Context
 ```
 
 知识片段应保存：
 
-- 稳定片段 ID
-- 来源路径或 URL
-- 文档类型
-- 版本或更新时间
+- `fragment_id`
+- `knowledge_id`
+- `doc_type`
+- `version`
+- `updated_at`
+- `source_ids`
+- `source_path_or_url`
 - 片段正文
+
+`fragment_id` 使用
+`{knowledge_id}::{section_id}::{split_sequence}`，其中序号在每个稳定
+章节内从 `001` 重新开始。来源路径始终使用 Manifest 中的 POSIX 相对
+路径，不能写入开发者本机绝对路径。
+
+稳定章节经过二次切分后，每个片段正文都会补充文档标题、知识类型、标签
+和稳定章节编号。这样即使片段主体只剩表格或代码块，Embedding 仍保留其
+所属知识主题；这些检索上下文不改变稳定 `fragment_id`。
+
+Retriever 先读取 `RAG_CANDIDATE_K` 个向量候选，再按知识标签、标题、正文
+词面匹配和原始向量顺序执行确定性重排，最终只返回 `RAG_TOP_K` 个片段。
+没有词面线索时仍保持原始向量相关性顺序。
+
+所有 Manifest 文档必须在任何 Chroma 写入前完成完整性和结构校验；任一
+文档失败时，本批次不能产生部分写入。检索结果按命中片段返回
+`fragment_id` 与 `source_path_or_url`，用于回答来源审计。
+
+`fashion_knowledge` collection 是正式知识专用集合。同步新发布时先
+upsert 本次全部片段；只有新片段写入成功后，才清理集合中不属于当前
+Manifest 的旧 ID，防止历史示例或已撤回片段继续被召回。
 
 RAG 结果只能作为参考知识。具体用户数据以 PostgreSQL 为准，具体商品数据以 Tool 或外部平台为准。
 

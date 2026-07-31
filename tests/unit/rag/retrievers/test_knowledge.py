@@ -1,34 +1,75 @@
 from unittest.mock import Mock
 
+from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore
 
 from app.rag.retrievers.knowledge import (
+    KnowledgeRetriever,
     create_knowledge_retriever,
 )
 
 
-def test_create_knowledge_retriever_uses_top_k() -> None:
-    """验证 Retriever 正确使用检索数量配置。"""
+def test_create_knowledge_retriever_uses_candidate_size() -> None:
+    """验证 Retriever 使用更大的候选集，再返回配置数量。"""
 
-    # 创建假的 Vector Store 和 Retriever
+    first_document = Document(
+        page_content="第一条向量结果。",
+        metadata={},
+    )
     vector_store = Mock(spec=VectorStore)
-    fake_retriever = Mock()
-
-    # 指定 as_retriever() 返回的对象
-    vector_store.as_retriever.return_value = fake_retriever
-
-    # 创建检索器
+    vector_store.similarity_search.return_value = [
+        first_document,
+        Document(
+            page_content="第二条向量结果。",
+            metadata={},
+        ),
+    ]
     retriever = create_knowledge_retriever(
         vector_store=vector_store,
-        top_k=5,
+        top_k=1,
+        candidate_k=20,
     )
 
-    # 工厂应返回 Vector Store 创建出的 Retriever
-    assert retriever is fake_retriever
+    assert isinstance(retriever, KnowledgeRetriever)
+    assert retriever.invoke("没有词面匹配的查询") == [
+        first_document,
+    ]
+    vector_store.similarity_search.assert_called_once_with(
+        "没有词面匹配的查询",
+        k=20,
+    )
 
-    # 验证 top_k 被转换成底层检索参数 k
-    vector_store.as_retriever.assert_called_once_with(
-        search_kwargs={
-            "k": 5,
+
+def test_knowledge_retriever_prioritizes_matching_tags() -> None:
+    """验证精确知识标签能够纠正不理想的纯向量顺序。"""
+
+    interview_document = Document(
+        page_content="面试时先确认组织要求。",
+        metadata={
+            "title": "面试穿搭",
+            "tags": ["面试", "正式度"],
         },
     )
+    linen_document = Document(
+        page_content="亚麻适合高温通勤，但需要关注褶皱。",
+        metadata={
+            "title": "亚麻纤维与亚麻类服装",
+            "tags": ["亚麻", "高温", "褶皱"],
+        },
+    )
+    vector_store = Mock(spec=VectorStore)
+    vector_store.similarity_search.return_value = [
+        interview_document,
+        linen_document,
+    ]
+    retriever = create_knowledge_retriever(
+        vector_store=vector_store,
+        top_k=1,
+        candidate_k=20,
+    )
+
+    results = retriever.invoke(
+        "夏天通勤选择亚麻有什么注意事项？",
+    )
+
+    assert results == [linen_document]

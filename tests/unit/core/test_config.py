@@ -19,6 +19,13 @@ def test_settings_use_default_values() -> None:
     assert settings.log_level == "INFO"
     assert settings.weather_provider_backend == "disabled"
     assert settings.weather_timeout_seconds == 10.0
+    assert settings.knowledge_repository_path == (
+        "./data/raw/Fashion-Agent-Knowledge"
+    )
+    assert settings.knowledge_release_manifest == (
+        "releases/manifests/fashion-knowledge-2.8.0.yaml"
+    )
+    assert settings.rag_candidate_k == 24
 
 
 def test_settings_read_environment_variables(monkeypatch) -> None:
