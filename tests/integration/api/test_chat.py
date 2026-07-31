@@ -29,11 +29,13 @@ from app.main import create_app
 wardrobe_repository = Mock(
     spec=WardrobeRepository,
 )
+outfit_repository = Mock()
+outfit_feedback_repository = Mock()
 repositories = FashionRepositories(
     style_profiles=Mock(),
     wardrobe=wardrobe_repository,
-    outfits=Mock(),
-    outfit_feedback=Mock(),
+    outfits=outfit_repository,
+    outfit_feedback=outfit_feedback_repository,
 )
 
 
@@ -113,6 +115,10 @@ def test_chat_returns_agent_response() -> None:
     # 当前用户和请求级衣橱仓库被绑定到本次 Agent Graph
     mocked_create_graph.assert_called_once_with(
         wardrobe_repository=wardrobe_repository,
+        outfit_repository=outfit_repository,
+        outfit_feedback_repository=(
+            outfit_feedback_repository
+        ),
         user_id="user-001",
     )
 

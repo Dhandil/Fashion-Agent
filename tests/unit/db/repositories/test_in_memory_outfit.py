@@ -161,6 +161,18 @@ async def test_repository_isolates_users_and_deletes_outfit() -> None:
         == user_two_outfit
     )
 
+    # 批量查询保持输入顺序，并且不会返回其他用户的数据
+    batch_outfits = await repository.get_by_ids(
+        user_id="user-001",
+        outfit_ids=(
+            "missing-outfit",
+            "outfit-001",
+        ),
+    )
+    assert batch_outfits == [
+        user_one_outfit,
+    ]
+
     # 删除用户一的穿搭
     assert (
         await repository.delete(

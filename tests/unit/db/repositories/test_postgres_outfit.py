@@ -146,6 +146,50 @@ async def test_postgres_outfit_repository_gets_outfit_by_id() -> None:
 
 
 @pytest.mark.anyio
+async def test_postgres_outfit_repository_gets_outfits_by_ids() -> None:
+    """验证仓库批量查询 Outfit 并恢复调用方要求的顺序。"""
+
+    session = AsyncMock(spec=AsyncSession)
+    repository = PostgresOutfitRepository(session)
+    first_model = outfit_entity_to_model(
+        create_test_outfit(),
+    )
+    second_model = outfit_entity_to_model(
+        create_test_outfit().model_copy(
+            update={
+                "outfit_id": "outfit-002",
+                "name": "第二套穿搭",
+            },
+        ),
+    )
+    scalar_result = Mock()
+    scalar_result.all.return_value = [
+        first_model,
+        second_model,
+    ]
+    database_result = Mock()
+    database_result.scalars.return_value = scalar_result
+    session.execute.return_value = database_result
+
+    outfits = await repository.get_by_ids(
+        user_id="user-001",
+        outfit_ids=(
+            "outfit-002",
+            "outfit-001",
+        ),
+    )
+
+    session.execute.assert_awaited_once()
+    assert [
+        outfit.outfit_id
+        for outfit in outfits
+    ] == [
+        "outfit-002",
+        "outfit-001",
+    ]
+
+
+@pytest.mark.anyio
 async def test_postgres_outfit_repository_searches_outfits() -> None:
     """验证仓库根据用户、场景和收藏状态查询穿搭。"""
 

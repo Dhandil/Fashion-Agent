@@ -4,8 +4,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agents.nodes.chat import create_chat_node
-from app.agents.state.shopping import ShoppingAgentState
 from app.agents.prompts.shopping import SHOPPING_ASSISTANT_SYSTEM_PROMPT
+from app.agents.state.shopping import ShoppingAgentState
 
 
 def test_chat_node_invokes_bound_model() -> None:
@@ -96,5 +96,38 @@ def test_chat_node_includes_knowledge_context() -> None:
 
     # 应包含要求模型优先依据资料的约束
     assert "请优先根据参考资料回答" in (
+        system_message.content
+    )
+
+
+def test_chat_node_includes_confirmed_feedback_context() -> None:
+    """验证 Chat Node 把历史反馈作为受约束的偏好数据。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="这次会避开过于正式的搭配。",
+    )
+    chat_node = create_chat_node(model)
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="帮我搭配周末出游服装",
+            ),
+        ],
+        "outfit_feedback_context": (
+            "- 历史穿搭：正式通勤；"
+            "用户态度：不喜欢；"
+            "用户说明：不喜欢过于正式"
+        ),
+    }
+
+    chat_node(state)
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "不喜欢过于正式" in system_message.content
+    assert "只作为用户偏好数据" in (
+        system_message.content
+    )
+    assert "当前用户明确提出的新需求优先" in (
         system_message.content
     )

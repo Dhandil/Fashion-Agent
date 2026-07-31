@@ -26,6 +26,10 @@ from app.domain.entities.wardrobe_item import (
     WardrobeItem,
     WardrobeItemStatus,
 )
+from app.domain.repositories.outfit import OutfitRepository
+from app.domain.repositories.outfit_feedback import (
+    OutfitFeedbackRepository,
+)
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -84,6 +88,8 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
         retriever=Mock(),
     )
     fake_repository = Mock()
+    fake_outfit_repository = Mock()
+    fake_feedback_repository = Mock()
 
     fake_tools = (
         Mock(),
@@ -114,10 +120,18 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
     ):
         first_result = create_user_shopping_graph(
             wardrobe_repository=fake_repository,
+            outfit_repository=fake_outfit_repository,
+            outfit_feedback_repository=(
+                fake_feedback_repository
+            ),
             user_id="user-001",
         )
         second_result = create_user_shopping_graph(
             wardrobe_repository=fake_repository,
+            outfit_repository=fake_outfit_repository,
+            outfit_feedback_repository=(
+                fake_feedback_repository
+            ),
             user_id="user-001",
         )
 
@@ -138,6 +152,11 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
         checkpointer=fake_runtime.checkpointer,
         retriever=fake_runtime.retriever,
         tools=fake_tools,
+        outfit_repository=fake_outfit_repository,
+        outfit_feedback_repository=(
+            fake_feedback_repository
+        ),
+        user_id="user-001",
     )
 
 
@@ -213,6 +232,18 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
             ),
         ],
     )
+    outfit_repository = Mock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids = AsyncMock(
+        return_value=[],
+    )
+    feedback_repository = Mock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search = AsyncMock(
+        return_value=[],
+    )
 
     # 本测试不需要商品工具，只验证请求级衣橱工具链路
     shared_registry = ToolRegistry()
@@ -229,6 +260,10 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
     ):
         graph = create_user_shopping_graph(
             wardrobe_repository=wardrobe_repository,
+            outfit_repository=outfit_repository,
+            outfit_feedback_repository=(
+                feedback_repository
+            ),
             user_id="user-001",
         )
 
@@ -253,5 +288,10 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
         status=WardrobeItemStatus.AVAILABLE,
         limit=20,
     )
+    feedback_repository.search.assert_awaited_once_with(
+        user_id="user-001",
+        limit=20,
+    )
+    outfit_repository.get_by_ids.assert_not_awaited()
     assert result["messages"][-1].content == ("可以使用浅蓝色亚麻衬衫完成通勤搭配。")
     assert result["outfit_recommendation"] == recommendation

@@ -11,6 +11,10 @@ from app.agents.graphs.shopping import (
     ShoppingGraph,
     create_shopping_graph,
 )
+from app.domain.repositories.outfit import OutfitRepository
+from app.domain.repositories.outfit_feedback import (
+    OutfitFeedbackRepository,
+)
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -47,9 +51,11 @@ def get_shopping_agent_runtime() -> ShoppingAgentRuntime:
 
 def create_user_shopping_graph(
     wardrobe_repository: WardrobeRepository,
+    outfit_repository: OutfitRepository,
+    outfit_feedback_repository: OutfitFeedbackRepository,
     user_id: str,
 ) -> ShoppingGraph:
-    """为当前用户创建绑定请求级衣橱工具的工作流。"""
+    """为当前用户创建绑定请求级仓库和工具的工作流。"""
 
     # 模型、Retriever 和 Checkpointer 不包含请求级数据库状态
     runtime = get_shopping_agent_runtime()
@@ -65,4 +71,9 @@ def create_user_shopping_graph(
         checkpointer=runtime.checkpointer,
         retriever=runtime.retriever,
         tools=request_tool_registry.list_tools(),
+        outfit_repository=outfit_repository,
+        outfit_feedback_repository=(
+            outfit_feedback_repository
+        ),
+        user_id=user_id,
     )

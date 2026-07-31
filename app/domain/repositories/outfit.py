@@ -1,5 +1,6 @@
 """穿搭方案仓库接口。"""
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from app.domain.entities.outfit import Outfit
@@ -14,6 +15,15 @@ class OutfitRepository(Protocol):
         outfit_id: str,
     ) -> Outfit | None:
         """查询属于指定用户的一套穿搭方案。"""
+
+        ...
+
+    async def get_by_ids(
+        self,
+        user_id: str,
+        outfit_ids: Sequence[str],
+    ) -> list[Outfit]:
+        """批量查询属于指定用户的多套穿搭方案。"""
 
         ...
 

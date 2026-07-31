@@ -106,6 +106,9 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     state: ShoppingAgentState = {
         "messages": create_current_turn_messages(),
         "knowledge_context": "亚麻适合炎热天气。",
+        "outfit_feedback_context": (
+            "用户喜欢简约清爽的历史穿搭。"
+        ),
     }
 
     result = generate_outfit(state)
@@ -123,6 +126,9 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     assert OUTFIT_GENERATION_SYSTEM_PROMPT in (structured_messages[0].content)
     assert "shirt-001" in (structured_messages[1].content)
     assert "亚麻适合炎热天气" in (structured_messages[1].content)
+    assert "用户喜欢简约清爽" in (
+        structured_messages[1].content
+    )
     assert "output_schema" in (structured_messages[1].content)
 
 

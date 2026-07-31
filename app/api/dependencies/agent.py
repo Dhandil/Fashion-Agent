@@ -24,6 +24,10 @@ def get_request_shopping_graph(
 
     return create_user_shopping_graph(
         wardrobe_repository=repositories.wardrobe,
+        outfit_repository=repositories.outfits,
+        outfit_feedback_repository=(
+            repositories.outfit_feedback
+        ),
         user_id=current_user.user_id,
     )
 

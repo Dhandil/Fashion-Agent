@@ -1,6 +1,6 @@
 """穿搭方案的内存仓库实现。"""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from app.domain.entities.outfit import Outfit
 
@@ -36,6 +36,28 @@ class InMemoryOutfitRepository:
                 outfit_id,
             ),
         )
+
+    async def get_by_ids(
+        self,
+        user_id: str,
+        outfit_ids: Sequence[str],
+    ) -> list[Outfit]:
+        """按输入 ID 顺序批量查询当前用户的穿搭方案。"""
+
+        outfits: list[Outfit] = []
+
+        for outfit_id in outfit_ids:
+            outfit = self._outfits.get(
+                (
+                    user_id,
+                    outfit_id,
+                ),
+            )
+
+            if outfit is not None:
+                outfits.append(outfit)
+
+        return outfits
 
     async def search(
         self,

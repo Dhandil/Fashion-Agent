@@ -1,5 +1,7 @@
 """PostgreSQL 穿搭方案仓库实现。"""
 
+from collections.abc import Sequence
+
 from sqlalchemy import (
     func,
     select,
@@ -52,6 +54,45 @@ class PostgresOutfitRepository:
             return None
 
         return outfit_model_to_entity(outfit_model)
+
+    async def get_by_ids(
+        self,
+        user_id: str,
+        outfit_ids: Sequence[str],
+    ) -> list[Outfit]:
+        """使用一次查询批量读取当前用户的多套穿搭。"""
+
+        if not outfit_ids:
+            return []
+
+        statement = (
+            select(OutfitModel)
+            .where(
+                OutfitModel.user_id == user_id,
+                OutfitModel.outfit_id.in_(
+                    tuple(outfit_ids),
+                ),
+            )
+            .options(
+                selectinload(OutfitModel.items),
+            )
+        )
+
+        result = await self._session.execute(statement)
+        outfit_models = result.scalars().all()
+        outfits_by_id = {
+            outfit_model.outfit_id: (
+                outfit_model_to_entity(outfit_model)
+            )
+            for outfit_model in outfit_models
+        }
+
+        # 数据库 IN 查询不保证顺序，因此按调用方传入的 ID 恢复顺序
+        return [
+            outfits_by_id[outfit_id]
+            for outfit_id in outfit_ids
+            if outfit_id in outfits_by_id
+        ]
 
     async def search(
         self,

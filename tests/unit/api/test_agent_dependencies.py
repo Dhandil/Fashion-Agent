@@ -9,6 +9,10 @@ from app.api.dependencies.identity import CurrentUser
 from app.db.repositories.fashion_provider import (
     FashionRepositories,
 )
+from app.domain.repositories.outfit import OutfitRepository
+from app.domain.repositories.outfit_feedback import (
+    OutfitFeedbackRepository,
+)
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -23,11 +27,17 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
     wardrobe_repository = Mock(
         spec=WardrobeRepository,
     )
+    outfit_repository = Mock(
+        spec=OutfitRepository,
+    )
+    feedback_repository = Mock(
+        spec=OutfitFeedbackRepository,
+    )
     repositories = FashionRepositories(
         style_profiles=Mock(),
         wardrobe=wardrobe_repository,
-        outfits=Mock(),
-        outfit_feedback=Mock(),
+        outfits=outfit_repository,
+        outfit_feedback=feedback_repository,
     )
     fake_graph = Mock()
 
@@ -43,5 +53,7 @@ def test_agent_dependency_uses_current_user_and_wardrobe_repository() -> None:
     assert graph is fake_graph
     mocked_create_graph.assert_called_once_with(
         wardrobe_repository=wardrobe_repository,
+        outfit_repository=outfit_repository,
+        outfit_feedback_repository=feedback_repository,
         user_id="user-001",
     )

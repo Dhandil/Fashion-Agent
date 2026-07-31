@@ -139,6 +139,10 @@ def create_outfit_generation_node(
                 "knowledge_context",
                 "",
             ),
+            "outfit_feedback_context": state.get(
+                "outfit_feedback_context",
+                "",
+            ),
             "wardrobe_items": wardrobe_records,
             "products": product_records,
         }
