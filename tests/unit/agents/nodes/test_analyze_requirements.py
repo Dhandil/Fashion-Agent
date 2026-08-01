@@ -100,3 +100,78 @@ def test_analysis_falls_back_without_blocking_request() -> None:
     assert analysis.is_sufficient is True
     assert analysis.intent is RequestIntent.SHOPPING
     assert analysis.shopping_intent is ShoppingIntent.EXPLICIT
+
+
+def test_new_outfit_without_scenario_requires_clarification() -> None:
+    """验证全新完整穿搭缺少场景时由确定性策略补充追问。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(content="帮我搭配一套衣服"),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.is_sufficient is False
+    assert analysis.missing_fields == ("scenario",)
+
+
+def test_outfit_adjustment_can_reuse_previous_scenario() -> None:
+    """验证局部调整不会被新穿搭的场景规则错误阻断。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT_ADJUSTMENT,
+            needs_wardrobe=True,
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(content="把刚才那套改正式一点"),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.is_sufficient is True
+    assert analysis.missing_fields == ()
+
+
+def test_weekend_signal_is_enough_for_basic_outfit() -> None:
+    """验证周末等明确情境不会因模型字段归类差异被错误追问。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            target_date="周末",
+            wardrobe_preferred=True,
+            needs_wardrobe=True,
+            is_sufficient=False,
+            missing_fields=("scenario",),
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(
+                    content=("只用我的衣橱搭配周末穿搭，我不想买新衣服。"),
+                ),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.is_sufficient is True
+    assert analysis.missing_fields == ()
+    assert analysis.shopping_intent is ShoppingIntent.NONE

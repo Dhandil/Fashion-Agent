@@ -1,3 +1,4 @@
+import json
 from unittest.mock import Mock
 
 from langchain_core.documents import Document
@@ -8,6 +9,7 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agents.graphs.shopping import create_shopping_graph
+from app.agents.schemas.outfit import OutfitGenerationResult
 from app.agents.schemas.requirements import (
     OutfitRequirementAnalysis,
     RequestIntent,
@@ -355,3 +357,123 @@ def test_shopping_graph_executes_tool_call() -> None:
 
     # 第二次模型回复是工作流的最终结果
     assert result["messages"][-1].content == ("推荐亚麻通勤衬衫。")
+
+
+def test_shopping_graph_corrects_invalid_outfit_once() -> None:
+    """验证完整工作流只修正一次，并对修正结果重新执行检查。"""
+
+    wardrobe_records = [
+        {
+            "wardrobe_item_id": item_id,
+            "name": name,
+            "status": "available",
+        }
+        for item_id, name in (
+            ("upper-001", "亚麻衬衫"),
+            ("lower-001", "直筒长裤"),
+            ("shoes-001", "乐福鞋"),
+        )
+    ]
+
+    @tool
+    def search_wardrobe(query: str) -> str:
+        """根据穿搭需求查询当前可用衣物。"""
+
+        return json.dumps(
+            wardrobe_records,
+            ensure_ascii=False,
+        )
+
+    original_outfit = OutfitRecommendation(
+        name="不完整通勤方案",
+        scenario="通勤",
+        items=(
+            OutfitItem(
+                role="上装",
+                name="亚麻衬衫",
+                source="wardrobe",
+                source_reference_id="upper-001",
+            ),
+        ),
+        recommendation_reason="目前只有上装。",
+    )
+    corrected_outfit = OutfitRecommendation(
+        name="完整通勤方案",
+        scenario="通勤",
+        items=(
+            OutfitItem(
+                role="上装",
+                name="亚麻衬衫",
+                source="wardrobe",
+                source_reference_id="upper-001",
+            ),
+            OutfitItem(
+                role="下装",
+                name="直筒长裤",
+                source="wardrobe",
+                source_reference_id="lower-001",
+            ),
+            OutfitItem(
+                role="鞋履",
+                name="乐福鞋",
+                source="wardrobe",
+                source_reference_id="shoes-001",
+            ),
+        ),
+        recommendation_reason="补齐通勤所需核心单品。",
+    )
+
+    # 三个结构化模型依次负责需求分析、初次生成和唯一一次修正。
+    model = Mock(spec=BaseChatModel)
+    analysis_model = Mock()
+    generation_model = Mock()
+    correction_model = Mock()
+    model.with_structured_output.side_effect = [
+        analysis_model,
+        generation_model,
+        correction_model,
+    ]
+    analysis_model.invoke.return_value = OutfitRequirementAnalysis(
+        intent=RequestIntent.OUTFIT,
+        scenario="通勤",
+        needs_wardrobe=True,
+    )
+    generation_model.invoke.return_value = OutfitGenerationResult(outfit=original_outfit)
+    correction_model.invoke.return_value = OutfitGenerationResult(outfit=corrected_outfit)
+
+    tool_enabled_model = Mock(spec=BaseChatModel)
+    model.bind_tools.return_value = tool_enabled_model
+    tool_enabled_model.invoke.side_effect = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "search_wardrobe",
+                    "args": {"query": "通勤"},
+                    "id": "wardrobe-call-1",
+                    "type": "tool_call",
+                },
+            ],
+        ),
+        AIMessage(content="正在整理通勤方案。"),
+    ]
+
+    graph = create_shopping_graph(
+        model=model,
+        tools=[search_wardrobe],
+    )
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(
+                    content="用我的衣橱搭配一套通勤服装",
+                ),
+            ],
+        },
+    )
+
+    assert generation_model.invoke.call_count == 1
+    assert correction_model.invoke.call_count == 1
+    assert result["outfit_correction_attempts"] == 1
+    assert result["outfit_recommendation"] == corrected_outfit
+    assert result["outfit_feasibility_report"].is_executable is True

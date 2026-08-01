@@ -1,0 +1,183 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "case_id": "generation-wardrobe-weekend",
+      "category": "wardrobe",
+      "mode": "generation",
+      "user_request": "用我的衣橱搭配一套周末咖啡馆穿搭。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "周末咖啡馆",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-linen-001", "name": "米白亚麻衬衫", "category": "上装", "status": "available"},
+        {"wardrobe_item_id": "lower-jeans-001", "name": "深蓝直筒牛仔裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-loafer-001", "name": "棕色乐福鞋", "category": "鞋履", "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "allowed",
+        "require_source_integrity": true
+      }
+    },
+    {
+      "case_id": "generation-hot-commute",
+      "category": "weather",
+      "mode": "generation",
+      "user_request": "用我的衣橱搭配明天上海高温通勤穿搭。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "高温通勤",
+        "target_date": "明天",
+        "location": "上海",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "needs_weather": true
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-cotton-001", "name": "浅蓝高支棉衬衫", "category": "上装", "status": "available"},
+        {"wardrobe_item_id": "lower-light-001", "name": "灰色轻薄长裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-sneaker-001", "name": "白色透气运动鞋", "category": "鞋履", "status": "available"},
+        {"wardrobe_item_id": "outer-wool-001", "name": "厚羊毛大衣", "category": "外套", "status": "available"}
+      ],
+      "weather_context": {
+        "location": "上海",
+        "target_date": "2026-08-02",
+        "condition": "晴",
+        "temperature_min_c": 28,
+        "temperature_max_c": 35,
+        "feels_like_c": 38,
+        "precipitation_probability": 10,
+        "source": "user_provided"
+      },
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "allowed",
+        "require_source_integrity": true
+      }
+    },
+    {
+      "case_id": "generation-product-gap",
+      "category": "shopping",
+      "mode": "generation",
+      "user_request": "用我的衬衫和长裤搭配，并从商品结果中补一双500元以内的通勤鞋。",
+      "requirement_analysis": {
+        "intent": "shopping",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "shopping_intent": "explicit"
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-shirt-001", "name": "白色通勤衬衫", "category": "上装", "status": "available"},
+        {"wardrobe_item_id": "lower-trouser-001", "name": "藏蓝西裤", "category": "下装", "status": "available"}
+      ],
+      "product_records": [
+        {"product_id": "product-shoes-001", "name": "黑色通勤乐福鞋", "category": "鞋履", "price": "399.00", "in_stock": true}
+      ],
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "allowed",
+        "require_source_integrity": true
+      }
+    },
+    {
+      "case_id": "correction-missing-core-roles",
+      "category": "completeness",
+      "mode": "correction",
+      "user_request": "用我的衣橱搭配完整通勤穿搭。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-001", "name": "浅蓝衬衫", "category": "上装", "status": "available"},
+        {"wardrobe_item_id": "lower-001", "name": "灰色西裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-001", "name": "黑色乐福鞋", "category": "鞋履", "status": "available"}
+      ],
+      "initial_outfit": {
+        "name": "不完整通勤方案",
+        "scenario": "通勤",
+        "items": [
+          {"role": "上装", "name": "浅蓝衬衫", "source": "wardrobe", "source_reference_id": "upper-001"}
+        ],
+        "recommendation_reason": "当前初稿缺少核心角色。"
+      },
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "required",
+        "require_source_integrity": true
+      }
+    },
+    {
+      "case_id": "correction-invented-source",
+      "category": "source_integrity",
+      "mode": "correction",
+      "user_request": "修正这套通勤穿搭，只使用当前衣橱结果。",
+      "requirement_analysis": {
+        "intent": "outfit_adjustment",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-real-001", "name": "白色衬衫", "category": "上装", "status": "available"},
+        {"wardrobe_item_id": "lower-real-001", "name": "黑色长裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-real-001", "name": "黑色皮鞋", "category": "鞋履", "status": "available"}
+      ],
+      "initial_outfit": {
+        "name": "包含虚构来源的方案",
+        "scenario": "通勤",
+        "items": [
+          {"role": "上装", "name": "不存在的衬衫", "source": "wardrobe", "source_reference_id": "invented-999"},
+          {"role": "下装", "name": "黑色长裤", "source": "wardrobe", "source_reference_id": "lower-real-001"},
+          {"role": "鞋履", "name": "黑色皮鞋", "source": "wardrobe", "source_reference_id": "shoes-real-001"}
+        ],
+        "recommendation_reason": "初稿错误引用了不存在的衣物。"
+      },
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "required",
+        "require_source_integrity": true
+      }
+    },
+    {
+      "case_id": "correction-scenario-mismatch",
+      "category": "scenario",
+      "mode": "correction",
+      "user_request": "把方案修正为适合正式面试的穿搭。",
+      "requirement_analysis": {
+        "intent": "outfit_adjustment",
+        "scenario": "正式面试",
+        "formality": "正式",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-interview-001", "name": "白色正装衬衫", "category": "上装", "status": "available"},
+        {"wardrobe_item_id": "lower-interview-001", "name": "深色西裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-interview-001", "name": "黑色皮鞋", "category": "鞋履", "status": "available"}
+      ],
+      "initial_outfit": {
+        "name": "周末休闲方案",
+        "scenario": "周末休闲",
+        "items": [
+          {"role": "上装", "name": "白色正装衬衫", "source": "wardrobe", "source_reference_id": "upper-interview-001"},
+          {"role": "下装", "name": "深色西裤", "source": "wardrobe", "source_reference_id": "lower-interview-001"},
+          {"role": "鞋履", "name": "黑色皮鞋", "source": "wardrobe", "source_reference_id": "shoes-interview-001"}
+        ],
+        "recommendation_reason": "单品可用，但初稿场景错误。"
+      },
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "required",
+        "require_source_integrity": true
+      }
+    }
+  ]
+}

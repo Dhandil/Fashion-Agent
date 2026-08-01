@@ -1,0 +1,189 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "case_id": "knowledge-linen-care",
+      "category": "knowledge",
+      "messages": [
+        {"role": "user", "content": "亚麻衬衫应该怎样清洗和晾晒？"}
+      ],
+      "expected": {
+        "intent": "knowledge",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "knowledge-color-principle",
+      "category": "knowledge",
+      "messages": [
+        {"role": "user", "content": "低饱和度颜色为什么更容易搭配？"}
+      ],
+      "expected": {
+        "intent": "knowledge",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "incomplete-no-scenario",
+      "category": "incomplete",
+      "messages": [
+        {"role": "user", "content": "帮我搭配一套衣服。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": false,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": ["scenario"]
+      }
+    },
+    {
+      "case_id": "incomplete-weather-location",
+      "category": "incomplete",
+      "messages": [
+        {"role": "user", "content": "按明天的天气帮我搭配通勤服装。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": false,
+        "needs_wardrobe": false,
+        "needs_weather": true,
+        "shopping_intent": "none",
+        "missing_fields_contains": ["location"]
+      }
+    },
+    {
+      "case_id": "wardrobe-weekend-outfit",
+      "category": "wardrobe",
+      "messages": [
+        {"role": "user", "content": "用我的衣橱搭配一套周末咖啡馆穿的衣服。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": true,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "wardrobe-inventory-query",
+      "category": "wardrobe",
+      "messages": [
+        {"role": "user", "content": "看看我的衣柜里有哪些可以通勤穿的衬衫。"}
+      ],
+      "expected": {
+        "intent": "wardrobe",
+        "is_sufficient": true,
+        "needs_wardrobe": true,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "adjustment-more-formal",
+      "category": "adjustment",
+      "messages": [
+        {"role": "user", "content": "给我一套适合见客户的通勤搭配。"},
+        {"role": "assistant", "content": "已经为你准备了一套商务休闲方案。"},
+        {"role": "user", "content": "把刚才那套调整得更正式一点。"}
+      ],
+      "expected": {
+        "intent": "outfit_adjustment",
+        "is_sufficient": true,
+        "needs_wardrobe": true,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "adjustment-replace-upper",
+      "category": "adjustment",
+      "messages": [
+        {"role": "user", "content": "用我的衣橱搭配了一套约会服装。"},
+        {"role": "assistant", "content": "当前方案使用针织上衣和半身裙。"},
+        {"role": "user", "content": "保留其他单品，只把上衣换成我的白衬衫。"}
+      ],
+      "expected": {
+        "intent": "outfit_adjustment",
+        "is_sufficient": true,
+        "needs_wardrobe": true,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "shopping-explicit-shirt",
+      "category": "shopping",
+      "messages": [
+        {"role": "user", "content": "帮我找一件价格不超过 300 元的浅蓝色衬衫。"}
+      ],
+      "expected": {
+        "intent": "shopping",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "explicit",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "shopping-explicit-shoes",
+      "category": "shopping",
+      "messages": [
+        {"role": "user", "content": "请查询商品，推荐一双 500 元以内的黑色通勤鞋。"}
+      ],
+      "expected": {
+        "intent": "shopping",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "explicit",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "shopping-boundary-wardrobe-only",
+      "category": "shopping_boundary",
+      "messages": [
+        {"role": "user", "content": "只用我的衣橱搭配周末穿搭，我不想买新衣服。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": true,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "shopping-boundary-advice-only",
+      "category": "shopping_boundary",
+      "messages": [
+        {"role": "user", "content": "告诉我夏天通勤怎么搭就行，不需要购买商品。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    }
+  ]
+}

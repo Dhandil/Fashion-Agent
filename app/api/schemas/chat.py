@@ -4,6 +4,9 @@ from app.api.schemas.weather import WeatherContextInput
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
+from app.domain.entities.outfit_validation import (
+    OutfitFeasibilityIssue,
+)
 
 
 class ChatRequest(BaseModel):
@@ -46,4 +49,10 @@ class ChatResponse(BaseModel):
     sources: list[str] = Field(
         default_factory=list,
         description="本次回答使用的知识文档来源",
+    )
+
+    # 结构化 Outfit 的确定性错误或风险提示
+    outfit_issues: list[OutfitFeasibilityIssue] = Field(
+        default_factory=list,
+        description="本次穿搭可执行性检查发现的问题",
     )

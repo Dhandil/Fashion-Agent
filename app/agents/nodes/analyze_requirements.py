@@ -18,6 +18,7 @@ from app.agents.prompts.requirements import (
 from app.agents.schemas.requirements import (
     OutfitRequirementAnalysis,
     RequestIntent,
+    RequirementField,
     ShoppingIntent,
 )
 from app.agents.state.shopping import ShoppingAgentState
@@ -57,6 +58,26 @@ _WARDROBE_TERMS = (
     "我的衣服",
     "我已有",
 )
+_OUTFIT_SCENARIO_TERMS = (
+    "通勤",
+    "上班",
+    "工作",
+    "面试",
+    "见客户",
+    "约会",
+    "聚会",
+    "婚礼",
+    "旅行",
+    "运动",
+    "健身",
+    "户外",
+    "逛街",
+    "咖啡馆",
+    "周末",
+    "日常",
+    "上课",
+    "校园",
+)
 
 
 def _latest_user_text(state: ShoppingAgentState) -> str:
@@ -82,6 +103,12 @@ def _has_explicit_wardrobe_intent(text: str) -> bool:
     """识别用户明确要求读取已有衣物的表达。"""
 
     return any(term in text for term in _WARDROBE_TERMS)
+
+
+def _has_outfit_scenario_signal(text: str) -> bool:
+    """识别足以支持第一版搭配的明确使用情境。"""
+
+    return any(term in text for term in _OUTFIT_SCENARIO_TERMS)
 
 
 def _fallback_analysis(
@@ -117,15 +144,48 @@ def _apply_deterministic_permissions(
     explicit_wardrobe = _has_explicit_wardrobe_intent(
         current_request,
     )
-    return analysis.model_copy(
-        update={
-            "shopping_intent": (
-                ShoppingIntent.EXPLICIT if explicit_shopping else ShoppingIntent.NONE
-            ),
-            "needs_wardrobe": (analysis.needs_wardrobe or explicit_wardrobe),
-            "wardrobe_preferred": (analysis.wardrobe_preferred or explicit_wardrobe),
-        },
-    )
+    updates: dict[str, object] = {
+        "shopping_intent": (ShoppingIntent.EXPLICIT if explicit_shopping else ShoppingIntent.NONE),
+        "needs_wardrobe": (analysis.needs_wardrobe or explicit_wardrobe),
+        "wardrobe_preferred": (analysis.wardrobe_preferred or explicit_wardrobe),
+    }
+
+    # 全新完整穿搭如果连使用场景都没有，无法判断正式度和功能需求。
+    # 局部调整可以沿用 previous_outfit，因此不应用这条规则。
+    if analysis.intent is RequestIntent.OUTFIT:
+        has_scenario_signal = bool(
+            analysis.scenario,
+        ) or _has_outfit_scenario_signal(current_request)
+        if not has_scenario_signal:
+            missing_fields = tuple(
+                dict.fromkeys(
+                    (
+                        RequirementField.SCENARIO,
+                        *analysis.missing_fields,
+                    ),
+                ),
+            )[:3]
+            updates.update(
+                {
+                    "is_sufficient": False,
+                    "missing_fields": missing_fields,
+                },
+            )
+        elif (
+            not analysis.is_sufficient
+            and analysis.missing_fields
+            and set(analysis.missing_fields) == {RequirementField.SCENARIO}
+        ):
+            # 模型可能把“周末”等情境放进日期字段，同时又错误要求补场景。
+            # 只有唯一缺失项就是场景时才恢复为充分，避免掩盖地点等真实缺口。
+            updates.update(
+                {
+                    "is_sufficient": True,
+                    "missing_fields": (),
+                },
+            )
+
+    return analysis.model_copy(update=updates)
 
 
 def _recent_conversation_text(

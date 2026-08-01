@@ -95,6 +95,9 @@ async def chat(
     outfit_recommendation = result.get(
         "outfit_recommendation",
     )
+    feasibility_report = result.get(
+        "outfit_feasibility_report",
+    )
 
     log_event(
         logger,
@@ -105,6 +108,9 @@ async def chat(
         ),
         source_count=len(knowledge_sources),
         has_outfit=outfit_recommendation is not None,
+        outfit_issue_count=(
+            len(feasibility_report.issues) if feasibility_report is not None else 0
+        ),
     )
 
     # 将 Agent 消息转换成 API 响应
@@ -113,4 +119,5 @@ async def chat(
         message=str(last_message.content),
         outfit=outfit_recommendation,
         sources=knowledge_sources,
+        outfit_issues=(list(feasibility_report.issues) if feasibility_report is not None else []),
     )

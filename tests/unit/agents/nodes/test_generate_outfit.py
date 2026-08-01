@@ -148,8 +148,8 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     assert "output_schema" in (structured_messages[1].content)
 
 
-def test_generate_outfit_discards_unknown_wardrobe_id() -> None:
-    """验证节点拒绝工具结果中不存在的衣橱 ID。"""
+def test_generate_outfit_defers_wardrobe_id_validation() -> None:
+    """验证生成节点把来源 ID 校验交给后续可执行性节点。"""
 
     model = Mock(spec=BaseChatModel)
     structured_model = Mock()
@@ -167,9 +167,10 @@ def test_generate_outfit_discards_unknown_wardrobe_id() -> None:
         "messages": create_current_turn_messages(),
     }
 
-    assert generate_outfit(state) == {
-        "outfit_recommendation": None,
-    }
+    result = generate_outfit(state)
+
+    assert result["outfit_recommendation"] is not None
+    assert result["outfit_recommendation"].items[0].source_reference_id == "invented-shirt"
 
 
 def test_generate_outfit_includes_weather_tool_result() -> None:
@@ -218,8 +219,8 @@ def test_generate_outfit_includes_weather_tool_result() -> None:
     assert "高温或体感炎热" in (generation_message.content)
 
 
-def test_generate_outfit_discards_unknown_product_id() -> None:
-    """验证节点拒绝本轮商品工具结果中不存在的商品 ID。"""
+def test_generate_outfit_defers_product_id_validation() -> None:
+    """验证商品 ID 同样由独立可执行性节点统一校验。"""
 
     model = Mock(spec=BaseChatModel)
     structured_model = Mock()
@@ -268,9 +269,9 @@ def test_generate_outfit_discards_unknown_product_id() -> None:
         "messages": messages,
     }
 
-    assert generate_outfit(state) == {
-        "outfit_recommendation": None,
-    }
+    result = generate_outfit(state)
+
+    assert result["outfit_recommendation"] is recommendation
 
 
 def test_generate_outfit_allows_model_to_skip_outfit() -> None:

@@ -42,4 +42,9 @@ OUTFIT_GENERATION_SYSTEM_PROMPT = """
 27. requirement_analysis 是当前轮的结构化路由结果，不是用户原话；
     与 current_request 冲突时，以 current_request 为准。
 28. shopping_intent 只决定是否允许查询商品，不能替代真实 products 工具结果。
+29. weather_outfit_guidance 是根据真实天气生成的当前轮约束，不是可选建议；
+    高温或体感温度达到 30°C 以上时，不得选择厚羊毛大衣、羽绒、加绒、
+    厚呢或其他明显厚重保暖单品，即使它们存在于 wardrobe_items 中。
+30. 衣橱中同时存在适合与不适合当前天气的单品时，只选择适合项；
+    “用户拥有该单品”不代表“本次必须使用该单品”。
 """.strip()

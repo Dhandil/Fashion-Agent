@@ -17,6 +17,9 @@ from app.agents.nodes.chat import create_chat_node
 from app.agents.nodes.clarify_requirements import (
     clarify_requirements,
 )
+from app.agents.nodes.correct_outfit import (
+    create_outfit_correction_node,
+)
 from app.agents.nodes.generate_outfit import (
     create_outfit_generation_node,
 )
@@ -37,6 +40,10 @@ from app.agents.nodes.reject_tools import (
 )
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
+)
+from app.agents.nodes.validate_outfit import validate_outfit
+from app.agents.routing.outfit_validation import (
+    route_after_outfit_validation,
 )
 from app.agents.routing.requirements import (
     route_after_requirement_analysis,
@@ -252,6 +259,10 @@ def create_shopping_graph(
             model,
             context_max_chars=context_max_chars,
         )
+        outfit_correction_node = create_outfit_correction_node(
+            model,
+            context_max_chars=context_max_chars,
+        )
 
         graph_builder.add_node(
             "tools",
@@ -260,6 +271,14 @@ def create_shopping_graph(
         graph_builder.add_node(
             "generate_outfit",
             cast(Any, outfit_generation_node),
+        )
+        graph_builder.add_node(
+            "validate_outfit",
+            cast(Any, validate_outfit),
+        )
+        graph_builder.add_node(
+            "correct_outfit",
+            cast(Any, outfit_correction_node),
         )
         graph_builder.add_node(
             "reject_tools",
@@ -289,7 +308,19 @@ def create_shopping_graph(
         )
         graph_builder.add_edge(
             "generate_outfit",
-            END,
+            "validate_outfit",
+        )
+        graph_builder.add_conditional_edges(
+            "validate_outfit",
+            route_after_outfit_validation,
+            {
+                "correct_outfit": "correct_outfit",
+                "end": END,
+            },
+        )
+        graph_builder.add_edge(
+            "correct_outfit",
+            "validate_outfit",
         )
     else:
         # 没有提供工具时，聊天节点执行后直接结束

@@ -325,3 +325,4 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
     outfit_repository.get_by_ids.assert_not_awaited()
     assert result["messages"][-1].content == ("可以使用浅蓝色亚麻衬衫完成通勤搭配。")
     assert result["outfit_recommendation"] == recommendation
+    assert result["outfit_feasibility_report"].is_executable is True

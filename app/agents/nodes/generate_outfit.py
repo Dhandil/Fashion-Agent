@@ -33,7 +33,6 @@ from app.agents.schemas.outfit import (
 from app.agents.state.shopping import ShoppingAgentState
 from app.core.observability import log_event
 from app.domain.entities.outfit import (
-    OutfitItemSource,
     OutfitRecommendation,
 )
 from app.domain.entities.weather import WeatherContext
@@ -57,48 +56,6 @@ def _get_latest_text(
             return message.content
 
     return ""
-
-
-def _get_record_ids(
-    records: tuple[dict[str, Any], ...],
-    id_field: str,
-) -> set[str]:
-    """从工具记录中提取有效字符串 ID。"""
-
-    return {
-        record_id
-        for record in records
-        if isinstance(
-            record_id := record.get(id_field),
-            str,
-        )
-        and record_id
-    }
-
-
-def _validate_outfit_source_ids(
-    recommendation: OutfitRecommendation,
-    wardrobe_ids: set[str],
-    product_ids: set[str],
-) -> None:
-    """验证 Outfit 引用的真实来源 ID 均来自本轮工具结果。"""
-
-    for item in (
-        *recommendation.items,
-        *recommendation.alternatives,
-    ):
-        if (
-            item.source is OutfitItemSource.WARDROBE
-            and item.source_reference_id not in wardrobe_ids
-        ):
-            raise ValueError(
-                "Outfit 引用了本轮衣橱结果中不存在的 ID",
-            )
-
-        if item.source is OutfitItemSource.PRODUCT and item.source_reference_id not in product_ids:
-            raise ValueError(
-                "Outfit 引用了本轮商品结果中不存在的 ID",
-            )
 
 
 def _get_weather_from_records(
@@ -420,17 +377,6 @@ def create_outfit_generation_node(
                     "outfit_recommendation": None,
                 }
 
-            _validate_outfit_source_ids(
-                recommendation=recommendation,
-                wardrobe_ids=_get_record_ids(
-                    wardrobe_records,
-                    "wardrobe_item_id",
-                ),
-                product_ids=_get_record_ids(
-                    product_records,
-                    "product_id",
-                ),
-            )
         # 模型供应商和解析器可能抛出不同异常，节点边界统一安全降级
         except Exception as exc:  # noqa: BLE001
             # 结构化输出失败时保留已经生成的文本回复，不暴露不可信 Outfit

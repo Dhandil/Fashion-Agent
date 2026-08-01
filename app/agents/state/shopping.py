@@ -9,6 +9,9 @@ from app.agents.schemas.requirements import (
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
+from app.domain.entities.outfit_validation import (
+    OutfitFeasibilityReport,
+)
 from app.domain.entities.weather import WeatherContext
 
 
@@ -40,6 +43,12 @@ class ShoppingAgentState(TypedDict):
 
     # Agent 生成的结构化穿搭推荐；普通问答时可以不存在
     outfit_recommendation: NotRequired[OutfitRecommendation | None]
+
+    # 结构化推荐经过确定性规则检查后的结果
+    outfit_feasibility_report: NotRequired[OutfitFeasibilityReport | None]
+
+    # 当前轮可执行性失败后的修正次数，硬限制为最多一次
+    outfit_correction_attempts: NotRequired[int]
 
     # 最近一次成功生成的 Outfit，作为后续局部调整的结构化基线
     previous_outfit_recommendation: NotRequired[OutfitRecommendation | None]

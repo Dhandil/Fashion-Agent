@@ -20,6 +20,12 @@ from app.domain.entities.outfit import (
     OutfitRecommendation,
     WardrobeGap,
 )
+from app.domain.entities.outfit_validation import (
+    OutfitFeasibilityIssue,
+    OutfitFeasibilityReport,
+    OutfitIssueCode,
+    OutfitIssueSeverity,
+)
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
@@ -110,6 +116,7 @@ def test_chat_returns_agent_response() -> None:
         "sources": [
             "data/samples/fabrics.md",
         ],
+        "outfit_issues": [],
     }
 
     # 验证工作流只执行了一次
@@ -320,6 +327,18 @@ def test_chat_returns_structured_outfit_when_graph_provides_one() -> None:
                 ),
             ],
             "outfit_recommendation": recommendation,
+            "outfit_feasibility_report": (
+                OutfitFeasibilityReport(
+                    is_executable=True,
+                    issues=(
+                        OutfitFeasibilityIssue(
+                            code=(OutfitIssueCode.PRECIPITATION_RISK),
+                            severity=(OutfitIssueSeverity.WARNING),
+                            message="建议补充雨具。",
+                        ),
+                    ),
+                )
+            ),
         },
     )
 
@@ -349,6 +368,14 @@ def test_chat_returns_structured_outfit_when_graph_provides_one() -> None:
         "reason": "透气并适合通勤",
     }
     assert response_data["outfit"]["wardrobe_gaps"][0]["suggested_item"] == "黑色乐福鞋"
+    assert response_data["outfit_issues"] == [
+        {
+            "code": "precipitation_risk",
+            "severity": "warning",
+            "message": "建议补充雨具。",
+            "item_reference_id": None,
+        },
+    ]
 
 
 def test_chat_passes_user_provided_weather_to_graph() -> None:
