@@ -1,35 +1,122 @@
-# Python virtual environment
-.venv/
+# ==============================
+# Python
+# ==============================
 
-# Python cache
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+*.egg
 *.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+
+# ==============================
+# Python 虚拟环境
+# ==============================
+
+.venv/
+venv/
+env/
+ENV/
+
+
+# ==============================
+# 测试、类型检查与代码质量缓存
+# ==============================
+
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-htmlcov/
 .coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+junit.xml
 
-# Environment
+
+# ==============================
+# 环境变量与密钥
+# ==============================
+
 .env
 .env.*
 !.env.example
 
-# VS Code
+
+# ==============================
+# IDE 与编辑器
+# ==============================
+
 .vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
 
-# Logs
+
+# ==============================
+# 日志与临时文件
+# ==============================
+
 *.log
+logs/
+tmp/
+temp/
+*.tmp
 
-# Runtime data
-data/chroma/
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
 
-# OS
+# ==============================
+# 本地数据库文件
+# PostgreSQL 正式数据由 Docker Volume 管理
+# ==============================
+
+*.db
+*.sqlite
+*.sqlite3
+
+
+# ==============================
+# RAG 运行时数据
+# ==============================
+
+# 独立原始知识库不进入 Fashion-Agent 仓库
+/data/raw/**
+
+# 保留 raw 空目录占位文件
+!/data/raw/.gitkeep
+
+# Chroma 向量、索引和本地数据库不提交
+/data/chroma/**
+
+# 处理过程中生成的数据不提交
+/data/processed/**
+
+# 保留 processed 空目录占位文件
+!/data/processed/.gitkeep
+
+
+# ==============================
+# Hugging Face 与模型缓存
+# 防止模型权重被意外提交
+# ==============================
+
+.cache/
+huggingface/
+models/
+*.safetensors
+*.bin
+
+
+# ==============================
+# 操作系统文件
+# ==============================
+
 .DS_Store
 Thumbs.db
+desktop.ini
