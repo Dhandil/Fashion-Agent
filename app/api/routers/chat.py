@@ -1,3 +1,5 @@
+import logging
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import APIRouter
@@ -10,6 +12,8 @@ from app.api.dependencies.identity import (
     CurrentUserDependency,
 )
 from app.api.schemas.chat import ChatRequest, ChatResponse
+from app.core.observability import log_event
+from app.core.request_context import get_request_id
 from app.domain.entities.weather import (
     WeatherContext,
     WeatherDataSource,
@@ -20,6 +24,7 @@ router = APIRouter(
     prefix="/chat",
     tags=["chat"],
 )
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -49,6 +54,14 @@ async def chat(
         else None
     )
 
+    started_at = perf_counter()
+    log_event(
+        logger,
+        "agent.graph.started",
+        conversation_is_new=request.conversation_id is None,
+        has_weather=weather_context is not None,
+    )
+
     # 将 API 请求转换为 LangChain 消息并执行工作流
     result = await graph.ainvoke(
         {
@@ -61,6 +74,10 @@ async def chat(
         config={
             "configurable": {
                 "thread_id": thread_id,
+            },
+            # metadata 可被 LangGraph/LangSmith 等后续观测后端直接读取
+            "metadata": {
+                "request_id": get_request_id(),
             },
         },
     )
@@ -77,6 +94,17 @@ async def chat(
     # 普通知识问答可能没有结构化穿搭推荐
     outfit_recommendation = result.get(
         "outfit_recommendation",
+    )
+
+    log_event(
+        logger,
+        "agent.graph.completed",
+        duration_ms=round(
+            (perf_counter() - started_at) * 1000,
+            2,
+        ),
+        source_count=len(knowledge_sources),
+        has_outfit=outfit_recommendation is not None,
     )
 
     # 将 Agent 消息转换成 API 响应

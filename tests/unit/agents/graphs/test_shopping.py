@@ -8,6 +8,11 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agents.graphs.shopping import create_shopping_graph
+from app.agents.schemas.requirements import (
+    OutfitRequirementAnalysis,
+    RequestIntent,
+    RequirementField,
+)
 from app.domain.entities.outfit import (
     OutfitItem,
     OutfitRecommendation,
@@ -40,6 +45,40 @@ def test_shopping_graph_runs_chat_node() -> None:
     assert len(result["messages"]) == 2
     assert result["messages"][0].content == "我想买一件衬衫"
     assert result["messages"][1].content == "请告诉我你的预算"
+
+
+def test_incomplete_requirement_skips_retrieval_and_chat_model() -> None:
+    """验证信息不足时只执行确定性最小追问。"""
+
+    model = Mock(spec=BaseChatModel)
+    analysis_model = Mock()
+    model.with_structured_output.return_value = analysis_model
+    analysis_model.invoke.return_value = OutfitRequirementAnalysis(
+        intent=RequestIntent.OUTFIT,
+        is_sufficient=False,
+        missing_fields=(
+            RequirementField.SCENARIO,
+            RequirementField.LOCATION,
+        ),
+    )
+    retriever = Mock(spec=BaseRetriever)
+    graph = create_shopping_graph(
+        model=model,
+        retriever=retriever,
+    )
+
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(content="帮我搭配"),
+            ],
+        },
+    )
+
+    retriever.invoke.assert_not_called()
+    model.invoke.assert_not_called()
+    assert "使用场景" in result["messages"][-1].content
+    assert "地点" in result["messages"][-1].content
 
 
 def test_shopping_graph_moves_previous_outfit_to_adjustment_baseline() -> None:
@@ -76,10 +115,7 @@ def test_shopping_graph_moves_previous_outfit_to_adjustment_baseline() -> None:
     )
 
     assert result["outfit_recommendation"] is None
-    assert (
-        result["previous_outfit_recommendation"]
-        == previous_outfit
-    )
+    assert result["previous_outfit_recommendation"] == previous_outfit
 
 
 def test_shopping_graph_remembers_messages_in_same_thread() -> None:

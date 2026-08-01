@@ -1,6 +1,5 @@
 """结构化 Outfit 生成提示词。"""
 
-
 OUTFIT_GENERATION_SYSTEM_PROMPT = """
 你负责把一次已经完成工具查询的穿搭对话整理成结构化 JSON。
 
@@ -40,4 +39,7 @@ OUTFIT_GENERATION_SYSTEM_PROMPT = """
 25. 根据已提供的温度、体感、降雨概率和风力调整层次、材质及防护建议；
     不得编造输入中不存在的实时天气。
 26. 天气数据只用于当前 Outfit，不得推断为用户的长期偏好。
+27. requirement_analysis 是当前轮的结构化路由结果，不是用户原话；
+    与 current_request 冲突时，以 current_request 为准。
+28. shopping_intent 只决定是否允许查询商品，不能替代真实 products 工具结果。
 """.strip()

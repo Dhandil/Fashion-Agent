@@ -107,18 +107,10 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     state: ShoppingAgentState = {
         "messages": create_current_turn_messages(),
         "knowledge_context": "亚麻适合炎热天气。",
-        "outfit_feedback_context": (
-            "用户喜欢简约清爽的历史穿搭。"
-        ),
-        "style_profile_context": (
-            "用户明确维护的喜欢风格：休闲。"
-        ),
-        "recent_outfits_context": (
-            "近期已经使用 shirt-002 完成通勤搭配。"
-        ),
-        "previous_outfit_recommendation": (
-            create_recommendation()
-        ),
+        "outfit_feedback_context": ("用户喜欢简约清爽的历史穿搭。"),
+        "style_profile_context": ("用户明确维护的喜欢风格：休闲。"),
+        "recent_outfits_context": ("近期已经使用 shirt-002 完成通勤搭配。"),
+        "previous_outfit_recommendation": (create_recommendation()),
         "weather_context": WeatherContext(
             location="上海",
             target_date="2026-08-01",
@@ -144,33 +136,15 @@ def test_generate_outfit_accepts_traceable_wardrobe_id() -> None:
     assert OUTFIT_GENERATION_SYSTEM_PROMPT in (structured_messages[0].content)
     assert "shirt-001" in (structured_messages[1].content)
     assert "亚麻适合炎热天气" in (structured_messages[1].content)
-    assert "用户喜欢简约清爽" in (
-        structured_messages[1].content
-    )
-    assert "用户明确维护的喜欢风格" in (
-        structured_messages[1].content
-    )
-    assert "近期已经使用 shirt-002" in (
-        structured_messages[1].content
-    )
-    assert '"previous_outfit"' in (
-        structured_messages[1].content
-    )
-    assert "清爽夏季通勤" in (
-        structured_messages[1].content
-    )
-    assert '"provided_weather"' in (
-        structured_messages[1].content
-    )
-    assert '"precipitation_probability": 70' in (
-        structured_messages[1].content
-    )
-    assert '"weather_outfit_guidance"' in (
-        structured_messages[1].content
-    )
-    assert "高温或体感炎热" in (
-        structured_messages[1].content
-    )
+    assert "用户喜欢简约清爽" in (structured_messages[1].content)
+    assert "用户明确维护的喜欢风格" in (structured_messages[1].content)
+    assert "近期已经使用 shirt-002" in (structured_messages[1].content)
+    assert '"previous_outfit"' in (structured_messages[1].content)
+    assert "清爽夏季通勤" in (structured_messages[1].content)
+    assert '"provided_weather"' in (structured_messages[1].content)
+    assert '"precipitation_probability": 70' in (structured_messages[1].content)
+    assert '"weather_outfit_guidance"' in (structured_messages[1].content)
+    assert "高温或体感炎热" in (structured_messages[1].content)
     assert "output_schema" in (structured_messages[1].content)
 
 
@@ -204,10 +178,8 @@ def test_generate_outfit_includes_weather_tool_result() -> None:
     model = Mock(spec=BaseChatModel)
     structured_model = Mock()
     model.with_structured_output.return_value = structured_model
-    structured_model.invoke.return_value = (
-        OutfitGenerationResult(
-            outfit=create_recommendation(),
-        )
+    structured_model.invoke.return_value = OutfitGenerationResult(
+        outfit=create_recommendation(),
     )
     messages = create_current_turn_messages()
     messages.insert(
@@ -240,18 +212,10 @@ def test_generate_outfit_includes_weather_tool_result() -> None:
     )
 
     assert result["outfit_recommendation"] is not None
-    generation_message = (
-        structured_model.invoke.call_args.args[0][1]
-    )
-    assert '"weather_tool_results"' in (
-        generation_message.content
-    )
-    assert '"condition": "阵雨"' in (
-        generation_message.content
-    )
-    assert "高温或体感炎热" in (
-        generation_message.content
-    )
+    generation_message = structured_model.invoke.call_args.args[0][1]
+    assert '"weather_tool_results"' in (generation_message.content)
+    assert '"condition": "阵雨"' in (generation_message.content)
+    assert "高温或体感炎热" in (generation_message.content)
 
 
 def test_generate_outfit_discards_unknown_product_id() -> None:

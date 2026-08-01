@@ -52,6 +52,9 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
     fake_model = Mock()
     fake_checkpointer = Mock()
     fake_retriever = Mock()
+    fake_settings = Mock(
+        agent_context_max_chars=4_321,
+    )
 
     with (
         patch(
@@ -66,6 +69,10 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
             "app.services.agent.get_knowledge_retriever",
             return_value=fake_retriever,
         ) as mocked_get_retriever,
+        patch(
+            "app.services.agent.get_settings",
+            return_value=fake_settings,
+        ) as mocked_get_settings,
     ):
         first_runtime = get_shopping_agent_runtime()
         second_runtime = get_shopping_agent_runtime()
@@ -74,10 +81,12 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
     assert first_runtime.model is fake_model
     assert first_runtime.checkpointer is fake_checkpointer
     assert first_runtime.retriever is fake_retriever
+    assert first_runtime.context_max_chars == 4_321
 
     mocked_create_model.assert_called_once_with()
     mocked_get_checkpointer.assert_called_once_with()
     mocked_get_retriever.assert_called_once_with()
+    mocked_get_settings.assert_called_once_with()
 
     get_shopping_agent_runtime.cache_clear()
 
@@ -125,23 +134,15 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
         first_result = create_user_shopping_graph(
             wardrobe_repository=fake_repository,
             outfit_repository=fake_outfit_repository,
-            outfit_feedback_repository=(
-                fake_feedback_repository
-            ),
-            style_profile_repository=(
-                fake_style_profile_repository
-            ),
+            outfit_feedback_repository=(fake_feedback_repository),
+            style_profile_repository=(fake_style_profile_repository),
             user_id="user-001",
         )
         second_result = create_user_shopping_graph(
             wardrobe_repository=fake_repository,
             outfit_repository=fake_outfit_repository,
-            outfit_feedback_repository=(
-                fake_feedback_repository
-            ),
-            style_profile_repository=(
-                fake_style_profile_repository
-            ),
+            outfit_feedback_repository=(fake_feedback_repository),
+            style_profile_repository=(fake_style_profile_repository),
             user_id="user-001",
         )
 
@@ -164,13 +165,10 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
         retriever=fake_runtime.retriever,
         tools=fake_tools,
         outfit_repository=fake_outfit_repository,
-        outfit_feedback_repository=(
-            fake_feedback_repository
-        ),
-        style_profile_repository=(
-            fake_style_profile_repository
-        ),
+        outfit_feedback_repository=(fake_feedback_repository),
+        style_profile_repository=(fake_style_profile_repository),
         user_id="user-001",
+        context_max_chars=fake_runtime.context_max_chars,
     )
 
 
@@ -284,12 +282,8 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
         graph = create_user_shopping_graph(
             wardrobe_repository=wardrobe_repository,
             outfit_repository=outfit_repository,
-            outfit_feedback_repository=(
-                feedback_repository
-            ),
-            style_profile_repository=(
-                style_profile_repository
-            ),
+            outfit_feedback_repository=(feedback_repository),
+            style_profile_repository=(style_profile_repository),
             user_id="user-001",
         )
 

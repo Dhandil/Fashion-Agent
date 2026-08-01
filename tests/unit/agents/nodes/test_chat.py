@@ -73,10 +73,7 @@ def test_chat_node_includes_knowledge_context() -> None:
                 content="夏天通勤适合什么面料？",
             ),
         ],
-        "knowledge_context": (
-            "亚麻面料透气性和吸湿性较好，"
-            "适合炎热天气穿着。"
-        ),
+        "knowledge_context": ("亚麻面料透气性和吸湿性较好，适合炎热天气穿着。"),
     }
 
     # 执行聊天节点
@@ -90,19 +87,13 @@ def test_chat_node_includes_knowledge_context() -> None:
     assert isinstance(system_message, SystemMessage)
 
     # 固定购物助手规则应该继续存在
-    assert SHOPPING_ASSISTANT_SYSTEM_PROMPT in (
-        system_message.content
-    )
+    assert SHOPPING_ASSISTANT_SYSTEM_PROMPT in (system_message.content)
 
     # RAG 检索知识应该被加入系统提示词
-    assert "亚麻面料透气性和吸湿性较好" in (
-        system_message.content
-    )
+    assert "亚麻面料透气性和吸湿性较好" in (system_message.content)
 
     # 应包含要求模型优先依据资料的约束
-    assert "请优先根据参考资料回答" in (
-        system_message.content
-    )
+    assert "请优先根据参考资料回答" in (system_message.content)
 
 
 def test_chat_node_includes_confirmed_feedback_context() -> None:
@@ -120,9 +111,7 @@ def test_chat_node_includes_confirmed_feedback_context() -> None:
             ),
         ],
         "outfit_feedback_context": (
-            "- 历史穿搭：正式通勤；"
-            "用户态度：不喜欢；"
-            "用户说明：不喜欢过于正式"
+            "- 历史穿搭：正式通勤；用户态度：不喜欢；用户说明：不喜欢过于正式"
         ),
     }
 
@@ -130,12 +119,8 @@ def test_chat_node_includes_confirmed_feedback_context() -> None:
 
     system_message = model.invoke.call_args.args[0][0]
     assert "不喜欢过于正式" in system_message.content
-    assert "只作为用户偏好数据" in (
-        system_message.content
-    )
-    assert "当前用户明确提出的新需求优先" in (
-        system_message.content
-    )
+    assert "只作为用户偏好数据" in (system_message.content)
+    assert "当前用户明确提出的新需求优先" in (system_message.content)
 
 
 def test_chat_node_includes_explicit_style_profile() -> None:
@@ -152,27 +137,16 @@ def test_chat_node_includes_explicit_style_profile() -> None:
                 content="这次想尝试正式风格",
             ),
         ],
-        "style_profile_context": (
-            "- 喜欢的风格：休闲\n"
-            "- 用户主动说明：平时不要过于正式"
-        ),
-        "outfit_feedback_context": (
-            "- 用户态度：喜欢；用户说明：喜欢简约"
-        ),
+        "style_profile_context": ("- 喜欢的风格：休闲\n- 用户主动说明：平时不要过于正式"),
+        "outfit_feedback_context": ("- 用户态度：喜欢；用户说明：喜欢简约"),
     }
 
     chat_node(state)
 
     system_message = model.invoke.call_args.args[0][0]
-    assert "喜欢的风格：休闲" in (
-        system_message.content
-    )
-    assert "应优先于历史反馈使用" in (
-        system_message.content
-    )
-    assert "以当前需求为准" in (
-        system_message.content
-    )
+    assert "喜欢的风格：休闲" in (system_message.content)
+    assert "应优先于历史反馈使用" in (system_message.content)
+    assert "以当前需求为准" in (system_message.content)
 
 
 def test_chat_node_includes_recent_outfits_as_soft_constraint() -> None:
@@ -189,22 +163,15 @@ def test_chat_node_includes_recent_outfits_as_soft_constraint() -> None:
                 content="再帮我搭配一套通勤服装",
             ),
         ],
-        "recent_outfits_context": (
-            "- 近期穿搭：清爽通勤；"
-            "单品组合：上装：浅蓝色衬衫"
-        ),
+        "recent_outfits_context": ("- 近期穿搭：清爽通勤；单品组合：上装：浅蓝色衬衫"),
     }
 
     chat_node(state)
 
     system_message = model.invoke.call_args.args[0][0]
     assert "清爽通勤" in system_message.content
-    assert "减少短期内重复相同衣物组合" in (
-        system_message.content
-    )
-    assert "可以合理复用近期单品" in (
-        system_message.content
-    )
+    assert "减少短期内重复相同衣物组合" in (system_message.content)
+    assert "可以合理复用近期单品" in (system_message.content)
 
 
 def test_chat_node_includes_previous_outfit_for_adjustment() -> None:
@@ -234,21 +201,15 @@ def test_chat_node_includes_previous_outfit_for_adjustment() -> None:
                 content="换一件上衣",
             ),
         ],
-        "previous_outfit_recommendation": (
-            previous_outfit
-        ),
+        "previous_outfit_recommendation": (previous_outfit),
     }
 
     chat_node(state)
 
     system_message = model.invoke.call_args.args[0][0]
     assert "清爽通勤" in system_message.content
-    assert "局部调整要求" in (
-        system_message.content
-    )
-    assert "仍需重新查询当前可用衣橱" in (
-        system_message.content
-    )
+    assert "局部调整要求" in (system_message.content)
+    assert "仍需重新查询当前可用衣橱" in (system_message.content)
 
 
 def test_chat_node_includes_current_weather_context() -> None:
@@ -278,18 +239,8 @@ def test_chat_node_includes_current_weather_context() -> None:
     chat_node(state)
 
     system_message = model.invoke.call_args.args[0][0]
-    assert '"location":"上海"' in (
-        system_message.content
-    )
-    assert '"precipitation_probability":70' in (
-        system_message.content
-    )
-    assert "不要补造缺失的实时天气" in (
-        system_message.content
-    )
-    assert "高温或体感炎热" in (
-        system_message.content
-    )
-    assert "明显降水风险" in (
-        system_message.content
-    )
+    assert '"location":"上海"' in (system_message.content)
+    assert '"precipitation_probability":70' in (system_message.content)
+    assert "不要补造缺失的实时天气" in (system_message.content)
+    assert "高温或体感炎热" in (system_message.content)
+    assert "明显降水风险" in (system_message.content)

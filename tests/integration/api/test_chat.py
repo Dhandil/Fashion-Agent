@@ -99,6 +99,8 @@ def test_chat_returns_agent_response() -> None:
 
     # 验证 HTTP 请求成功
     assert response.status_code == 200
+    request_id = response.headers["X-Request-ID"]
+    assert UUID(request_id)
 
     # 验证 API 返回了假 Agent 的回复
     assert response.json() == {
@@ -117,12 +119,8 @@ def test_chat_returns_agent_response() -> None:
     mocked_create_graph.assert_called_once_with(
         wardrobe_repository=wardrobe_repository,
         outfit_repository=outfit_repository,
-        outfit_feedback_repository=(
-            outfit_feedback_repository
-        ),
-        style_profile_repository=(
-            style_profile_repository
-        ),
+        outfit_feedback_repository=(outfit_feedback_repository),
+        style_profile_repository=(style_profile_repository),
         user_id="user-001",
         weather_provider=None,
     )
@@ -143,6 +141,9 @@ def test_chat_returns_agent_response() -> None:
     assert graph_config == {
         "configurable": {
             "thread_id": ("user:user-001:conversation:test-conversation-id"),
+        },
+        "metadata": {
+            "request_id": request_id,
         },
     }
 
@@ -390,9 +391,7 @@ def test_chat_passes_user_provided_weather_to_graph() -> None:
     input_state = fake_graph.ainvoke.call_args.args[0]
     weather = input_state["weather_context"]
     assert weather.location == "上海"
-    assert weather.target_date.isoformat() == (
-        "2026-08-01"
-    )
+    assert weather.target_date.isoformat() == ("2026-08-01")
     assert weather.source.value == "user_provided"
 
 

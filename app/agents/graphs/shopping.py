@@ -9,7 +9,14 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
+from app.agents.context_package import DEFAULT_CONTEXT_MAX_CHARS
+from app.agents.nodes.analyze_requirements import (
+    create_requirement_analysis_node,
+)
 from app.agents.nodes.chat import create_chat_node
+from app.agents.nodes.clarify_requirements import (
+    clarify_requirements,
+)
 from app.agents.nodes.generate_outfit import (
     create_outfit_generation_node,
 )
@@ -25,8 +32,14 @@ from app.agents.nodes.load_style_profile import (
 from app.agents.nodes.prepare_turn import (
     create_prepare_turn_node,
 )
+from app.agents.nodes.reject_tools import (
+    reject_disallowed_tool_calls,
+)
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
+)
+from app.agents.routing.requirements import (
+    route_after_requirement_analysis,
 )
 from app.agents.routing.tools import route_after_chat
 from app.agents.state.shopping import ShoppingAgentState
@@ -52,13 +65,10 @@ def create_shopping_graph(
     retriever: BaseRetriever | None = None,
     tools: Sequence[BaseTool] | None = None,
     outfit_repository: OutfitRepository | None = None,
-    outfit_feedback_repository: (
-        OutfitFeedbackRepository | None
-    ) = None,
-    style_profile_repository: (
-        StyleProfileRepository | None
-    ) = None,
+    outfit_feedback_repository: (OutfitFeedbackRepository | None) = None,
+    style_profile_repository: (StyleProfileRepository | None) = None,
     user_id: str | None = None,
+    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
 ) -> ShoppingGraph:
     """创建并编译个人穿搭 Agent 工作流。"""
 
@@ -68,24 +78,14 @@ def create_shopping_graph(
         user_id,
     )
 
-    if (
-        any(
-            dependency is not None
-            for dependency in feedback_dependencies
-        )
-        and not all(
-            dependency is not None
-            for dependency in feedback_dependencies
-        )
+    if any(dependency is not None for dependency in feedback_dependencies) and not all(
+        dependency is not None for dependency in feedback_dependencies
     ):
         raise ValueError(
             "加载 Outfit 反馈需要同时提供两个仓库和 user_id",
         )
 
-    if (
-        style_profile_repository is not None
-        and user_id is None
-    ):
+    if style_profile_repository is not None and user_id is None:
         raise ValueError(
             "加载 Style Profile 需要同时提供 user_id",
         )
@@ -102,14 +102,31 @@ def create_shopping_graph(
     else:
         tool_enabled_model = model
 
-    # 创建使用当前模型的聊天节点
-    chat_node = create_chat_node(tool_enabled_model)
+    # 创建需求分析和聊天节点；分析模型不绑定业务工具，只输出路由状态
+    requirement_analysis_node = create_requirement_analysis_node(model)
+    graph_builder.add_node(
+        "analyze_requirements",
+        cast(Any, requirement_analysis_node),
+    )
+
+    chat_node = create_chat_node(
+        tool_enabled_model,
+        context_max_chars=context_max_chars,
+    )
 
     # 将聊天节点注册到图中，节点名称为 chat
     # LangGraph 当前类型桩无法识别工厂返回的节点闭包，运行时接口是兼容的
     graph_builder.add_node(
         "chat",
         cast(Any, chat_node),
+    )
+    graph_builder.add_node(
+        "clarify_requirements",
+        cast(Any, clarify_requirements),
+    )
+    graph_builder.add_edge(
+        "clarify_requirements",
+        END,
     )
 
     # 每轮先保存上一套结构化推荐并清空本轮输出，避免返回过期 Outfit
@@ -122,74 +139,57 @@ def create_shopping_graph(
         START,
         "prepare_turn",
     )
+    graph_builder.add_edge(
+        "prepare_turn",
+        "analyze_requirements",
+    )
 
-    # entry_node_name 记录个性化和检索链路中当前最后一个节点
-    entry_node_name: str | None = "prepare_turn"
+    # 个性化链路仅在需求充分且确实需要穿搭、衣橱或购物时执行。
+    personalized_entry: str | None = None
+    personalized_tail: str | None = None
 
-    if (
-        style_profile_repository is not None
-        and user_id is not None
-    ):
-        load_style_profile_node = (
-            create_load_style_profile_node(
-                repository=style_profile_repository,
-                user_id=user_id,
-            )
+    if style_profile_repository is not None and user_id is not None:
+        load_style_profile_node = create_load_style_profile_node(
+            repository=style_profile_repository,
+            user_id=user_id,
         )
-        entry_node_name = "load_style_profile"
+        style_profile_node_name = "load_style_profile"
         graph_builder.add_node(
-            entry_node_name,
+            style_profile_node_name,
             cast(Any, load_style_profile_node),
         )
-        graph_builder.add_edge(
-            START,
-            entry_node_name,
-        )
+        personalized_entry = style_profile_node_name
+        personalized_tail = style_profile_node_name
 
-    if (
-        outfit_repository is not None
-        and user_id is not None
-    ):
-        load_recent_outfits_node = (
-            create_load_recent_outfits_node(
-                repository=outfit_repository,
-                user_id=user_id,
-            )
+    if outfit_repository is not None and user_id is not None:
+        load_recent_outfits_node = create_load_recent_outfits_node(
+            repository=outfit_repository,
+            user_id=user_id,
         )
-        recent_outfits_node_name = (
-            "load_recent_outfits"
-        )
+        recent_outfits_node_name = "load_recent_outfits"
         graph_builder.add_node(
             recent_outfits_node_name,
             cast(Any, load_recent_outfits_node),
         )
 
-        if entry_node_name is None:
+        if personalized_tail is not None:
             graph_builder.add_edge(
-                START,
-                recent_outfits_node_name,
-            )
-        else:
-            graph_builder.add_edge(
-                entry_node_name,
+                personalized_tail,
                 recent_outfits_node_name,
             )
 
-        entry_node_name = recent_outfits_node_name
+        personalized_entry = personalized_entry or recent_outfits_node_name
+        personalized_tail = recent_outfits_node_name
 
     if (
         outfit_repository is not None
         and outfit_feedback_repository is not None
         and user_id is not None
     ):
-        load_outfit_feedback_node = (
-            create_load_outfit_feedback_node(
-                outfit_repository=outfit_repository,
-                feedback_repository=(
-                    outfit_feedback_repository
-                ),
-                user_id=user_id,
-            )
+        load_outfit_feedback_node = create_load_outfit_feedback_node(
+            outfit_repository=outfit_repository,
+            feedback_repository=(outfit_feedback_repository),
+            user_id=user_id,
         )
         feedback_node_name = "load_outfit_feedback"
         graph_builder.add_node(
@@ -197,20 +197,17 @@ def create_shopping_graph(
             cast(Any, load_outfit_feedback_node),
         )
 
-        if entry_node_name is None:
+        if personalized_tail is not None:
             graph_builder.add_edge(
-                START,
-                feedback_node_name,
-            )
-        else:
-            graph_builder.add_edge(
-                entry_node_name,
+                personalized_tail,
                 feedback_node_name,
             )
 
-        entry_node_name = feedback_node_name
+        personalized_entry = personalized_entry or feedback_node_name
+        personalized_tail = feedback_node_name
 
-    # 提供 Retriever 时，在个性化反馈之后检索知识
+    # 知识问答可直接进入 Retriever；个性化请求则在用户数据之后检索。
+    retrieval_node_name: str | None = None
     if retriever is not None:
         retrieve_knowledge_node = create_retrieve_knowledge_node(
             retriever,
@@ -220,14 +217,10 @@ def create_shopping_graph(
             "retrieve_knowledge",
             cast(Any, retrieve_knowledge_node),
         )
-        if entry_node_name is None:
+        retrieval_node_name = "retrieve_knowledge"
+        if personalized_tail is not None:
             graph_builder.add_edge(
-                START,
-                "retrieve_knowledge",
-            )
-        else:
-            graph_builder.add_edge(
-                entry_node_name,
+                personalized_tail,
                 "retrieve_knowledge",
             )
 
@@ -235,22 +228,30 @@ def create_shopping_graph(
             "retrieve_knowledge",
             "chat",
         )
-    else:
-        if entry_node_name is None:
-            # 没有个性化仓库和 Retriever 时保持原来的单节点工作流
-            graph_builder.add_edge(
-                START,
-                "chat",
-            )
-        else:
-            graph_builder.add_edge(
-                entry_node_name,
-                "chat",
-            )
+    elif personalized_tail is not None:
+        graph_builder.add_edge(
+            personalized_tail,
+            "chat",
+        )
+
+    personalized_target = personalized_entry or retrieval_node_name or "chat"
+    general_target = retrieval_node_name or "chat"
+    graph_builder.add_conditional_edges(
+        "analyze_requirements",
+        route_after_requirement_analysis,
+        {
+            "clarify": "clarify_requirements",
+            "general": general_target,
+            "personalized": personalized_target,
+        },
+    )
 
     # 提供工具时，创建工具执行节点和循环路由
     if tools:
-        outfit_generation_node = create_outfit_generation_node(model)
+        outfit_generation_node = create_outfit_generation_node(
+            model,
+            context_max_chars=context_max_chars,
+        )
 
         graph_builder.add_node(
             "tools",
@@ -260,6 +261,10 @@ def create_shopping_graph(
             "generate_outfit",
             cast(Any, outfit_generation_node),
         )
+        graph_builder.add_node(
+            "reject_tools",
+            cast(Any, reject_disallowed_tool_calls),
+        )
 
         # 根据模型回复判断执行工具还是结束
         graph_builder.add_conditional_edges(
@@ -267,6 +272,7 @@ def create_shopping_graph(
             route_after_chat,
             {
                 "tools": "tools",
+                "reject_tools": "reject_tools",
                 "generate_outfit": "generate_outfit",
                 END: END,
             },
@@ -275,6 +281,10 @@ def create_shopping_graph(
         # 工具执行完成后回到聊天节点，让模型整理最终回答
         graph_builder.add_edge(
             "tools",
+            "chat",
+        )
+        graph_builder.add_edge(
+            "reject_tools",
             "chat",
         )
         graph_builder.add_edge(

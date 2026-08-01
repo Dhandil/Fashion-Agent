@@ -48,9 +48,13 @@ def test_prepare_turn_preserves_current_outfit_as_baseline() -> None:
 
     assert result == {
         "outfit_recommendation": None,
-        "previous_outfit_recommendation": (
-            recommendation
-        ),
+        "tool_policy_rejection_count": 0,
+        "knowledge_context": "",
+        "knowledge_sources": [],
+        "style_profile_context": "",
+        "outfit_feedback_context": "",
+        "recent_outfits_context": "",
+        "previous_outfit_recommendation": (recommendation),
     }
 
 
@@ -62,14 +66,39 @@ def test_prepare_turn_keeps_existing_baseline_when_no_new_outfit() -> None:
     state: ShoppingAgentState = {
         "messages": [],
         "outfit_recommendation": None,
-        "previous_outfit_recommendation": (
-            existing_baseline
-        ),
+        "previous_outfit_recommendation": (existing_baseline),
     }
 
     result = node(state)
 
     assert result == {
         "outfit_recommendation": None,
+        "tool_policy_rejection_count": 0,
+        "knowledge_context": "",
+        "knowledge_sources": [],
+        "style_profile_context": "",
+        "outfit_feedback_context": "",
+        "recent_outfits_context": "",
     }
 
+
+def test_prepare_turn_clears_previous_derived_context() -> None:
+    """验证轻量路由不会复用上一轮的知识和个性化文本。"""
+
+    node = create_prepare_turn_node()
+    result = node(
+        {
+            "messages": [],
+            "knowledge_context": "上一轮知识",
+            "knowledge_sources": ["old-source.md"],
+            "style_profile_context": "上一轮档案",
+            "outfit_feedback_context": "上一轮反馈",
+            "recent_outfits_context": "上一轮穿搭",
+        },
+    )
+
+    assert result["knowledge_context"] == ""
+    assert result["knowledge_sources"] == []
+    assert result["style_profile_context"] == ""
+    assert result["outfit_feedback_context"] == ""
+    assert result["recent_outfits_context"] == ""

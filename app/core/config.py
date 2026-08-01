@@ -87,14 +87,10 @@ class Settings(BaseSettings):
     chroma_collection_name: str = "fashion_knowledge"
 
     # 独立知识库根目录；其中的原文件只读，不由应用修改
-    knowledge_repository_path: str = (
-        "./data/raw/Fashion-Agent-Knowledge"
-    )
+    knowledge_repository_path: str = "./data/raw/Fashion-Agent-Knowledge"
 
     # 相对知识库根目录的正式发布 Manifest
-    knowledge_release_manifest: str = (
-        "releases/manifests/fashion-knowledge-2.8.0.yaml"
-    )
+    knowledge_release_manifest: str = "releases/manifests/fashion-knowledge-2.8.0.yaml"
 
     # 每个知识片段允许的最大字符数
     rag_chunk_size: int = 400
@@ -107,6 +103,14 @@ class Settings(BaseSettings):
 
     # 向量初筛候选数量，随后根据知识标题和标签执行本地重排
     rag_candidate_k: int = 24
+
+    # 单次模型调用允许注入的外部上下文字符预算
+    # 当前用户消息和固定系统规则不计入此预算
+    agent_context_max_chars: int = Field(
+        default=12_000,
+        ge=1_000,
+        le=100_000,
+    )
 
 
 @lru_cache

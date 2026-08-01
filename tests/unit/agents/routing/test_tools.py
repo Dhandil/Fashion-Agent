@@ -8,6 +8,11 @@ from langchain_core.messages import (
 from langgraph.graph import END
 
 from app.agents.routing.tools import route_after_chat
+from app.agents.schemas.requirements import (
+    OutfitRequirementAnalysis,
+    RequestIntent,
+    ShoppingIntent,
+)
 from app.agents.state.shopping import ShoppingAgentState
 
 
@@ -121,6 +126,90 @@ def test_route_after_chat_ignores_failed_wardrobe_tool() -> None:
                 content="暂时无法读取你的衣橱，请稍后再试。",
             ),
         ],
+    }
+
+    assert route_after_chat(state) == END
+
+
+def test_route_rejects_product_tool_without_explicit_intent() -> None:
+    """验证普通穿搭请求不能执行商品查询。"""
+
+    state: ShoppingAgentState = {
+        "messages": [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_products",
+                        "args": {"query": "衬衫"},
+                        "id": "product-call-1",
+                        "type": "tool_call",
+                    },
+                ],
+            ),
+        ],
+        "requirement_analysis": (
+            OutfitRequirementAnalysis(
+                intent=RequestIntent.OUTFIT,
+                needs_wardrobe=True,
+            )
+        ),
+    }
+
+    assert route_after_chat(state) == "reject_tools"
+
+
+def test_route_allows_product_tool_for_explicit_shopping() -> None:
+    """验证用户明确购物时允许执行商品查询。"""
+
+    state: ShoppingAgentState = {
+        "messages": [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_products",
+                        "args": {"query": "衬衫"},
+                        "id": "product-call-1",
+                        "type": "tool_call",
+                    },
+                ],
+            ),
+        ],
+        "requirement_analysis": (
+            OutfitRequirementAnalysis(
+                intent=RequestIntent.SHOPPING,
+                shopping_intent=(ShoppingIntent.EXPLICIT),
+            )
+        ),
+    }
+
+    assert route_after_chat(state) == "tools"
+
+
+def test_route_stops_repeated_disallowed_tool_call() -> None:
+    """验证同一轮第二次越权调用不会形成无限循环。"""
+
+    state: ShoppingAgentState = {
+        "messages": [
+            AIMessage(
+                content="无法直接查询商品。",
+                tool_calls=[
+                    {
+                        "name": "search_products",
+                        "args": {"query": "衬衫"},
+                        "id": "product-call-2",
+                        "type": "tool_call",
+                    },
+                ],
+            ),
+        ],
+        "requirement_analysis": (
+            OutfitRequirementAnalysis(
+                intent=RequestIntent.OUTFIT,
+            )
+        ),
+        "tool_policy_rejection_count": 1,
     }
 
     assert route_after_chat(state) == END

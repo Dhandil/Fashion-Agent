@@ -16,6 +16,14 @@ from app.agents.context import (
     get_current_turn_messages,
     get_current_turn_tool_records,
 )
+from app.agents.context_package import (
+    DEFAULT_CONTEXT_MAX_CHARS,
+    ContextCandidate,
+    ContextPackage,
+    ContextPriority,
+    ContextSource,
+    build_context_package,
+)
 from app.agents.prompts.outfit import (
     OUTFIT_GENERATION_SYSTEM_PROMPT,
 )
@@ -23,6 +31,7 @@ from app.agents.schemas.outfit import (
     OutfitGenerationResult,
 )
 from app.agents.state.shopping import ShoppingAgentState
+from app.core.observability import log_event
 from app.domain.entities.outfit import (
     OutfitItemSource,
     OutfitRecommendation,
@@ -44,10 +53,7 @@ def _get_latest_text(
     for message in reversed(
         get_current_turn_messages(state["messages"]),
     ):
-        if (
-            isinstance(message, message_type)
-            and isinstance(message.content, str)
-        ):
+        if isinstance(message, message_type) and isinstance(message.content, str):
             return message.content
 
     return ""
@@ -89,10 +95,7 @@ def _validate_outfit_source_ids(
                 "Outfit 引用了本轮衣橱结果中不存在的 ID",
             )
 
-        if (
-            item.source is OutfitItemSource.PRODUCT
-            and item.source_reference_id not in product_ids
-        ):
+        if item.source is OutfitItemSource.PRODUCT and item.source_reference_id not in product_ids:
             raise ValueError(
                 "Outfit 引用了本轮商品结果中不存在的 ID",
             )
@@ -114,8 +117,162 @@ def _get_weather_from_records(
     return None
 
 
+def _create_generation_context_package(
+    state: ShoppingAgentState,
+    wardrobe_records: tuple[dict[str, Any], ...],
+    product_records: tuple[dict[str, Any], ...],
+    weather_records: tuple[dict[str, Any], ...],
+    active_weather: WeatherContext | None,
+    max_chars: int,
+) -> ContextPackage:
+    """装配结构化 Outfit 生成所需的受控上下文。"""
+
+    candidates: list[ContextCandidate] = []
+
+    requirement_analysis = state.get(
+        "requirement_analysis",
+    )
+    if requirement_analysis is not None:
+        candidates.append(
+            ContextCandidate(
+                key="requirement_analysis",
+                source=(ContextSource.REQUIREMENT_ANALYSIS),
+                priority=ContextPriority.CURRENT_FACT,
+                content=(requirement_analysis.model_dump_json()),
+                truncatable=False,
+            ),
+        )
+
+    # 本轮工具事实逐条作为原子项加入，超出预算时整条舍弃，避免破坏 JSON。
+    for source, records in (
+        (ContextSource.WEATHER_TOOL, weather_records),
+        (ContextSource.WARDROBE, wardrobe_records),
+        (ContextSource.PRODUCTS, product_records),
+    ):
+        for index, record in enumerate(records):
+            candidates.append(
+                ContextCandidate(
+                    key=f"{source.value}:{index}",
+                    source=source,
+                    priority=ContextPriority.CURRENT_FACT,
+                    content=json.dumps(
+                        record,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    truncatable=False,
+                ),
+            )
+
+    provided_weather = state.get("weather_context")
+    if provided_weather is not None:
+        candidates.append(
+            ContextCandidate(
+                key="provided_weather",
+                source=ContextSource.WEATHER,
+                priority=ContextPriority.CURRENT_FACT,
+                content=provided_weather.model_dump_json(),
+                truncatable=False,
+            ),
+        )
+
+    if active_weather is not None:
+        weather_guidance = build_weather_outfit_guidance(
+            active_weather,
+        )
+        if weather_guidance:
+            candidates.append(
+                ContextCandidate(
+                    key="weather_guidance",
+                    source=ContextSource.WEATHER_GUIDANCE,
+                    priority=ContextPriority.CURRENT_FACT,
+                    content=json.dumps(
+                        weather_guidance,
+                        ensure_ascii=False,
+                    ),
+                    truncatable=False,
+                ),
+            )
+
+    style_profile = state.get(
+        "style_profile_context",
+        "",
+    )
+    if style_profile:
+        candidates.append(
+            ContextCandidate(
+                key="style_profile",
+                source=ContextSource.STYLE_PROFILE,
+                priority=ContextPriority.EXPLICIT_MEMORY,
+                content=style_profile,
+            ),
+        )
+
+    previous_outfit = state.get(
+        "previous_outfit_recommendation",
+    )
+    if previous_outfit is not None:
+        candidates.append(
+            ContextCandidate(
+                key="previous_outfit",
+                source=ContextSource.PREVIOUS_OUTFIT,
+                priority=ContextPriority.EXPLICIT_MEMORY,
+                content=previous_outfit.model_dump_json(),
+                truncatable=False,
+            ),
+        )
+
+    for key, source, content in (
+        (
+            "outfit_feedback",
+            ContextSource.OUTFIT_FEEDBACK,
+            state.get("outfit_feedback_context", ""),
+        ),
+        (
+            "recent_outfits",
+            ContextSource.RECENT_OUTFITS,
+            state.get("recent_outfits_context", ""),
+        ),
+    ):
+        if content:
+            candidates.append(
+                ContextCandidate(
+                    key=key,
+                    source=source,
+                    priority=ContextPriority.HISTORICAL_MEMORY,
+                    content=content,
+                ),
+            )
+
+    knowledge = state.get("knowledge_context", "")
+    if knowledge:
+        candidates.append(
+            ContextCandidate(
+                key="knowledge",
+                source=ContextSource.KNOWLEDGE,
+                priority=ContextPriority.KNOWLEDGE,
+                content=knowledge,
+            ),
+        )
+
+    return build_context_package(
+        tuple(candidates),
+        max_chars=max_chars,
+    )
+
+
+def _decode_context_values(
+    package: ContextPackage,
+    source: ContextSource,
+) -> tuple[Any, ...]:
+    """把未截断的 JSON 上下文还原为结构化值。"""
+
+    return tuple(json.loads(content) for content in package.contents_for(source))
+
+
 def create_outfit_generation_node(
     model: BaseChatModel,
+    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
 ) -> Callable[
     [ShoppingAgentState],
     dict[str, OutfitRecommendation | None],
@@ -145,9 +302,6 @@ def create_outfit_generation_node(
             state["messages"],
             "get_weather",
         )
-        previous_outfit = state.get(
-            "previous_outfit_recommendation",
-        )
         weather_context = state.get(
             "weather_context",
         )
@@ -158,11 +312,53 @@ def create_outfit_generation_node(
             or weather_context
         )
 
+        context_package = _create_generation_context_package(
+            state=state,
+            wardrobe_records=wardrobe_records,
+            product_records=product_records,
+            weather_records=weather_records,
+            active_weather=active_weather,
+            max_chars=context_max_chars,
+        )
+        diagnostics = context_package.diagnostics
+        log_event(
+            logger,
+            "agent.context.built",
+            purpose="outfit_generation",
+            max_chars=diagnostics.max_chars,
+            input_items=diagnostics.input_items,
+            selected_items=diagnostics.selected_items,
+            input_chars=diagnostics.input_chars,
+            selected_chars=diagnostics.selected_chars,
+            duplicate_count=len(diagnostics.duplicate_keys),
+            omitted_count=len(diagnostics.omitted_keys),
+            truncated_count=len(diagnostics.truncated_keys),
+        )
+
+        decoded_weather = _decode_context_values(
+            context_package,
+            ContextSource.WEATHER,
+        )
+        decoded_weather_tool_results = _decode_context_values(
+            context_package,
+            ContextSource.WEATHER_TOOL,
+        )
+        decoded_guidance = _decode_context_values(
+            context_package,
+            ContextSource.WEATHER_GUIDANCE,
+        )
+        decoded_previous_outfit = _decode_context_values(
+            context_package,
+            ContextSource.PREVIOUS_OUTFIT,
+        )
+        decoded_requirements = _decode_context_values(
+            context_package,
+            ContextSource.REQUIREMENT_ANALYSIS,
+        )
+
         generation_context = {
             # JSON Mode 不会自动把 Schema 发给模型，因此显式提供
-            "output_schema": (
-                OutfitGenerationResult.model_json_schema()
-            ),
+            "output_schema": (OutfitGenerationResult.model_json_schema()),
             "user_request": _get_latest_text(
                 state,
                 HumanMessage,
@@ -171,46 +367,31 @@ def create_outfit_generation_node(
                 state,
                 AIMessage,
             ),
-            "knowledge_context": state.get(
-                "knowledge_context",
-                "",
+            "requirement_analysis": (decoded_requirements[0] if decoded_requirements else None),
+            "knowledge_context": context_package.combined_content_for(
+                ContextSource.KNOWLEDGE,
             ),
-            "outfit_feedback_context": state.get(
-                "outfit_feedback_context",
-                "",
+            "outfit_feedback_context": context_package.combined_content_for(
+                ContextSource.OUTFIT_FEEDBACK,
             ),
-            "recent_outfits_context": state.get(
-                "recent_outfits_context",
-                "",
+            "recent_outfits_context": context_package.combined_content_for(
+                ContextSource.RECENT_OUTFITS,
             ),
-            "previous_outfit": (
-                previous_outfit.model_dump(
-                    mode="json",
-                )
-                if previous_outfit is not None
-                else None
+            "previous_outfit": (decoded_previous_outfit[0] if decoded_previous_outfit else None),
+            "provided_weather": (decoded_weather[0] if decoded_weather else None),
+            "weather_tool_results": decoded_weather_tool_results,
+            "weather_outfit_guidance": (decoded_guidance[0] if decoded_guidance else ()),
+            "style_profile_context": context_package.combined_content_for(
+                ContextSource.STYLE_PROFILE,
             ),
-            "provided_weather": (
-                weather_context.model_dump(
-                    mode="json",
-                )
-                if weather_context is not None
-                else None
+            "wardrobe_items": _decode_context_values(
+                context_package,
+                ContextSource.WARDROBE,
             ),
-            "weather_tool_results": weather_records,
-            "weather_outfit_guidance": (
-                build_weather_outfit_guidance(
-                    active_weather,
-                )
-                if active_weather is not None
-                else ()
+            "products": _decode_context_values(
+                context_package,
+                ContextSource.PRODUCTS,
             ),
-            "style_profile_context": state.get(
-                "style_profile_context",
-                "",
-            ),
-            "wardrobe_items": wardrobe_records,
-            "products": product_records,
         }
 
         try:

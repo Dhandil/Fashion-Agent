@@ -3,6 +3,9 @@ from typing import Annotated, NotRequired, TypedDict
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
+from app.agents.schemas.requirements import (
+    OutfitRequirementAnalysis,
+)
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
@@ -39,6 +42,10 @@ class ShoppingAgentState(TypedDict):
     outfit_recommendation: NotRequired[OutfitRecommendation | None]
 
     # 最近一次成功生成的 Outfit，作为后续局部调整的结构化基线
-    previous_outfit_recommendation: NotRequired[
-        OutfitRecommendation | None
-    ]
+    previous_outfit_recommendation: NotRequired[OutfitRecommendation | None]
+
+    # 当前轮结构化需求分析，用于数据加载和工具权限的确定性路由
+    requirement_analysis: NotRequired[OutfitRequirementAnalysis]
+
+    # 防止模型在同一轮反复请求被策略拒绝的工具
+    tool_policy_rejection_count: NotRequired[int]

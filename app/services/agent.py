@@ -7,10 +7,12 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.retrievers import BaseRetriever
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from app.agents.context_package import DEFAULT_CONTEXT_MAX_CHARS
 from app.agents.graphs.shopping import (
     ShoppingGraph,
     create_shopping_graph,
 )
+from app.core.config import get_settings
 from app.domain.providers.weather import WeatherProvider
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
@@ -40,16 +42,19 @@ class ShoppingAgentRuntime:
     model: BaseChatModel
     checkpointer: BaseCheckpointSaver[str]
     retriever: BaseRetriever
+    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS
 
 
 @lru_cache
 def get_shopping_agent_runtime() -> ShoppingAgentRuntime:
     """创建并缓存不包含用户或数据库 Session 的共享资源。"""
 
+    settings = get_settings()
     return ShoppingAgentRuntime(
         model=create_chat_model(),
         checkpointer=get_short_term_checkpointer(),
         retriever=get_knowledge_retriever(),
+        context_max_chars=settings.agent_context_max_chars,
     )
 
 
@@ -79,9 +84,8 @@ def create_user_shopping_graph(
         retriever=runtime.retriever,
         tools=request_tool_registry.list_tools(),
         outfit_repository=outfit_repository,
-        outfit_feedback_repository=(
-            outfit_feedback_repository
-        ),
+        outfit_feedback_repository=(outfit_feedback_repository),
         style_profile_repository=style_profile_repository,
         user_id=user_id,
+        context_max_chars=runtime.context_max_chars,
     )

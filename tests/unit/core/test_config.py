@@ -19,13 +19,26 @@ def test_settings_use_default_values() -> None:
     assert settings.log_level == "INFO"
     assert settings.weather_provider_backend == "disabled"
     assert settings.weather_timeout_seconds == 10.0
-    assert settings.knowledge_repository_path == (
-        "./data/raw/Fashion-Agent-Knowledge"
-    )
+    assert settings.knowledge_repository_path == ("./data/raw/Fashion-Agent-Knowledge")
     assert settings.knowledge_release_manifest == (
         "releases/manifests/fashion-knowledge-2.8.0.yaml"
     )
     assert settings.rag_candidate_k == 24
+    assert settings.agent_context_max_chars == 12_000
+
+
+def test_settings_reject_invalid_context_budget(
+    monkeypatch,
+) -> None:
+    """验证上下文预算不能小于保障基本事实所需的下限。"""
+
+    monkeypatch.setenv(
+        "AGENT_CONTEXT_MAX_CHARS",
+        "999",
+    )
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
 
 
 def test_settings_read_environment_variables(monkeypatch) -> None:

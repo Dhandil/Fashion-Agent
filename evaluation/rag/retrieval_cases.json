@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "release_id": "fashion-knowledge-2.8.0",
+  "cases": [
+    {
+      "case_id": "material-linen-hot-commute",
+      "category": "material",
+      "query": "夏天通勤穿亚麻有什么优点，又要注意哪些问题？",
+      "expected_knowledge_id": "fk-materials-linen-001",
+      "expected_section_ids": ["S02", "S04", "S06"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "material-wool-care",
+      "category": "material",
+      "query": "羊毛衣服清洗时怎样避免缩水和毡化？",
+      "expected_knowledge_id": "fk-materials-wool-001",
+      "expected_section_ids": ["S04"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "occasion-interview-dress-code",
+      "category": "occasion",
+      "query": "不知道公司着装要求时，第一次面试应该怎么确定正式程度？",
+      "expected_knowledge_id": "fk-occasion-interview-001",
+      "expected_section_ids": ["S02", "S03", "S05"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "occasion-commute-walking",
+      "category": "occasion",
+      "query": "每天步行和坐地铁通勤，怎样兼顾舒适与办公室正式度？",
+      "expected_knowledge_id": "fk-occasion-commute-001",
+      "expected_section_ids": ["S03", "S04"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "weather-rain-protection-terms",
+      "category": "weather",
+      "query": "下雨天选外套时，防泼水、防水和透湿有什么区别？",
+      "expected_knowledge_id": "fk-weather-rain-protection-001",
+      "expected_section_ids": ["S02", "S03", "S04", "S05", "S11"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "weather-wind-outer-layer",
+      "category": "weather",
+      "query": "气温不算低但风很大，穿搭为什么还要考虑防风外层？",
+      "expected_knowledge_id": "fk-weather-wind-001",
+      "expected_section_ids": ["S02", "S04", "S05"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "care-unclear-label",
+      "category": "care",
+      "query": "衣服护理标签模糊看不清时，可以直接按面料成分决定怎么洗吗？",
+      "expected_knowledge_id": "fk-care-labels-001",
+      "expected_section_ids": ["S02", "S03", "S07", "S08", "S09"],
+      "max_rank": 3
+    },
+    {
+      "case_id": "care-washing-drying",
+      "category": "care",
+      "query": "洗衣前信息不完整时，应该怎样决定洗涤、脱水和干燥方式？",
+      "expected_knowledge_id": "fk-care-washing-drying-001",
+      "expected_section_ids": ["S01", "S02", "S03", "S07", "S09"],
+      "max_rank": 3
+    }
+  ]
+}
