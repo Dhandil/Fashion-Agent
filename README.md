@@ -64,3 +64,21 @@ python -m scripts.smoke_api
 
 它只使用隔离的开发身份读取进程健康、数据库就绪、Style Profile、偏好记忆、
 衣橱和已保存 Outfit 列表。服务运行在其他地址时可通过 `--base-url` 指定。
+
+## Docker Compose
+
+只验证 Compose 结构，不构建或下载镜像：
+
+```powershell
+docker compose -f deployments/docker/compose.yaml config --quiet
+```
+
+首次完整启动会下载 Python 基础镜像和项目依赖，因此应确认网络与磁盘空间后执行：
+
+```powershell
+docker compose -f deployments/docker/compose.yaml up --build -d
+```
+
+Compose 会先等待 PostgreSQL 健康，再运行一次 Alembic migration，成功后启动 API。
+应用使用非 root 用户；原始知识库以只读方式挂载，Chroma 和 Hugging Face 缓存
+独立持久化，不会被复制进镜像。

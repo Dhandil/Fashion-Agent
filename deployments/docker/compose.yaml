@@ -34,5 +34,98 @@ services:
       retries: 10
       start_period: 10s
 
+  migrate:
+    # App 和迁移任务使用同一个不可变镜像，避免代码与表结构版本不一致
+    image: fashion-agent-api:local
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+
+    env_file:
+      # 密钥只在运行时注入，不复制进镜像
+      - ../../.env
+
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: "false"
+      DATABASE_URL: >-
+        postgresql+asyncpg://${POSTGRES_USER:-fashion_agent}:${POSTGRES_PASSWORD:-fashion_agent_dev}@postgres:5432/${POSTGRES_DB:-fashion_agent}
+      DATABASE_ECHO: "false"
+
+    command: ["alembic", "upgrade", "head"]
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: "no"
+
+  app:
+    image: fashion-agent-api:local
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+
+    # Docker 的 init 进程负责正确转发停止信号并回收子进程
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+    env_file:
+      - ../../.env
+
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      DEBUG: "false"
+      DATABASE_URL: >-
+        postgresql+asyncpg://${POSTGRES_USER:-fashion_agent}:${POSTGRES_PASSWORD:-fashion_agent_dev}@postgres:5432/${POSTGRES_DB:-fashion_agent}
+      DATABASE_ECHO: "false"
+      EMBEDDING_DEVICE: cpu
+      CHROMA_PERSIST_DIRECTORY: /app/data/chroma
+      KNOWLEDGE_REPOSITORY_PATH: /app/data/raw/Fashion-Agent-Knowledge
+
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+
+    ports:
+      - "${APP_PORT:-8000}:8000"
+
+    volumes:
+      # 正式知识发布只读挂载；应用不能修改独立知识库
+      - ../../data/raw/Fashion-Agent-Knowledge:/app/data/raw/Fashion-Agent-Knowledge:ro
+      # Chroma 索引是可重建的本地运行数据
+      - ../../data/chroma:/app/data/chroma
+      # 首次下载的 Embedding 模型在容器重建后继续复用
+      - fashion_agent_huggingface_cache:/home/fashion_agent/.cache/huggingface
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
 volumes:
   fashion_agent_postgres_data:
+  fashion_agent_huggingface_cache:

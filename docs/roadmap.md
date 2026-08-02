@@ -645,7 +645,7 @@ Fashion-Agent 不负责下单、支付、物流和售后。
 核心单 Agent 产品闭环稳定后，再完善：
 
 - JWT 或 OAuth 真实身份认证
-- API、PostgreSQL、Redis 的完整 Docker Compose
+- [已完成 API + PostgreSQL] 完整 Docker Compose；Redis 在短期记忆阶段加入
 - Redis 高可用、容量、备份和故障恢复
 - OpenTelemetry Collector 与生产观测后端
 - 限流、超时、重试和熔断
@@ -730,6 +730,14 @@ Multi-Agent 是扩展方案，不是当前 MVP 的前置条件。
   连接信息的结构化 503，并已纳入 6 项真实只读 API 冒烟检查
 
 Redis、OpenTelemetry 和其他新依赖仍需用户同意后实施。
+
+Docker 部署进度：
+
+- [已完成] Python 3.11 非 root API 镜像、安全构建上下文和优雅关闭生命周期
+- [已完成] Compose 按 PostgreSQL → migration → App 顺序启动，并配置 readiness
+- [已完成] 独立挂载只读知识、Chroma 数据和 Hugging Face 模型缓存
+- [已完成] 使用 CPU 版 PyTorch 构建完整镜像，migration 正常退出、App healthy，
+  容器内运行身份、CPU 运行时、6 项 API 冒烟和优雅关闭均已真实验证
 
 需求分析评测的第一批基础设施已完成：
 

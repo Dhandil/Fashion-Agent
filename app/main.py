@@ -29,6 +29,7 @@ from app.core.exceptions import (
     StyleProfileUpdateConflictError,
     WardrobeItemNotFoundError,
 )
+from app.core.lifecycle import application_lifespan
 from app.core.logging import setup_logging
 
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title=settings.app_name,
         debug=settings.debug,
+        lifespan=application_lifespan,
     )
 
     # 注册健康检查路由，并统一添加 API 版本前缀

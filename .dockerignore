@@ -1,0 +1,40 @@
+# 版本控制和本地开发工具
+.git
+.github
+.venv
+.idea
+.vscode
+
+# 本地配置与密钥
+.env
+.env.*
+!.env.example
+
+# Python 缓存和测试产物
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# 不把测试、评测和文档复制进运行镜像
+tests
+evaluation
+docs
+
+# 原始知识、Chroma 数据和本地模型必须通过 Volume 提供
+data/raw
+data/chroma
+data/processed
+.cache
+huggingface
+models
+**/*.safetensors
+**/*.bin
+
+# 操作系统和编辑器临时文件
+.DS_Store
+Thumbs.db
+*.log

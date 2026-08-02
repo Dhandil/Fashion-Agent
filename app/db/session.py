@@ -73,3 +73,15 @@ async def get_database_session() -> AsyncIterator[AsyncSession]:
 
             # 保留原始异常，让 FastAPI 的异常处理器继续处理
             raise
+
+
+async def close_database_connections() -> None:
+    """应用停止时释放已创建的数据库连接池和缓存工厂。"""
+
+    # 不为了关闭而新建 Engine；只有实际使用过数据库才执行 dispose。
+    if get_database_engine.cache_info().currsize > 0:
+        engine = get_database_engine()
+        await engine.dispose()
+
+    get_session_factory.cache_clear()
+    get_database_engine.cache_clear()

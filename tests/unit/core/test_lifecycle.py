@@ -1,0 +1,25 @@
+"""FastAPI 应用生命周期测试。"""
+
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+from fastapi import FastAPI
+
+from app.core.lifecycle import application_lifespan
+
+
+@pytest.mark.anyio
+async def test_application_lifespan_closes_database_resources() -> None:
+    """验证应用退出时即使没有业务请求也执行统一资源清理。"""
+
+    application = Mock(spec=FastAPI)
+    close_connections = AsyncMock()
+
+    with patch(
+        "app.core.lifecycle.close_database_connections",
+        close_connections,
+    ):
+        async with application_lifespan(application):
+            close_connections.assert_not_awaited()
+
+    close_connections.assert_awaited_once()

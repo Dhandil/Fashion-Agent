@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import Settings
 from app.core.exceptions import ConfigurationError
 from app.db.session import (
+    close_database_connections,
     get_database_engine,
     get_database_session,
 )
@@ -158,3 +159,27 @@ async def test_database_session_rolls_back_failed_request() -> None:
 
     fake_session.rollback.assert_awaited_once()
     fake_session.commit.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_close_database_connections_disposes_cached_engine() -> None:
+    """验证应用关闭时释放已创建的连接池并清理缓存。"""
+
+    fake_engine = AsyncMock(spec=AsyncEngine)
+    cache_info = Mock(currsize=1)
+
+    with (
+        patch(
+            "app.db.session.get_database_engine",
+            return_value=fake_engine,
+        ) as mocked_get_engine,
+        patch(
+            "app.db.session.get_session_factory",
+        ) as mocked_get_factory,
+    ):
+        mocked_get_engine.cache_info.return_value = cache_info
+        await close_database_connections()
+
+    fake_engine.dispose.assert_awaited_once()
+    mocked_get_factory.cache_clear.assert_called_once()
+    mocked_get_engine.cache_clear.assert_called_once()

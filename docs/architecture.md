@@ -843,21 +843,29 @@ Fashion-Agent/
 
 ## 14. 部署拓扑
 
-开发阶段目标：
+当前开发拓扑：
 
 ```text
 Docker Compose
-├── api
-├── postgres
-└── redis
-
-Chroma
-└── 初期使用本地持久化目录
+├── postgres（持久化 Volume + pg_isready）
+├── migrate（一次性 alembic upgrade head）
+└── app（非 root FastAPI + PostgreSQL readiness）
+    ├── data/raw/Fashion-Agent-Knowledge（只读 Bind Mount）
+    ├── data/chroma（可重建的运行时 Bind Mount）
+    └── Hugging Face 模型缓存（独立 Volume）
 ```
 
-后续可以将 Chroma 切换为独立服务，并增加反向代理、监控和任务 Worker。
+Compose 只有在 PostgreSQL 健康且 migration 成功退出后才启动 App。停止 App 时，
+FastAPI lifespan 会释放 SQLAlchemy Engine 连接池；容器 init 负责转发终止信号。
+构建上下文通过 `.dockerignore` 排除 `.env`、虚拟环境、知识原文、Chroma 数据、
+模型权重和测试缓存。后续可以增加 Redis、反向代理、监控和任务 Worker，或将
+Chroma 切换为独立服务。
 
-生产环境中的 Secret 不写入镜像、Compose 文件或 Git，由部署环境注入。
+本地 Compose 从受保护 `.env` 注入 LLM 等配置，并用容器网络地址覆盖数据库连接；
+生产环境中的 Secret 不写入镜像、Compose 文件或 Git，应由部署平台注入。
+当前镜像构建显式使用 PyTorch CPU Wheel，与 `EMBEDDING_DEVICE=cpu` 一致，避免
+下载和打包不需要的 CUDA 运行库。首次构建完成后 Docker 会复用依赖层；构建缓存
+属于可回收数据，不应在未确认其他构建需求前自动清理。
 
 ---
 
