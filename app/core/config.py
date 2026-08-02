@@ -104,12 +104,54 @@ class Settings(BaseSettings):
     # 向量初筛候选数量，随后根据知识标题和标签执行本地重排
     rag_candidate_k: int = 24
 
+    # Retriever 返回后最多允许进入 Agent State 的知识片段数
+    rag_context_max_documents: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+    )
+
+    # 单个检索片段进入 Agent State 前的最大字符数
+    rag_context_max_fragment_chars: int = Field(
+        default=1_200,
+        ge=100,
+        le=20_000,
+    )
+
+    # 全部检索片段进入 Agent State 前的总字符上限
+    rag_context_max_chars: int = Field(
+        default=4_000,
+        ge=200,
+        le=50_000,
+    )
+
     # 单次模型调用允许注入的外部上下文字符预算
     # 当前用户消息和固定系统规则不计入此预算
     agent_context_max_chars: int = Field(
         default=12_000,
         ge=1_000,
         le=100_000,
+    )
+
+    # 用户明确维护的长期档案和上一套 Outfit 的分类预算
+    agent_explicit_memory_max_chars: int = Field(
+        default=3_000,
+        ge=200,
+        le=50_000,
+    )
+
+    # 对话摘要、近期 Outfit 和反馈等历史记忆的分类预算
+    agent_historical_memory_max_chars: int = Field(
+        default=3_000,
+        ge=200,
+        le=50_000,
+    )
+
+    # 单次模型调用允许使用的 RAG 知识分类预算
+    agent_knowledge_max_chars: int = Field(
+        default=4_000,
+        ge=200,
+        le=50_000,
     )
 
     # 聊天模型最多接收的最近完整对话轮数；当前轮始终保留

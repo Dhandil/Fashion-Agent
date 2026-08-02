@@ -1,5 +1,6 @@
 """用户长期穿搭档案 API 数据结构。"""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Self
 
@@ -14,7 +15,11 @@ from pydantic import (
 
 from app.domain.entities.preference_candidate import (
     PreferenceCandidateCategory,
+    PreferenceCandidateSource,
     PreferenceDirection,
+)
+from app.domain.entities.preference_memory import (
+    PreferenceMemorySource,
 )
 from app.domain.entities.style_profile import (
     STYLE_PROFILE_SEQUENCE_FIELDS,
@@ -26,7 +31,9 @@ from app.domain.entities.style_profile import (
 class PreferenceCandidateResponse(BaseModel):
     """一条由反馈推导的长期偏好候选。"""
 
+    candidate_id: str
     category: PreferenceCandidateCategory
+    source: PreferenceCandidateSource
     value: str
     direction: PreferenceDirection
     evidence_count: int = Field(
@@ -57,6 +64,9 @@ class PreferenceCandidateListResponse(BaseModel):
 class PreferenceCandidateConfirmRequest(BaseModel):
     """确认一条当前仍然有效的长期偏好候选。"""
 
+    candidate_id: str = Field(
+        pattern=r"^pc_[0-9a-f]{32}$",
+    )
     category: PreferenceCandidateCategory
     value: str = Field(
         min_length=1,
@@ -68,6 +78,51 @@ class PreferenceCandidateConfirmRequest(BaseModel):
         ge=2,
         le=20,
     )
+
+
+class PreferenceMemoryResponse(BaseModel):
+    """一条不暴露用户 ID 的长期偏好审计响应。"""
+
+    preference_memory_id: str
+    category: PreferenceCandidateCategory
+    value: str
+    direction: PreferenceDirection
+    source: PreferenceMemorySource
+    source_reference_ids: tuple[str, ...]
+    confirmed_at: datetime
+    last_confirmed_at: datetime
+    expires_at: datetime | None = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+
+class PreferenceMemoryExpiryRequest(BaseModel):
+    """设置或清除一条长期偏好的过期时间。"""
+
+    # 字段必填；传 null 表示清除过期时间。
+    expires_at: datetime | None
+
+    @field_validator("expires_at")
+    @classmethod
+    def require_timezone(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        """显式时间必须包含时区，避免客户端时区歧义。"""
+
+        if value is not None and value.tzinfo is None:
+            raise ValueError("过期时间必须包含时区")
+        return value
+
+
+class PreferenceMemoryListResponse(BaseModel):
+    """当前用户可见的长期偏好审计列表。"""
+
+    items: tuple[PreferenceMemoryResponse, ...] = ()
+    count: int = Field(ge=0)
+    include_expired: bool = False
 
 
 class StyleProfileUpsertRequest(BaseModel):

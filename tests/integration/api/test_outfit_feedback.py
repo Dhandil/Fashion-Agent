@@ -67,6 +67,7 @@ def create_repositories(
 
     return FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=feedback_repository,

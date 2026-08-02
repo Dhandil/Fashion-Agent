@@ -45,6 +45,7 @@ outfit_feedback_repository = Mock()
 style_profile_repository = Mock()
 repositories = FashionRepositories(
     style_profiles=style_profile_repository,
+    preference_memories=Mock(),
     wardrobe=wardrobe_repository,
     outfits=outfit_repository,
     outfit_feedback=outfit_feedback_repository,

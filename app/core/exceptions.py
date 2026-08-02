@@ -40,6 +40,14 @@ class PreferenceCandidateUnavailableError(
     """用户尝试确认的偏好候选已不存在或证据不足。"""
 
 
+class PreferenceMemoryNotFoundError(FashionAgentError):
+    """当前用户不存在指定的长期偏好记录。"""
+
+
+class PreferenceMemoryUpdateConflictError(FashionAgentError):
+    """长期偏好记录的更新时间或状态不合法。"""
+
+
 class StyleProfileUpdateConflictError(
     FashionAgentError,
 ):

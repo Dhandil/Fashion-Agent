@@ -98,6 +98,7 @@ def test_confirm_outfit_saves_current_recommendation() -> None:
     )
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=Mock(),
@@ -168,6 +169,7 @@ def test_confirm_outfit_requires_current_recommendation() -> None:
     )
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=Mock(),
@@ -224,6 +226,7 @@ def test_list_outfits_uses_filters_and_current_user() -> None:
     outfit_repository.count.return_value = 12
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=Mock(),
@@ -291,6 +294,7 @@ def test_get_outfit_returns_current_user_record() -> None:
     outfit_repository.get_by_id.return_value = outfit
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=Mock(),
@@ -337,6 +341,7 @@ def test_get_outfit_returns_structured_not_found() -> None:
     outfit_repository.get_by_id.return_value = None
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=Mock(),
@@ -386,6 +391,7 @@ def test_update_outfit_favorite_uses_current_user() -> None:
     )
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=Mock(),

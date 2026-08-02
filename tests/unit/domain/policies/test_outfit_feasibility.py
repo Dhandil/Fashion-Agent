@@ -166,6 +166,69 @@ def test_hot_weather_conflict_blocks_heavy_item() -> None:
     assert any(issue.code is OutfitIssueCode.HOT_WEATHER_CONFLICT for issue in report.issues)
 
 
+def test_hot_weather_uses_referenced_record_material() -> None:
+    """验证模型弱化名称时仍以真实衣橱材质判断高温冲突。"""
+
+    recommendation = _complete_outfit(
+        upper_name="保暖上衣",
+    )
+    report = evaluate_outfit_feasibility(
+        recommendation,
+        wardrobe_records=(
+            {
+                "wardrobe_item_id": "upper-001",
+                "status": "available",
+                "materials": ["厚羊毛"],
+            },
+            *_wardrobe_records()[1:],
+        ),
+        weather=WeatherContext(
+            location="上海",
+            target_date="2026-08-02",
+            temperature_max_c=36,
+            source="user_provided",
+        ),
+    )
+
+    assert report.is_executable is False
+    assert any(
+        issue.code is OutfitIssueCode.HOT_WEATHER_CONFLICT
+        for issue in report.issues
+    )
+
+
+def test_hot_weather_ignores_historical_reason_text() -> None:
+    """验证旧冲突说明不会被误判为当前方案仍使用厚重单品。"""
+
+    recommendation = _complete_outfit(
+        upper_name="浅蓝轻薄棉衬衫",
+    ).model_copy(
+        update={
+            "recommendation_reason": (
+                "初稿错误使用了厚羊毛上衣，现已替换。"
+            ),
+            "notes": "不要再穿厚羊毛单品。",
+        },
+    )
+    report = evaluate_outfit_feasibility(
+        recommendation,
+        wardrobe_records=_wardrobe_records(),
+        weather=WeatherContext(
+            location="上海",
+            target_date="2026-08-02",
+            temperature_max_c=36,
+            source="user_provided",
+        ),
+        requirement_analysis=_outfit_analysis(),
+    )
+
+    assert report.is_executable is True
+    assert not any(
+        issue.code is OutfitIssueCode.HOT_WEATHER_CONFLICT
+        for issue in report.issues
+    )
+
+
 def test_weather_warning_does_not_block_otherwise_valid_outfit() -> None:
     """验证降雨防护缺失作为警告返回，不武断否决方案。"""
 

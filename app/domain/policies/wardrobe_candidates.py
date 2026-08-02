@@ -7,7 +7,7 @@ from typing import Any
 
 from app.domain.entities.weather import WeatherContext
 
-_HOT_WEATHER_INCOMPATIBLE_TERMS = (
+HOT_WEATHER_INCOMPATIBLE_TERMS = (
     "羽绒",
     "加绒",
     "厚呢",
@@ -151,7 +151,7 @@ def select_eligible_wardrobe_records(
 
         searchable_text = _record_searchable_text(record)
         if has_high_heat and any(
-            term in searchable_text for term in _HOT_WEATHER_INCOMPATIBLE_TERMS
+            term in searchable_text for term in HOT_WEATHER_INCOMPATIBLE_TERMS
         ):
             exclusions.append(
                 WardrobeCandidateExclusion(

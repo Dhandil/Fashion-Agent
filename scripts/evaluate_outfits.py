@@ -4,6 +4,7 @@ import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app.agents.context_package import ContextBudgetPolicy
 from app.agents.evaluation.outfits import (
     OutfitEvaluationReport,
     OutfitEvaluationSuite,
@@ -109,15 +110,21 @@ def main() -> None:
     )
     settings = get_settings()
     model = create_chat_model(settings)
+    context_budget_policy = ContextBudgetPolicy(
+        total_max_chars=settings.agent_context_max_chars,
+        explicit_memory_max_chars=(settings.agent_explicit_memory_max_chars),
+        historical_memory_max_chars=(settings.agent_historical_memory_max_chars),
+        knowledge_max_chars=settings.agent_knowledge_max_chars,
+    )
     report = evaluate_outfit_suite(
         suite,
         generate_outfit=create_outfit_generation_node(
             model,
-            context_max_chars=settings.agent_context_max_chars,
+            context_budget_policy=context_budget_policy,
         ),
         correct_outfit=create_outfit_correction_node(
             model,
-            context_max_chars=settings.agent_context_max_chars,
+            context_budget_policy=context_budget_policy,
         ),
     )
     _print_report(report)

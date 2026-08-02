@@ -9,7 +9,14 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
-from app.agents.context_package import DEFAULT_CONTEXT_MAX_CHARS
+from app.agents.context_package import (
+    DEFAULT_CONTEXT_BUDGET_POLICY,
+    ContextBudgetPolicy,
+)
+from app.agents.knowledge_context import (
+    DEFAULT_KNOWLEDGE_CONTEXT_POLICY,
+    KnowledgeContextPolicy,
+)
 from app.agents.nodes.analyze_requirements import (
     create_requirement_analysis_node,
 )
@@ -82,7 +89,10 @@ def create_shopping_graph(
     outfit_feedback_repository: (OutfitFeedbackRepository | None) = None,
     style_profile_repository: (StyleProfileRepository | None) = None,
     user_id: str | None = None,
-    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
+    context_budget_policy: ContextBudgetPolicy = (DEFAULT_CONTEXT_BUDGET_POLICY),
+    knowledge_context_policy: KnowledgeContextPolicy = (
+        DEFAULT_KNOWLEDGE_CONTEXT_POLICY
+    ),
     history_max_turns: int = DEFAULT_HISTORY_MAX_TURNS,
     history_max_chars: int = DEFAULT_HISTORY_MAX_CHARS,
     summary_max_chars: int = DEFAULT_SUMMARY_MAX_CHARS,
@@ -128,7 +138,7 @@ def create_shopping_graph(
 
     chat_node = create_chat_node(
         tool_enabled_model,
-        context_max_chars=context_max_chars,
+        context_budget_policy=context_budget_policy,
         history_max_turns=history_max_turns,
         history_max_chars=history_max_chars,
         summary_max_chars=summary_max_chars,
@@ -231,6 +241,7 @@ def create_shopping_graph(
     if retriever is not None:
         retrieve_knowledge_node = create_retrieve_knowledge_node(
             retriever,
+            context_policy=knowledge_context_policy,
         )
 
         graph_builder.add_node(
@@ -270,11 +281,11 @@ def create_shopping_graph(
     if tools:
         outfit_generation_node = create_outfit_generation_node(
             model,
-            context_max_chars=context_max_chars,
+            context_budget_policy=context_budget_policy,
         )
         outfit_correction_node = create_outfit_correction_node(
             model,
-            context_max_chars=context_max_chars,
+            context_budget_policy=context_budget_policy,
         )
 
         graph_builder.add_node(

@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from app.agents.context_package import ContextBudgetPolicy
 from app.agents.nodes.chat import create_chat_node
 from app.agents.prompts.shopping import SHOPPING_ASSISTANT_SYSTEM_PROMPT
 from app.agents.schemas.requirements import (
@@ -59,6 +60,45 @@ def test_chat_node_invokes_bound_model() -> None:
     # 验证节点返回模型产生的新消息
     assert len(result["messages"]) == 1
     assert result["messages"][0].content == "请告诉我你的预算"
+
+
+def test_chat_node_records_llm_usage_without_prompt() -> None:
+    """验证 LLM 事件包含用量和耗时，但不记录消息或提示词。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="测试回复",
+        usage_metadata={
+            "input_tokens": 20,
+            "output_tokens": 5,
+            "total_tokens": 25,
+        },
+    )
+    chat_node = create_chat_node(model)
+
+    with patch(
+        "app.core.observability.log_event",
+    ) as mocked_log_event:
+        chat_node(
+            {
+                "messages": [
+                    HumanMessage(content="测试请求"),
+                ],
+            },
+        )
+
+    llm_call = next(
+        call
+        for call in mocked_log_event.call_args_list
+        if call.args[1] == "agent.llm.completed"
+    )
+    assert llm_call.kwargs["purpose"] == "chat"
+    assert llm_call.kwargs["input_tokens"] == 20
+    assert llm_call.kwargs["output_tokens"] == 5
+    assert llm_call.kwargs["total_tokens"] == 25
+    assert llm_call.kwargs["duration_ms"] >= 0
+    assert "content" not in llm_call.kwargs
+    assert "prompt" not in llm_call.kwargs
 
 
 def test_chat_node_sends_only_recent_complete_turns() -> None:
@@ -157,6 +197,49 @@ def test_chat_node_includes_knowledge_context() -> None:
 
     # 应包含要求模型优先依据资料的约束
     assert "请优先根据参考资料回答" in (system_message.content)
+
+
+def test_chat_node_logs_independent_context_budget_usage() -> None:
+    """验证各类上下文独立限额生效，且日志不记录正文。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(content="已收到。")
+    chat_node = create_chat_node(
+        model,
+        context_budget_policy=ContextBudgetPolicy(
+            total_max_chars=1_000,
+            explicit_memory_max_chars=120,
+            historical_memory_max_chars=140,
+            knowledge_max_chars=160,
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [HumanMessage(content="请给我一套通勤穿搭。")],
+        "style_profile_context": "显式偏好" * 80,
+        "outfit_feedback_context": "历史反馈" * 80,
+        "knowledge_context": "知识资料" * 80,
+    }
+
+    with patch(
+        "app.agents.nodes.chat.log_event",
+    ) as mocked_log_event:
+        chat_node(state)
+
+    context_call = next(
+        call for call in mocked_log_event.call_args_list if call.args[1] == "agent.context.built"
+    )
+    selected_chars = context_call.kwargs["priority_selected_chars"]
+
+    assert context_call.kwargs["priority_limited_count"] == 3
+    assert context_call.kwargs["selected_estimated_tokens"] > 0
+    assert selected_chars["explicit_memory"] <= 120
+    assert selected_chars["historical_memory"] <= 140
+    assert selected_chars["knowledge"] <= 160
+    assert "content" not in context_call.kwargs
+    assert "prompt" not in context_call.kwargs
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "[上下文已按预算截断]" in system_message.content
 
 
 def test_chat_node_includes_confirmed_feedback_context() -> None:

@@ -8,7 +8,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import SystemMessage
 
 from app.agents.context_package import (
-    DEFAULT_CONTEXT_MAX_CHARS,
+    DEFAULT_CONTEXT_BUDGET_POLICY,
+    ContextBudgetPolicy,
     ContextCandidate,
     ContextPackage,
     ContextPriority,
@@ -21,7 +22,10 @@ from app.agents.style_constraints import (
     get_effective_style_constraints,
     serialize_style_constraints,
 )
-from app.core.observability import log_event
+from app.core.observability import (
+    log_event,
+    observe_operation,
+)
 from app.domain.policies.weather import (
     build_weather_outfit_guidance,
 )
@@ -41,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 def _build_chat_context_package(
     state: ShoppingAgentState,
-    max_chars: int,
+    budget_policy: ContextBudgetPolicy,
     conversation_summary: ConversationSummary | None = None,
 ) -> ContextPackage:
     """把当前 State 中的外部上下文装配成受预算约束的数据包。"""
@@ -174,12 +178,15 @@ def _build_chat_context_package(
                 source=ContextSource.KNOWLEDGE,
                 priority=ContextPriority.KNOWLEDGE,
                 content=knowledge,
+                provenance=tuple(
+                    state.get("knowledge_provenance", ()),
+                ),
             ),
         )
 
     return build_context_package(
         tuple(candidates),
-        max_chars=max_chars,
+        budget_policy=budget_policy,
     )
 
 
@@ -295,7 +302,7 @@ def _render_chat_context(package: ContextPackage) -> str:
 
 def create_chat_node(
     model: BaseChatModel,
-    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
+    context_budget_policy: ContextBudgetPolicy = (DEFAULT_CONTEXT_BUDGET_POLICY),
     history_max_turns: int = DEFAULT_HISTORY_MAX_TURNS,
     history_max_chars: int = DEFAULT_HISTORY_MAX_CHARS,
     summary_max_chars: int = DEFAULT_SUMMARY_MAX_CHARS,
@@ -322,7 +329,7 @@ def create_chat_node(
         )
         context_package = _build_chat_context_package(
             state,
-            max_chars=context_max_chars,
+            budget_policy=context_budget_policy,
             conversation_summary=conversation_summary,
         )
         diagnostics = context_package.diagnostics
@@ -338,6 +345,18 @@ def create_chat_node(
             duplicate_count=len(diagnostics.duplicate_keys),
             omitted_count=len(diagnostics.omitted_keys),
             truncated_count=len(diagnostics.truncated_keys),
+            priority_limited_count=len(
+                diagnostics.priority_limited_keys,
+            ),
+            provenance_conflict_count=len(
+                diagnostics.provenance_conflict_keys,
+            ),
+            input_estimated_tokens=(diagnostics.input_estimated_tokens),
+            selected_estimated_tokens=(diagnostics.selected_estimated_tokens),
+            priority_selected_chars={
+                usage.priority.name.lower(): (usage.selected_chars)
+                for usage in diagnostics.priority_usage
+            },
         )
 
         log_event(
@@ -371,7 +390,31 @@ def create_chat_node(
             SystemMessage(content=system_prompt),
             *conversation_window.messages,
         ]
-        response = model.invoke(messages_with_system_prompt)
+        with observe_operation(
+            logger,
+            "agent.llm",
+            purpose="chat",
+        ) as observation:
+            response = model.invoke(
+                messages_with_system_prompt,
+            )
+            usage_metadata = getattr(
+                response,
+                "usage_metadata",
+                None,
+            )
+            if isinstance(usage_metadata, dict):
+                observation.add_fields(
+                    input_tokens=usage_metadata.get(
+                        "input_tokens",
+                    ),
+                    output_tokens=usage_metadata.get(
+                        "output_tokens",
+                    ),
+                    total_tokens=usage_metadata.get(
+                        "total_tokens",
+                    ),
+                )
         return {
             "messages": [response],
             "conversation_summary": conversation_summary,

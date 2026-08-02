@@ -1,5 +1,6 @@
 """用户长期穿搭档案应用服务测试。"""
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
@@ -7,6 +8,8 @@ import pytest
 
 from app.core.exceptions import (
     PreferenceCandidateUnavailableError,
+    PreferenceMemoryNotFoundError,
+    PreferenceMemoryUpdateConflictError,
     StyleProfileUpdateConflictError,
 )
 from app.domain.entities.outfit import Outfit, OutfitItem
@@ -15,12 +18,21 @@ from app.domain.entities.outfit_feedback import (
     OutfitFeedbackSentiment,
 )
 from app.domain.entities.preference_candidate import (
+    PreferenceCandidateCategory,
     PreferenceDirection,
+    create_preference_candidate_id,
+)
+from app.domain.entities.preference_memory import (
+    PreferenceMemory,
+    PreferenceMemorySource,
 )
 from app.domain.entities.style_profile import StyleProfile
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
+)
+from app.domain.repositories.preference_memory import (
+    PreferenceMemoryRepository,
 )
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
@@ -29,10 +41,42 @@ from app.services.style_profile import (
     analyze_style_preference_candidates,
     build_style_preference_candidates,
     confirm_style_preference_candidate,
+    delete_preference_memory,
+    delete_style_profile,
     get_style_profile,
+    list_preference_memories,
     patch_style_profile,
     replace_style_profile,
+    set_preference_memory_expiry,
 )
+
+
+@pytest.mark.anyio
+async def test_delete_style_profile_delegates_to_repository() -> None:
+    """验证长期档案删除只作用于当前用户，并返回删除结果。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.delete_by_user_id.return_value = True
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    memory_repository.delete_by_user_id.return_value = 2
+
+    deleted = await delete_style_profile(
+        repository=repository,
+        preference_memory_repository=memory_repository,
+        user_id="user-001",
+    )
+
+    repository.delete_by_user_id.assert_awaited_once_with(
+        "user-001",
+    )
+    memory_repository.delete_by_user_id.assert_awaited_once_with(
+        "user-001",
+    )
+    assert deleted is True
 
 
 def create_feedback_outfit(
@@ -68,6 +112,186 @@ def create_feedback(
         user_id="user-001",
         outfit_id=outfit_id,
         sentiment=sentiment,
+    )
+
+
+def create_preference_memory(
+    *,
+    expires_at: datetime | None = None,
+) -> PreferenceMemory:
+    """创建长期偏好列表测试记录。"""
+
+    confirmed_at = datetime(
+        2026,
+        8,
+        2,
+        10,
+        tzinfo=UTC,
+    )
+    return PreferenceMemory(
+        preference_memory_id=(
+            "pm_0123456789abcdef0123456789abcdef"
+        ),
+        user_id="user-001",
+        category=PreferenceCandidateCategory.STYLE,
+        value="休闲",
+        direction=PreferenceDirection.PREFER,
+        source=(
+            PreferenceMemorySource.OUTFIT_FEEDBACK_CONFIRMATION
+        ),
+        source_reference_ids=("outfit-001",),
+        confirmed_at=confirmed_at,
+        last_confirmed_at=confirmed_at,
+        expires_at=expires_at,
+    )
+
+
+@pytest.mark.anyio
+async def test_list_preference_memories_filters_expired_records() -> None:
+    """验证默认只返回仍然有效的长期偏好审计。"""
+
+    reference_time = datetime(
+        2026,
+        8,
+        10,
+        tzinfo=UTC,
+    )
+    active = create_preference_memory()
+    expired = create_preference_memory(
+        expires_at=reference_time - timedelta(days=1),
+    ).model_copy(
+        update={
+            "preference_memory_id": (
+                "pm_fedcba9876543210fedcba9876543210"
+            ),
+            "value": "复古",
+        },
+    )
+    repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    repository.list_by_user_id.return_value = (
+        active,
+        expired,
+    )
+
+    visible = await list_preference_memories(
+        repository=repository,
+        user_id="user-001",
+        at=reference_time,
+    )
+    all_records = await list_preference_memories(
+        repository=repository,
+        user_id="user-001",
+        include_expired=True,
+        at=reference_time,
+    )
+
+    assert visible == (active,)
+    assert all_records == (active, expired)
+
+
+@pytest.mark.anyio
+async def test_set_preference_memory_expiry_saves_valid_time() -> None:
+    """验证用户可以设置或清除一条偏好的过期时间。"""
+
+    memory = create_preference_memory()
+    expires_at = memory.last_confirmed_at + timedelta(days=30)
+    repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    repository.get_by_id.return_value = memory
+    repository.save.side_effect = lambda item: item
+
+    updated = await set_preference_memory_expiry(
+        repository=repository,
+        user_id="user-001",
+        preference_memory_id=memory.preference_memory_id,
+        expires_at=expires_at,
+    )
+
+    assert updated.expires_at == expires_at
+    repository.save.assert_awaited_once_with(updated)
+
+
+@pytest.mark.anyio
+async def test_set_preference_memory_expiry_rejects_invalid_time() -> None:
+    """验证过期时间不能早于最近确认时间。"""
+
+    memory = create_preference_memory()
+    repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    repository.get_by_id.return_value = memory
+
+    with pytest.raises(
+        PreferenceMemoryUpdateConflictError,
+        match="晚于最近确认时间",
+    ):
+        await set_preference_memory_expiry(
+            repository=repository,
+            user_id="user-001",
+            preference_memory_id=(
+                memory.preference_memory_id
+            ),
+            expires_at=memory.last_confirmed_at,
+        )
+
+    repository.save.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_set_preference_memory_expiry_rejects_missing_record() -> None:
+    """验证其他用户或不存在的记录不会被修改。"""
+
+    repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    repository.get_by_id.return_value = None
+
+    with pytest.raises(PreferenceMemoryNotFoundError):
+        await set_preference_memory_expiry(
+            repository=repository,
+            user_id="user-001",
+            preference_memory_id=(
+                "pm_0123456789abcdef0123456789abcdef"
+            ),
+            expires_at=None,
+        )
+
+
+@pytest.mark.anyio
+async def test_delete_preference_memory_updates_profile() -> None:
+    """验证删除审计记录时同步移除其同向档案偏好。"""
+
+    memory = create_preference_memory()
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    memory_repository.get_by_id.return_value = memory
+    memory_repository.delete_by_id.return_value = True
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    style_repository.get_by_user_id.return_value = StyleProfile(
+        user_id="user-001",
+        preferred_styles=("休闲", "简约"),
+    )
+    style_repository.save.side_effect = lambda profile: profile
+
+    deleted = await delete_preference_memory(
+        style_profile_repository=style_repository,
+        preference_memory_repository=memory_repository,
+        user_id="user-001",
+        preference_memory_id=memory.preference_memory_id,
+    )
+
+    saved_profile = style_repository.save.await_args.args[0]
+    assert saved_profile.preferred_styles == ("简约",)
+    assert deleted is True
+    memory_repository.delete_by_id.assert_awaited_once_with(
+        user_id="user-001",
+        preference_memory_id=memory.preference_memory_id,
     )
 
 
@@ -288,6 +512,8 @@ def test_build_style_candidates_tracks_opposing_evidence() -> None:
     assert len(candidates) == 1
     candidate = candidates[0]
     assert candidate.value == "简约"
+    assert candidate.candidate_id.startswith("pc_")
+    assert candidate.source.value == "outfit_feedback"
     assert candidate.direction is PreferenceDirection.PREFER
     assert candidate.evidence_count == 2
     assert candidate.opposing_evidence_count == 1
@@ -466,12 +692,36 @@ async def test_confirm_preferred_style_updates_profile() -> None:
     style_repository.save.side_effect = (
         lambda profile: profile
     )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    existing_memory = create_preference_memory().model_copy(
+        update={
+            "direction": PreferenceDirection.AVOID,
+        },
+    )
+    memory_repository.get_by_identity.return_value = (
+        existing_memory
+    )
+    memory_repository.save.side_effect = (
+        lambda memory: memory
+    )
 
     profile = await confirm_style_preference_candidate(
         style_profile_repository=style_repository,
         outfit_repository=outfit_repository,
         feedback_repository=feedback_repository,
+        preference_memory_repository=memory_repository,
         user_id="user-001",
+        candidate_id=create_preference_candidate_id(
+            category=PreferenceCandidateCategory.STYLE,
+            value="休闲",
+            direction=PreferenceDirection.PREFER,
+            evidence_outfit_ids=(
+                "outfit-001",
+                "outfit-002",
+            ),
+        ),
         value=" 休闲 ",
         direction=PreferenceDirection.PREFER,
     )
@@ -483,6 +733,20 @@ async def test_confirm_preferred_style_updates_profile() -> None:
     assert profile.avoided_styles == ()
     style_repository.save.assert_awaited_once_with(
         profile,
+    )
+    saved_memory = memory_repository.save.await_args.args[0]
+    # 同一偏好方向翻转时复用稳定记录，而不是保留冲突副本。
+    assert saved_memory.preference_memory_id == (
+        existing_memory.preference_memory_id
+    )
+    assert saved_memory.direction is PreferenceDirection.PREFER
+    assert saved_memory.confirmed_at == (
+        existing_memory.confirmed_at
+    )
+    assert saved_memory.value == "休闲"
+    assert saved_memory.source_reference_ids == (
+        "outfit-001",
+        "outfit-002",
     )
 
 
@@ -535,12 +799,29 @@ async def test_confirm_avoided_style_updates_profile() -> None:
     style_repository.save.side_effect = (
         lambda profile: profile
     )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    memory_repository.get_by_identity.return_value = None
+    memory_repository.save.side_effect = (
+        lambda memory: memory
+    )
 
     profile = await confirm_style_preference_candidate(
         style_profile_repository=style_repository,
         outfit_repository=outfit_repository,
         feedback_repository=feedback_repository,
+        preference_memory_repository=memory_repository,
         user_id="user-001",
+        candidate_id=create_preference_candidate_id(
+            category=PreferenceCandidateCategory.STYLE,
+            value="街头",
+            direction=PreferenceDirection.AVOID,
+            evidence_outfit_ids=(
+                "outfit-001",
+                "outfit-002",
+            ),
+        ),
         value="街头",
         direction=PreferenceDirection.AVOID,
     )
@@ -578,6 +859,9 @@ async def test_confirm_style_candidate_rejects_stale_evidence() -> None:
     style_repository = AsyncMock(
         spec=StyleProfileRepository,
     )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
 
     with pytest.raises(
         PreferenceCandidateUnavailableError,
@@ -587,10 +871,78 @@ async def test_confirm_style_candidate_rejects_stale_evidence() -> None:
             style_profile_repository=style_repository,
             outfit_repository=outfit_repository,
             feedback_repository=feedback_repository,
+            preference_memory_repository=memory_repository,
             user_id="user-001",
+            candidate_id=("pc_" + "0" * 32),
             value="休闲",
             direction=PreferenceDirection.PREFER,
         )
 
     style_repository.get_by_user_id.assert_not_awaited()
     style_repository.save.assert_not_awaited()
+    memory_repository.save.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_confirm_style_candidate_rejects_changed_evidence_set() -> None:
+    """验证候选仍存在但证据集合变化时旧 candidate_id 失效。"""
+
+    outfit_ids = (
+        "outfit-001",
+        "outfit-002",
+        "outfit-003",
+    )
+    outfit_repository = AsyncMock(
+        spec=OutfitRepository,
+    )
+    outfit_repository.get_by_ids.return_value = [
+        create_feedback_outfit(
+            outfit_id,
+            ("休闲",),
+        )
+        for outfit_id in outfit_ids
+    ]
+    feedback_repository = AsyncMock(
+        spec=OutfitFeedbackRepository,
+    )
+    feedback_repository.search.return_value = [
+        create_feedback(
+            outfit_id,
+            OutfitFeedbackSentiment.LIKE,
+        )
+        for outfit_id in outfit_ids
+    ]
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    stale_candidate_id = create_preference_candidate_id(
+        category=PreferenceCandidateCategory.STYLE,
+        value="休闲",
+        direction=PreferenceDirection.PREFER,
+        evidence_outfit_ids=(
+            "outfit-001",
+            "outfit-002",
+        ),
+    )
+
+    with pytest.raises(
+        PreferenceCandidateUnavailableError,
+        match="候选偏好已不存在",
+    ):
+        await confirm_style_preference_candidate(
+            style_profile_repository=style_repository,
+            outfit_repository=outfit_repository,
+            feedback_repository=feedback_repository,
+            preference_memory_repository=memory_repository,
+            user_id="user-001",
+            candidate_id=stale_candidate_id,
+            value="休闲",
+            direction=PreferenceDirection.PREFER,
+        )
+
+    style_repository.get_by_user_id.assert_not_awaited()
+    style_repository.save.assert_not_awaited()
+    memory_repository.save.assert_not_awaited()

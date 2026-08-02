@@ -26,6 +26,7 @@ def create_prepare_turn_node() -> Callable[
             # 以下字段都属于本轮派生上下文；路由跳过加载节点时必须清空旧值
             "knowledge_context": "",
             "knowledge_sources": [],
+            "knowledge_provenance": [],
             "style_profile_context": "",
             "style_profile_snapshot": None,
             "outfit_feedback_context": "",

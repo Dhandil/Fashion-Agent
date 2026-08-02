@@ -91,6 +91,40 @@ async def preference_candidate_unavailable_handler(
     )
 
 
+async def preference_memory_not_found_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将找不到长期偏好记录转换成统一的 404 响应。"""
+
+    error_response = ErrorResponse(
+        code="preference_memory_not_found",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=error_response.model_dump(),
+    )
+
+
+async def preference_memory_update_conflict_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将长期偏好更新时间冲突转换成统一的 409 响应。"""
+
+    error_response = ErrorResponse(
+        code="preference_memory_update_conflict",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=error_response.model_dump(),
+    )
+
+
 async def style_profile_update_conflict_handler(
     _request: Request,
     exc: Exception,

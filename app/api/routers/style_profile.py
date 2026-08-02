@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query, status
 
 from app.api.dependencies.database import (
     FashionRepositoriesDependency,
@@ -14,6 +14,9 @@ from app.api.schemas.style_profile import (
     PreferenceCandidateConfirmRequest,
     PreferenceCandidateListResponse,
     PreferenceCandidateResponse,
+    PreferenceMemoryExpiryRequest,
+    PreferenceMemoryListResponse,
+    PreferenceMemoryResponse,
     StyleProfilePatchRequest,
     StyleProfileResponse,
     StyleProfileUpsertRequest,
@@ -21,9 +24,13 @@ from app.api.schemas.style_profile import (
 from app.services.style_profile import (
     analyze_style_preference_candidates,
     confirm_style_preference_candidate,
+    delete_preference_memory,
+    delete_style_profile,
     get_style_profile,
+    list_preference_memories,
     patch_style_profile,
     replace_style_profile,
+    set_preference_memory_expiry,
 )
 
 router = APIRouter(
@@ -92,7 +99,11 @@ async def confirm_preference_candidate(
         feedback_repository=(
             repositories.outfit_feedback
         ),
+        preference_memory_repository=(
+            repositories.preference_memories
+        ),
         user_id=current_user.user_id,
+        candidate_id=request.candidate_id,
         value=request.value,
         direction=request.direction,
         minimum_evidence=request.minimum_evidence,
@@ -100,6 +111,86 @@ async def confirm_preference_candidate(
 
     return StyleProfileResponse.model_validate(
         profile,
+    )
+
+
+@router.get(
+    "/memories",
+    response_model=PreferenceMemoryListResponse,
+    summary="查询长期偏好来源",
+)
+async def read_preference_memories(
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    include_expired: bool = False,
+) -> PreferenceMemoryListResponse:
+    """读取当前用户已确认偏好的来源、证据和确认时间。"""
+
+    memories = await list_preference_memories(
+        repository=repositories.preference_memories,
+        user_id=current_user.user_id,
+        include_expired=include_expired,
+    )
+    items = tuple(
+        PreferenceMemoryResponse.model_validate(memory)
+        for memory in memories
+    )
+    return PreferenceMemoryListResponse(
+        items=items,
+        count=len(items),
+        include_expired=include_expired,
+    )
+
+
+@router.patch(
+    "/memories/{preference_memory_id}",
+    response_model=PreferenceMemoryResponse,
+    summary="设置长期偏好过期时间",
+)
+async def update_preference_memory_expiry(
+    request: PreferenceMemoryExpiryRequest,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    preference_memory_id: Annotated[
+        str,
+        Path(pattern=r"^pm_[0-9a-f]{32}$"),
+    ],
+) -> PreferenceMemoryResponse:
+    """设置过期时间；显式传 null 可以恢复为长期有效。"""
+
+    memory = await set_preference_memory_expiry(
+        repository=repositories.preference_memories,
+        user_id=current_user.user_id,
+        preference_memory_id=preference_memory_id,
+        expires_at=request.expires_at,
+    )
+    return PreferenceMemoryResponse.model_validate(memory)
+
+
+@router.delete(
+    "/memories/{preference_memory_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除一条长期偏好",
+)
+async def remove_preference_memory(
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    preference_memory_id: Annotated[
+        str,
+        Path(pattern=r"^pm_[0-9a-f]{32}$"),
+    ],
+) -> None:
+    """删除偏好审计及其对档案的同向影响，并保持幂等。"""
+
+    await delete_preference_memory(
+        style_profile_repository=(
+            repositories.style_profiles
+        ),
+        preference_memory_repository=(
+            repositories.preference_memories
+        ),
+        user_id=current_user.user_id,
+        preference_memory_id=preference_memory_id,
     )
 
 
@@ -178,4 +269,24 @@ async def update_style_profile(
 
     return StyleProfileResponse.model_validate(
         profile,
+    )
+
+
+@router.delete(
+    "",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除长期穿搭档案",
+)
+async def remove_style_profile(
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+) -> None:
+    """删除当前用户的长期档案；档案不存在时也返回成功。"""
+
+    await delete_style_profile(
+        repository=repositories.style_profiles,
+        preference_memory_repository=(
+            repositories.preference_memories
+        ),
+        user_id=current_user.user_id,
     )

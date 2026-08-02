@@ -248,3 +248,104 @@ def test_correction_context_uses_only_eligible_wardrobe_items() -> None:
         "lower-001",
         "shoes-001",
     }
+
+
+def test_hot_weather_conflict_uses_deterministic_replacement() -> None:
+    """验证存在同品类轻薄候选时无需再次依赖模型修正。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    original = OutfitRecommendation(
+        name="不适合高温的方案",
+        scenario="高温通勤",
+        items=(
+            OutfitItem(
+                role="上装",
+                name="厚羊毛上衣",
+                source="wardrobe",
+                source_reference_id="upper-heavy",
+            ),
+            OutfitItem(
+                role="下装",
+                name="轻薄长裤",
+                source="wardrobe",
+                source_reference_id="lower-light",
+            ),
+            OutfitItem(
+                role="鞋履",
+                name="透气运动鞋",
+                source="wardrobe",
+                source_reference_id="shoes-light",
+            ),
+        ),
+        recommendation_reason="初稿使用了厚重上衣。",
+    )
+    wardrobe_records = [
+        {
+            "wardrobe_item_id": "upper-heavy",
+            "name": "厚羊毛上衣",
+            "category": "上装",
+            "materials": ["厚羊毛"],
+            "status": "available",
+        },
+        {
+            "wardrobe_item_id": "upper-light",
+            "name": "浅蓝轻薄棉衬衫",
+            "category": "上装",
+            "materials": ["棉"],
+            "status": "available",
+        },
+        {
+            "wardrobe_item_id": "lower-light",
+            "name": "轻薄长裤",
+            "category": "下装",
+            "status": "available",
+        },
+        {
+            "wardrobe_item_id": "shoes-light",
+            "name": "透气运动鞋",
+            "category": "鞋履",
+            "status": "available",
+        },
+    ]
+    state = {
+        "messages": [
+            HumanMessage(content="修正高温通勤方案"),
+            ToolMessage(
+                name="search_wardrobe",
+                tool_call_id="wardrobe-hot",
+                content=json.dumps(
+                    wardrobe_records,
+                    ensure_ascii=False,
+                ),
+            ),
+        ],
+        "weather_context": WeatherContext(
+            location="上海",
+            target_date="2026-08-02",
+            temperature_max_c=36,
+            source="user_provided",
+        ),
+        "outfit_recommendation": original,
+        "outfit_feasibility_report": OutfitFeasibilityReport(
+            is_executable=False,
+            issues=(
+                OutfitFeasibilityIssue(
+                    code=(OutfitIssueCode.HOT_WEATHER_CONFLICT),
+                    severity=OutfitIssueSeverity.ERROR,
+                    message="高温天气下不应使用厚羊毛单品。",
+                ),
+            ),
+        ),
+        "outfit_correction_attempts": 0,
+    }
+
+    result = create_outfit_correction_node(model)(state)
+
+    repaired = result["outfit_recommendation"]
+    assert repaired.items[0].source_reference_id == (
+        "upper-light"
+    )
+    assert repaired.items[1:] == original.items[1:]
+    structured_model.invoke.assert_not_called()

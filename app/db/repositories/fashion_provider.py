@@ -10,6 +10,9 @@ from app.db.repositories.postgres_outfit import (
 from app.db.repositories.postgres_outfit_feedback import (
     PostgresOutfitFeedbackRepository,
 )
+from app.db.repositories.postgres_preference_memory import (
+    PostgresPreferenceMemoryRepository,
+)
 from app.db.repositories.postgres_style_profile import (
     PostgresStyleProfileRepository,
 )
@@ -21,6 +24,9 @@ from app.domain.repositories.outfit import (
 )
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
+)
+from app.domain.repositories.preference_memory import (
+    PreferenceMemoryRepository,
 )
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
@@ -38,6 +44,7 @@ class FashionRepositories:
     """一次业务操作需要使用的用户时尚数据仓库。"""
 
     style_profiles: StyleProfileRepository
+    preference_memories: PreferenceMemoryRepository
     wardrobe: WardrobeRepository
     outfits: OutfitRepository
     outfit_feedback: OutfitFeedbackRepository
@@ -51,6 +58,11 @@ def create_postgres_fashion_repositories(
     return FashionRepositories(
         style_profiles=PostgresStyleProfileRepository(
             session,
+        ),
+        preference_memories=(
+            PostgresPreferenceMemoryRepository(
+                session,
+            )
         ),
         wardrobe=PostgresWardrobeRepository(
             session,

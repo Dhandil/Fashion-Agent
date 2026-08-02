@@ -2,12 +2,15 @@
 
 from collections import defaultdict
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import ValidationError
 
 from app.core.exceptions import (
     PreferenceCandidateUnavailableError,
+    PreferenceMemoryNotFoundError,
+    PreferenceMemoryUpdateConflictError,
     StyleProfileUpdateConflictError,
 )
 from app.domain.entities.outfit import Outfit
@@ -19,11 +22,20 @@ from app.domain.entities.preference_candidate import (
     PreferenceCandidate,
     PreferenceCandidateCategory,
     PreferenceDirection,
+    create_preference_candidate_id,
+)
+from app.domain.entities.preference_memory import (
+    PreferenceMemory,
+    PreferenceMemorySource,
+    create_preference_memory_id,
 )
 from app.domain.entities.style_profile import StyleProfile
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
+)
+from app.domain.repositories.preference_memory import (
+    PreferenceMemoryRepository,
 )
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
@@ -130,6 +142,19 @@ def build_style_preference_candidates(
 
         candidates.append(
             PreferenceCandidate(
+                candidate_id=create_preference_candidate_id(
+                    category=(
+                        PreferenceCandidateCategory.STYLE
+                    ),
+                    value=display_value,
+                    direction=direction,
+                    evidence_outfit_ids=tuple(
+                        sorted(supporting_ids),
+                    ),
+                    opposing_evidence_outfit_ids=tuple(
+                        sorted(opposing_ids),
+                    ),
+                ),
                 category=(
                     PreferenceCandidateCategory.STYLE
                 ),
@@ -231,10 +256,15 @@ async def confirm_style_preference_candidate(
     style_profile_repository: StyleProfileRepository,
     outfit_repository: OutfitRepository,
     feedback_repository: OutfitFeedbackRepository,
+    preference_memory_repository: (
+        PreferenceMemoryRepository
+    ),
     user_id: str,
+    candidate_id: str,
     value: str,
     direction: PreferenceDirection,
     minimum_evidence: int = 2,
+    confirmed_at: datetime | None = None,
 ) -> StyleProfile:
     """重新校验证据后把用户确认的风格候选合并进档案。"""
 
@@ -252,6 +282,7 @@ async def confirm_style_preference_candidate(
             if (
                 candidate.value.casefold()
                 == normalized_value
+                and candidate.candidate_id == candidate_id
                 and candidate.direction is direction
                 and candidate.category
                 is PreferenceCandidateCategory.STYLE
@@ -297,9 +328,54 @@ async def confirm_style_preference_candidate(
         },
     )
 
-    return await style_profile_repository.save(
+    existing_memory = (
+        await preference_memory_repository.get_by_identity(
+            user_id=user_id,
+            category=matched_candidate.category,
+            value=confirmed_value,
+        )
+    )
+    confirmation_time = confirmed_at or datetime.now(UTC)
+    if confirmation_time.tzinfo is None:
+        raise ValueError("偏好确认时间必须包含时区")
+    memory = PreferenceMemory(
+        preference_memory_id=(
+            existing_memory.preference_memory_id
+            if existing_memory is not None
+            else create_preference_memory_id()
+        ),
+        user_id=user_id,
+        category=matched_candidate.category,
+        value=confirmed_value,
+        direction=direction,
+        source=(
+            PreferenceMemorySource.OUTFIT_FEEDBACK_CONFIRMATION
+        ),
+        source_reference_ids=(
+            matched_candidate.evidence_outfit_ids
+        ),
+        confirmed_at=(
+            existing_memory.confirmed_at
+            if existing_memory is not None
+            else confirmation_time
+        ),
+        last_confirmed_at=confirmation_time,
+        # 用户再次确认一条已过期记录时将其重新激活。
+        expires_at=(
+            existing_memory.expires_at
+            if existing_memory is not None
+            and existing_memory.expires_at is not None
+            and existing_memory.expires_at
+            > confirmation_time
+            else None
+        ),
+    )
+
+    saved_profile = await style_profile_repository.save(
         updated_profile,
     )
+    await preference_memory_repository.save(memory)
+    return saved_profile
 
 
 async def get_style_profile(
@@ -317,6 +393,126 @@ async def get_style_profile(
 
     return StyleProfile(
         user_id=user_id,
+    )
+
+
+async def delete_style_profile(
+    repository: StyleProfileRepository,
+    preference_memory_repository: (
+        PreferenceMemoryRepository
+    ),
+    user_id: str,
+) -> bool:
+    """删除当前用户长期档案及审计记录，并保持幂等。"""
+
+    await preference_memory_repository.delete_by_user_id(
+        user_id,
+    )
+    return await repository.delete_by_user_id(user_id)
+
+
+async def list_preference_memories(
+    repository: PreferenceMemoryRepository,
+    user_id: str,
+    *,
+    include_expired: bool = False,
+    at: datetime | None = None,
+) -> tuple[PreferenceMemory, ...]:
+    """读取用户可见的偏好审计记录，默认过滤过期项。"""
+
+    memories = await repository.list_by_user_id(
+        user_id,
+    )
+    if include_expired:
+        return memories
+    reference_time = at or datetime.now(UTC)
+    return tuple(
+        memory
+        for memory in memories
+        if memory.is_active(reference_time)
+    )
+
+
+async def set_preference_memory_expiry(
+    repository: PreferenceMemoryRepository,
+    user_id: str,
+    preference_memory_id: str,
+    expires_at: datetime | None,
+) -> PreferenceMemory:
+    """设置或清除一条长期偏好的过期时间。"""
+
+    memory = await repository.get_by_id(
+        user_id=user_id,
+        preference_memory_id=preference_memory_id,
+    )
+    if memory is None:
+        raise PreferenceMemoryNotFoundError(
+            "当前用户不存在指定的长期偏好记录",
+        )
+
+    # 重新验证完整实体，确保过期时间晚于最近确认时间。
+    try:
+        updated_memory = PreferenceMemory.model_validate(
+            {
+                **memory.model_dump(),
+                "expires_at": expires_at,
+            },
+        )
+    except ValidationError as exc:
+        raise PreferenceMemoryUpdateConflictError(
+            "过期时间必须晚于最近确认时间",
+        ) from exc
+    return await repository.save(updated_memory)
+
+
+async def delete_preference_memory(
+    style_profile_repository: StyleProfileRepository,
+    preference_memory_repository: (
+        PreferenceMemoryRepository
+    ),
+    user_id: str,
+    preference_memory_id: str,
+) -> bool:
+    """删除一条偏好及其对 Style Profile 产生的同向影响。"""
+
+    memory = await preference_memory_repository.get_by_id(
+        user_id=user_id,
+        preference_memory_id=preference_memory_id,
+    )
+    if memory is None:
+        return False
+
+    profile = await get_style_profile(
+        repository=style_profile_repository,
+        user_id=user_id,
+    )
+    if memory.direction is PreferenceDirection.PREFER:
+        preferred_styles = _remove_value(
+            profile.preferred_styles,
+            memory.value,
+        )
+        avoided_styles = profile.avoided_styles
+    else:
+        preferred_styles = profile.preferred_styles
+        avoided_styles = _remove_value(
+            profile.avoided_styles,
+            memory.value,
+        )
+
+    updated_profile = profile.model_copy(
+        update={
+            "preferred_styles": preferred_styles,
+            "avoided_styles": avoided_styles,
+        },
+    )
+    if updated_profile != profile:
+        await style_profile_repository.save(
+            updated_profile,
+        )
+
+    return await preference_memory_repository.delete_by_id(
+        user_id=user_id,
+        preference_memory_id=preference_memory_id,
     )
 
 

@@ -17,7 +17,8 @@ from app.agents.context import (
     get_current_turn_tool_records,
 )
 from app.agents.context_package import (
-    DEFAULT_CONTEXT_MAX_CHARS,
+    DEFAULT_CONTEXT_BUDGET_POLICY,
+    ContextBudgetPolicy,
     ContextCandidate,
     ContextPackage,
     ContextPriority,
@@ -35,7 +36,10 @@ from app.agents.style_constraints import (
     get_effective_style_constraints,
     serialize_style_constraints,
 )
-from app.core.observability import log_event
+from app.core.observability import (
+    log_event,
+    observe_operation,
+)
 from app.domain.entities.weather import WeatherContext
 from app.domain.policies.outfit_coverage import (
     build_outfit_gap_report,
@@ -88,7 +92,7 @@ def _create_generation_context_package(
     product_records: tuple[dict[str, Any], ...],
     weather_records: tuple[dict[str, Any], ...],
     active_weather: WeatherContext | None,
-    max_chars: int,
+    budget_policy: ContextBudgetPolicy,
 ) -> ContextPackage:
     """装配结构化 Outfit 生成所需的受控上下文。"""
 
@@ -232,12 +236,15 @@ def _create_generation_context_package(
                 source=ContextSource.KNOWLEDGE,
                 priority=ContextPriority.KNOWLEDGE,
                 content=knowledge,
+                provenance=tuple(
+                    state.get("knowledge_provenance", ()),
+                ),
             ),
         )
 
     return build_context_package(
         tuple(candidates),
-        max_chars=max_chars,
+        budget_policy=budget_policy,
     )
 
 
@@ -252,7 +259,7 @@ def _decode_context_values(
 
 def create_outfit_generation_node(
     model: BaseChatModel,
-    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
+    context_budget_policy: ContextBudgetPolicy = (DEFAULT_CONTEXT_BUDGET_POLICY),
 ) -> Callable[
     [ShoppingAgentState],
     dict[str, Any],
@@ -332,7 +339,7 @@ def create_outfit_generation_node(
             product_records=product_records,
             weather_records=weather_records,
             active_weather=active_weather,
-            max_chars=context_max_chars,
+            budget_policy=context_budget_policy,
         )
         diagnostics = context_package.diagnostics
         log_event(
@@ -347,6 +354,18 @@ def create_outfit_generation_node(
             duplicate_count=len(diagnostics.duplicate_keys),
             omitted_count=len(diagnostics.omitted_keys),
             truncated_count=len(diagnostics.truncated_keys),
+            priority_limited_count=len(
+                diagnostics.priority_limited_keys,
+            ),
+            provenance_conflict_count=len(
+                diagnostics.provenance_conflict_keys,
+            ),
+            input_estimated_tokens=(diagnostics.input_estimated_tokens),
+            selected_estimated_tokens=(diagnostics.selected_estimated_tokens),
+            priority_selected_chars={
+                usage.priority.name.lower(): (usage.selected_chars)
+                for usage in diagnostics.priority_usage
+            },
             excluded_wardrobe_count=len(
                 wardrobe_selection.exclusions,
             ),
@@ -419,19 +438,24 @@ def create_outfit_generation_node(
         }
 
         try:
-            raw_result = structured_model.invoke(
-                [
-                    SystemMessage(
-                        content=OUTFIT_GENERATION_SYSTEM_PROMPT,
-                    ),
-                    HumanMessage(
-                        content=json.dumps(
-                            generation_context,
-                            ensure_ascii=False,
+            with observe_operation(
+                logger,
+                "agent.llm",
+                purpose="outfit_generation",
+            ):
+                raw_result = structured_model.invoke(
+                    [
+                        SystemMessage(
+                            content=OUTFIT_GENERATION_SYSTEM_PROMPT,
                         ),
-                    ),
-                ],
-            )
+                        HumanMessage(
+                            content=json.dumps(
+                                generation_context,
+                                ensure_ascii=False,
+                            ),
+                        ),
+                    ],
+                )
 
             structured_result = OutfitGenerationResult.model_validate(
                 raw_result,

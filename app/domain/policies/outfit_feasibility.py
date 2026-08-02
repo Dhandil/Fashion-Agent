@@ -22,6 +22,9 @@ from app.domain.entities.weather import WeatherContext
 from app.domain.policies.style_constraints import (
     EffectiveStyleConstraints,
 )
+from app.domain.policies.wardrobe_candidates import (
+    HOT_WEATHER_INCOMPATIBLE_TERMS,
+)
 
 _UPPER_ROLE_TERMS = (
     "上装",
@@ -48,13 +51,6 @@ _OUTERWEAR_ROLE_TERMS = (
     "大衣",
     "夹克",
     "风衣",
-)
-_COLD_ITEM_TERMS = (
-    "羽绒",
-    "加绒",
-    "厚呢",
-    "羊毛大衣",
-    "皮草",
 )
 _WARMING_TERMS = (
     "外套",
@@ -371,23 +367,59 @@ def _check_scenario(
 def _check_weather(
     recommendation: OutfitRecommendation,
     weather: WeatherContext | None,
+    wardrobe_records: Sequence[Mapping[str, Any]],
+    product_records: Sequence[Mapping[str, Any]],
 ) -> list[OutfitFeasibilityIssue]:
-    """识别少量高置信度天气冲突和需要提示的风险。"""
+    """使用推荐文本和真实来源记录识别高置信度天气冲突。"""
 
     if weather is None:
         return []
 
     issues: list[OutfitFeasibilityIssue] = []
+    wardrobe_by_id = _record_by_id(
+        wardrobe_records,
+        "wardrobe_item_id",
+    )
+    product_by_id = _record_by_id(
+        product_records,
+        "product_id",
+    )
+    # 天气适配只检查实际选中的单品及其真实来源记录。
+    # 推荐理由可能描述“已替换厚羊毛”等历史信息，不能当成当前穿着事实。
+    outfit_text_parts: list[str] = []
+    for item in (
+        *recommendation.items,
+        *recommendation.alternatives,
+    ):
+        outfit_text_parts.append(item.name)
+        record: Mapping[str, Any] | None = None
+        if item.source is OutfitItemSource.WARDROBE:
+            record = wardrobe_by_id.get(
+                item.source_reference_id or "",
+            )
+        elif item.source is OutfitItemSource.PRODUCT:
+            record = product_by_id.get(
+                item.source_reference_id or "",
+            )
+        if record is not None:
+            for field_name in (
+                "name",
+                "category",
+                "materials",
+                "style_tags",
+                "notes",
+            ):
+                value = record.get(field_name)
+                if isinstance(value, str):
+                    outfit_text_parts.append(value)
+                elif isinstance(value, Sequence):
+                    outfit_text_parts.extend(
+                        entry
+                        for entry in value
+                        if isinstance(entry, str)
+                    )
     outfit_text = " ".join(
-        filter(
-            None,
-            (
-                *(item.name for item in recommendation.items),
-                *(item.reason for item in recommendation.items),
-                recommendation.recommendation_reason,
-                recommendation.notes,
-            ),
-        ),
+        part for part in outfit_text_parts if part
     )
     high_temperature = max(
         value
@@ -408,7 +440,10 @@ def _check_weather(
     ]
     low_temperature = min(low_temperature_candidates) if low_temperature_candidates else None
 
-    if high_temperature >= 30 and any(term in outfit_text for term in _COLD_ITEM_TERMS):
+    if high_temperature >= 30 and any(
+        term in outfit_text
+        for term in HOT_WEATHER_INCOMPATIBLE_TERMS
+    ):
         issues.append(
             OutfitFeasibilityIssue(
                 code=(OutfitIssueCode.HOT_WEATHER_CONFLICT),
@@ -484,6 +519,8 @@ def evaluate_outfit_feasibility(
         *_check_weather(
             recommendation,
             weather,
+            wardrobe_records,
+            product_records,
         ),
     )
     return OutfitFeasibilityReport(

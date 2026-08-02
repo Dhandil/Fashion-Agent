@@ -232,7 +232,9 @@ def test_manifest_import_can_be_retrieved_with_hit_source(
         assert result["knowledge_sources"] == [
             (
                 "fk-materials-linen-test::S01::001 | "
-                "knowledge/01_materials/linen.md"
+                "knowledge/01_materials/linen.md | "
+                "knowledge_id=fk-materials-linen-test | "
+                "version=1.0.0 | updated_at=2026-07-31"
             ),
         ]
     finally:

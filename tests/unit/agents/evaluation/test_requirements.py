@@ -53,7 +53,7 @@ def test_committed_suite_covers_requirement_boundaries() -> None:
     )
 
     assert suite.schema_version == "1.0"
-    assert len(suite.cases) == 15
+    assert len(suite.cases) == 18
     assert {case.category for case in suite.cases} == {
         "knowledge",
         "incomplete",
@@ -61,8 +61,22 @@ def test_committed_suite_covers_requirement_boundaries() -> None:
         "adjustment",
         "shopping",
         "shopping_boundary",
+        "weather_boundary",
         "preference_boundary",
     }
+    positive_and_avoidance = next(
+        case
+        for case in suite.cases
+        if case.case_id == (
+            "preference-current-positive-and-avoidance"
+        )
+    )
+    assert positive_and_avoidance.expected.color_preferences == (
+        "黑色",
+    )
+    assert positive_and_avoidance.expected.avoided_colors == (
+        "米白色",
+    )
 
 
 def test_evaluate_case_reports_each_mismatched_field() -> None:
@@ -97,6 +111,46 @@ def test_evaluate_case_reports_each_mismatched_field() -> None:
         "intent",
         "is_sufficient",
         "missing_fields_contains",
+    )
+
+
+def test_omitted_preference_expectation_is_not_compared() -> None:
+    """验证未声明的偏好字段代表本案例不关心，而不是必须为空。"""
+
+    case = _case(case_id="partial-expectation")
+    actual = OutfitRequirementAnalysis(
+        intent=RequestIntent.KNOWLEDGE,
+        style_preferences=("简洁",),
+        color_preferences=("浅蓝色",),
+    )
+
+    result = evaluate_requirement_case(case, actual)
+
+    assert result.passed is True
+
+
+def test_explicit_empty_preference_expectation_is_compared() -> None:
+    """验证显式空列表仍可用于检查模型是否无端增加偏好。"""
+
+    case = _case(case_id="strict-empty-preference").model_copy(
+        update={
+            "expected": _case(
+                case_id="strict-empty-preference",
+            ).expected.model_copy(
+                update={"style_preferences": ()},
+            ),
+        },
+    )
+    actual = OutfitRequirementAnalysis(
+        intent=RequestIntent.KNOWLEDGE,
+        style_preferences=("简洁",),
+    )
+
+    result = evaluate_requirement_case(case, actual)
+
+    assert result.passed is False
+    assert result.mismatched_fields == (
+        "style_preferences",
     )
 
 

@@ -1,16 +1,20 @@
 """用户衣橱搜索工具。"""
 
 import json
+import logging
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+from app.core.observability import observe_operation
 from app.domain.entities.wardrobe_item import (
     WardrobeItemStatus,
 )
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class WardrobeSearchInput(BaseModel):
@@ -47,29 +51,37 @@ def create_wardrobe_search_tool(
     ) -> str:
         """查询当前用户衣橱中可以参与穿搭的衣物。"""
 
-        # user_id 由应用层注入，模型不能查询其他用户
-        wardrobe_items = await repository.search(
-            user_id=user_id,
-            category=category,
-            status=WardrobeItemStatus.AVAILABLE,
-            limit=limit,
-        )
-
-        # 将领域实体转换为模型可以读取的 JSON 数据
-        wardrobe_data = [
-            wardrobe_item.model_dump(
-                mode="json",
-                # 工具已经绑定当前用户，模型不需要接触内部用户 ID
-                exclude={
-                    "user_id",
-                },
+        with observe_operation(
+            logger,
+            "agent.tool",
+            tool_name="search_wardrobe",
+        ) as observation:
+            # user_id 由应用层注入，模型不能查询其他用户
+            wardrobe_items = await repository.search(
+                user_id=user_id,
+                category=category,
+                status=WardrobeItemStatus.AVAILABLE,
+                limit=limit,
             )
-            for wardrobe_item in wardrobe_items
-        ]
 
-        return json.dumps(
-            wardrobe_data,
-            ensure_ascii=False,
-        )
+            # 将领域实体转换为模型可以读取的 JSON 数据
+            wardrobe_data = [
+                wardrobe_item.model_dump(
+                    mode="json",
+                    # 工具已经绑定当前用户，模型不需要接触内部用户 ID
+                    exclude={
+                        "user_id",
+                    },
+                )
+                for wardrobe_item in wardrobe_items
+            ]
+            observation.add_fields(
+                result_count=len(wardrobe_data),
+            )
+
+            return json.dumps(
+                wardrobe_data,
+                ensure_ascii=False,
+            )
 
     return search_wardrobe

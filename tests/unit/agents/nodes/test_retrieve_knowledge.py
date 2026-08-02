@@ -4,6 +4,7 @@ from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
 from langchain_core.retrievers import BaseRetriever
 
+from app.agents.context_package import ContextProvenance
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
 )
@@ -64,6 +65,14 @@ def test_retrieve_knowledge_node_builds_context() -> None:
             "data/samples/fabrics.md",
             "data/samples/fabrics.md",
         ],
+        "knowledge_provenance": [
+            ContextProvenance(
+                source_path_or_url=("data/samples/fabrics.md"),
+            ),
+            ContextProvenance(
+                source_path_or_url=("data/samples/fabrics.md"),
+            ),
+        ],
     }
 
 
@@ -81,6 +90,8 @@ def test_retrieve_knowledge_node_outputs_every_fragment_source() -> None:
                 "source_path_or_url": (
                     "knowledge/01_materials/fibers/linen.md"
                 ),
+                "version": "2.8.0",
+                "updated_at": "2026-07-31",
             },
         ),
         Document(
@@ -112,10 +123,27 @@ def test_retrieve_knowledge_node_outputs_every_fragment_source() -> None:
     assert result["knowledge_sources"] == [
         (
             "fk-materials-linen-001::S04::001 | "
-            "knowledge/01_materials/fibers/linen.md"
+            "knowledge/01_materials/fibers/linen.md | "
+            "version=2.8.0 | updated_at=2026-07-31"
         ),
         (
             "fk-materials-linen-001::S06::001 | "
             "knowledge/01_materials/fibers/linen.md"
+        ),
+    ]
+    assert result["knowledge_provenance"] == [
+        ContextProvenance(
+            reference_id=("fk-materials-linen-001::S04::001"),
+            source_path_or_url=(
+                "knowledge/01_materials/fibers/linen.md"
+            ),
+            version="2.8.0",
+            updated_at="2026-07-31",
+        ),
+        ContextProvenance(
+            reference_id=("fk-materials-linen-001::S06::001"),
+            source_path_or_url=(
+                "knowledge/01_materials/fibers/linen.md"
+            ),
         ),
     ]

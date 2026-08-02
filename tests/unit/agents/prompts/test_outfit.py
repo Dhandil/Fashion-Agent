@@ -49,3 +49,12 @@ def test_outfit_prompts_use_resolved_style_constraints() -> None:
     assert "effective_style_constraints" in (OUTFIT_CORRECTION_SYSTEM_PROMPT)
     assert "历史反馈不得覆盖" in (OUTFIT_GENERATION_SYSTEM_PROMPT)
     assert "当前明确要求 > 长期档案" in (OUTFIT_CORRECTION_SYSTEM_PROMPT)
+
+
+def test_correction_prompt_prefers_valid_same_role_replacement() -> None:
+    """验证天气冲突时优先使用仍在候选集中的同角色替代。"""
+
+    assert "同角色轻薄候选" in (
+        OUTFIT_CORRECTION_SYSTEM_PROMPT
+    )
+    assert "厚羊毛单品" in OUTFIT_CORRECTION_SYSTEM_PROMPT

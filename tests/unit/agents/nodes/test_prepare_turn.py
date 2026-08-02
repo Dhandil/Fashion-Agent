@@ -54,6 +54,7 @@ def test_prepare_turn_preserves_current_outfit_as_baseline() -> None:
         "tool_policy_rejection_count": 0,
         "knowledge_context": "",
         "knowledge_sources": [],
+        "knowledge_provenance": [],
         "style_profile_context": "",
         "style_profile_snapshot": None,
         "outfit_feedback_context": "",
@@ -85,6 +86,7 @@ def test_prepare_turn_keeps_existing_baseline_when_no_new_outfit() -> None:
         "tool_policy_rejection_count": 0,
         "knowledge_context": "",
         "knowledge_sources": [],
+        "knowledge_provenance": [],
         "style_profile_context": "",
         "style_profile_snapshot": None,
         "outfit_feedback_context": "",
@@ -101,6 +103,7 @@ def test_prepare_turn_clears_previous_derived_context() -> None:
             "messages": [],
             "knowledge_context": "上一轮知识",
             "knowledge_sources": ["old-source.md"],
+            "knowledge_provenance": [],
             "style_profile_context": "上一轮档案",
             "outfit_feedback_context": "上一轮反馈",
             "recent_outfits_context": "上一轮穿搭",
@@ -110,6 +113,7 @@ def test_prepare_turn_clears_previous_derived_context() -> None:
     assert result["knowledge_context"] == ""
     assert result["outfit_gap_report"] is None
     assert result["knowledge_sources"] == []
+    assert result["knowledge_provenance"] == []
     assert result["style_profile_context"] == ""
     assert result["style_profile_snapshot"] is None
     assert result["outfit_feedback_context"] == ""

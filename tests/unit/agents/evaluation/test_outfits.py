@@ -3,6 +3,9 @@
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+from langchain_core.language_models import BaseChatModel
+
 from app.agents.evaluation.outfits import (
     OutfitCaseResult,
     OutfitEvaluationCase,
@@ -13,6 +16,9 @@ from app.agents.evaluation.outfits import (
     evaluate_outfit_suite,
     load_outfit_evaluation_suite,
     render_outfit_baseline,
+)
+from app.agents.nodes.generate_outfit import (
+    create_outfit_generation_node,
 )
 from app.domain.entities.outfit import OutfitItem, OutfitRecommendation
 from app.domain.entities.outfit_gap import (
@@ -106,7 +112,7 @@ def test_committed_suite_covers_generation_and_correction() -> None:
         Path("evaluation/agents/outfit_cases.json"),
     )
 
-    assert len(suite.cases) == 11
+    assert len(suite.cases) == 14
     assert {case.mode for case in suite.cases} == {
         "generation",
         "correction",
@@ -129,6 +135,17 @@ def test_committed_suite_covers_generation_and_correction() -> None:
         case for case in suite.cases if case.case_id == "generation-wardrobe-gap-shopping-allowed"
     )
     assert shopping_gap_case.expected.gap_shopping_search_allowed is True
+    laundry_gap_case = next(
+        case
+        for case in suite.cases
+        if case.case_id == (
+            "generation-unavailable-laundry-gap"
+        )
+    )
+    assert laundry_gap_case.expected.require_gap is True
+    assert laundry_gap_case.wardrobe_records[0]["status"] == (
+        "unavailable"
+    )
 
 
 def test_generation_first_pass_reports_no_correction() -> None:
@@ -212,6 +229,44 @@ def test_expected_gap_is_counted_as_safe_rejection() -> None:
     assert result.final_disposition == "rejected"
     assert result.correction_attempted is False
     correct.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "generation-unavailable-laundry-gap",
+        "generation-high-heat-removes-only-upper",
+    ],
+)
+def test_boundary_gap_cases_reject_before_model_call(
+    case_id: str,
+) -> None:
+    """验证不可用衣物和高温冲突在模型调用前形成安全缺口。"""
+
+    suite = load_outfit_evaluation_suite(
+        Path("evaluation/agents/outfit_cases.json"),
+    )
+    case = next(
+        item for item in suite.cases if item.case_id == case_id
+    )
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = (
+        structured_model
+    )
+
+    result = evaluate_outfit_case(
+        case,
+        generate_outfit=create_outfit_generation_node(
+            model,
+        ),
+        correct_outfit=Mock(),
+    )
+
+    assert result.passed is True
+    assert result.gap_produced is True
+    assert result.final_disposition == "rejected"
+    structured_model.invoke.assert_not_called()
 
 
 def test_invalid_initial_outfit_can_be_corrected_once() -> None:

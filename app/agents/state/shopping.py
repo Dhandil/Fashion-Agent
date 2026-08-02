@@ -3,6 +3,7 @@ from typing import Annotated, NotRequired, TypedDict
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
+from app.agents.context_package import ContextProvenance
 from app.agents.schemas.requirements import (
     OutfitRequirementAnalysis,
 )
@@ -37,6 +38,9 @@ class ShoppingAgentState(TypedDict):
 
     # 本次 RAG 检索结果的来源文件
     knowledge_sources: NotRequired[list[str]]
+
+    # 本轮 RAG 命中的结构化来源，不与知识正文混合
+    knowledge_provenance: NotRequired[list[ContextProvenance]]
 
     # 当前请求明确提供的天气，只对本轮穿搭决策有效
     weather_context: NotRequired[WeatherContext | None]

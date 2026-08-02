@@ -37,9 +37,12 @@ class RequirementEvaluationExpectation(BaseModel):
     needs_weather: bool
     shopping_intent: ShoppingIntent
     missing_fields_contains: tuple[RequirementField, ...] = ()
-    avoided_styles: tuple[str, ...] = ()
-    avoided_colors: tuple[str, ...] = ()
-    avoided_materials: tuple[str, ...] = ()
+    # `None` 表示案例不检查该字段；显式 `[]` 表示要求结果必须为空。
+    style_preferences: tuple[str, ...] | None = None
+    color_preferences: tuple[str, ...] | None = None
+    avoided_styles: tuple[str, ...] | None = None
+    avoided_colors: tuple[str, ...] | None = None
+    avoided_materials: tuple[str, ...] | None = None
 
 
 class RequirementEvaluationCase(BaseModel):
@@ -55,6 +58,7 @@ class RequirementEvaluationCase(BaseModel):
         "adjustment",
         "shopping",
         "shopping_boundary",
+        "weather_boundary",
         "preference_boundary",
     ]
     messages: tuple[RequirementEvaluationMessage, ...] = Field(
@@ -184,13 +188,25 @@ def evaluate_requirement_case(
         "needs_wardrobe",
         "needs_weather",
         "shopping_intent",
-        "avoided_styles",
-        "avoided_colors",
-        "avoided_materials",
     ):
         if getattr(actual, field_name) != getattr(
             expected,
             field_name,
+        ):
+            mismatched_fields.append(field_name)
+
+    # 偏好字段属于可选评测子集：案例只有显式声明时才参与比较。
+    for field_name in (
+        "style_preferences",
+        "color_preferences",
+        "avoided_styles",
+        "avoided_colors",
+        "avoided_materials",
+    ):
+        expected_value = getattr(expected, field_name)
+        if (
+            expected_value is not None
+            and getattr(actual, field_name) != expected_value
         ):
             mismatched_fields.append(field_name)
 

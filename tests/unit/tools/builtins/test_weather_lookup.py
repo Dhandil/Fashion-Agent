@@ -2,7 +2,7 @@
 
 import json
 from datetime import date
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -88,12 +88,15 @@ async def test_weather_tool_degrades_provider_error() -> None:
         provider,
     )
 
-    result = await weather_tool.ainvoke(
-        {
-            "location": "上海",
-            "target_date": "2026-08-01",
-        },
-    )
+    with patch(
+        "app.core.observability.log_event",
+    ) as mocked_log_event:
+        result = await weather_tool.ainvoke(
+            {
+                "location": "上海",
+                "target_date": "2026-08-01",
+            },
+        )
     error = json.loads(result)
 
     assert error == {
@@ -102,3 +105,16 @@ async def test_weather_tool_degrades_provider_error() -> None:
         "location": "上海",
         "target_date": "2026-08-01",
     }
+    events = {
+        call.args[1]: call
+        for call in mocked_log_event.call_args_list
+    }
+    assert events["provider.weather.failed"].kwargs[
+        "error_type"
+    ] == "WeatherProviderError"
+    assert events["agent.tool.completed"].kwargs[
+        "degraded"
+    ] is True
+    assert "location" not in events[
+        "provider.weather.failed"
+    ].kwargs

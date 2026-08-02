@@ -303,6 +303,111 @@
         "correction": "required",
         "require_source_integrity": true
       }
+    },
+    {
+      "case_id": "generation-unavailable-laundry-gap",
+      "category": "wardrobe",
+      "mode": "generation",
+      "user_request": "只用我的衣橱搭配通勤服装，洗了还没干的衣服不能用。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "shopping_intent": "none"
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-drying-001", "name": "浅蓝棉质衬衫", "category": "上装", "status": "unavailable", "notes": "清洗后尚未晾干"},
+        {"wardrobe_item_id": "lower-ready-001", "name": "灰色长裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-ready-001", "name": "棕色乐福鞋", "category": "鞋履", "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "rejected",
+        "correction": "forbidden",
+        "require_source_integrity": true,
+        "require_gap": true,
+        "gap_shopping_search_allowed": false
+      }
+    },
+    {
+      "case_id": "generation-high-heat-removes-only-upper",
+      "category": "weather",
+      "mode": "generation",
+      "user_request": "只用我的衣橱搭配上海高温通勤服装，不要查询商品。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "高温通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "needs_weather": true,
+        "shopping_intent": "none"
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-thick-001", "name": "厚羊毛上衣", "category": "上装", "materials": ["厚羊毛"], "status": "available"},
+        {"wardrobe_item_id": "lower-summer-001", "name": "轻薄长裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-summer-001", "name": "透气运动鞋", "category": "鞋履", "status": "available"}
+      ],
+      "weather_context": {
+        "location": "上海",
+        "target_date": "2026-08-02",
+        "condition": "晴",
+        "temperature_min_c": 29,
+        "temperature_max_c": 36,
+        "feels_like_c": 39,
+        "precipitation_probability": 5,
+        "source": "user_provided"
+      },
+      "expected": {
+        "final_disposition": "rejected",
+        "correction": "forbidden",
+        "require_source_integrity": true,
+        "require_gap": true,
+        "gap_shopping_search_allowed": false
+      }
+    },
+    {
+      "case_id": "correction-hot-weather-conflict",
+      "category": "weather",
+      "mode": "correction",
+      "user_request": "把这套方案修正为适合上海高温通勤的穿搭。",
+      "requirement_analysis": {
+        "intent": "outfit_adjustment",
+        "scenario": "高温通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "needs_weather": true
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-heavy-001", "name": "厚羊毛上衣", "category": "上装", "materials": ["厚羊毛"], "status": "available"},
+        {"wardrobe_item_id": "upper-light-001", "name": "浅蓝轻薄棉衬衫", "category": "上装", "materials": ["棉"], "status": "available"},
+        {"wardrobe_item_id": "lower-hot-001", "name": "灰色轻薄长裤", "category": "下装", "status": "available"},
+        {"wardrobe_item_id": "shoes-hot-001", "name": "白色透气运动鞋", "category": "鞋履", "status": "available"}
+      ],
+      "weather_context": {
+        "location": "上海",
+        "target_date": "2026-08-02",
+        "condition": "晴",
+        "temperature_min_c": 29,
+        "temperature_max_c": 36,
+        "feels_like_c": 39,
+        "precipitation_probability": 5,
+        "source": "user_provided"
+      },
+      "initial_outfit": {
+        "name": "不适合高温的通勤方案",
+        "scenario": "高温通勤",
+        "items": [
+          {"role": "上装", "name": "厚羊毛上衣", "source": "wardrobe", "source_reference_id": "upper-heavy-001"},
+          {"role": "下装", "name": "灰色轻薄长裤", "source": "wardrobe", "source_reference_id": "lower-hot-001"},
+          {"role": "鞋履", "name": "白色透气运动鞋", "source": "wardrobe", "source_reference_id": "shoes-hot-001"}
+        ],
+        "recommendation_reason": "初稿错误使用了厚羊毛上衣。"
+      },
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "required",
+        "require_source_integrity": true
+      }
     }
   ]
 }

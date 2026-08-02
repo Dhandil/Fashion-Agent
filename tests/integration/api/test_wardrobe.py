@@ -58,6 +58,7 @@ def wardrobe_test_client(
 
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=repository,
         outfits=Mock(),
         outfit_feedback=Mock(),
@@ -91,6 +92,7 @@ def test_create_wardrobe_item_uses_current_user() -> None:
 
     repositories = FashionRepositories(
         style_profiles=Mock(),
+        preference_memories=Mock(),
         wardrobe=wardrobe_repository,
         outfits=Mock(),
         outfit_feedback=Mock(),

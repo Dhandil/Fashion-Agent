@@ -198,6 +198,7 @@
         "needs_weather": false,
         "shopping_intent": "none",
         "missing_fields_contains": [],
+        "color_preferences": ["浅蓝", "米白"],
         "avoided_colors": ["黑色"]
       }
     },
@@ -231,6 +232,55 @@
         "shopping_intent": "none",
         "missing_fields_contains": [],
         "avoided_styles": ["街头风"]
+      }
+    },
+    {
+      "case_id": "weather-provided-hot-commute",
+      "category": "weather_boundary",
+      "messages": [
+        {"role": "user", "content": "今天上海晴天35度，按这个天气给我一套通勤穿搭建议，不用查商品。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "weather-query-complete-location",
+      "category": "weather_boundary",
+      "messages": [
+        {"role": "user", "content": "请按明天上海的天气帮我搭配一套通勤服装。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": true,
+        "shopping_intent": "none",
+        "missing_fields_contains": []
+      }
+    },
+    {
+      "case_id": "preference-current-positive-and-avoidance",
+      "category": "preference_boundary",
+      "messages": [
+        {"role": "user", "content": "这次通勤想穿黑色和简约风，但不要米白色，也不要街头风。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": [],
+        "style_preferences": ["简约风"],
+        "color_preferences": ["黑色"],
+        "avoided_styles": ["街头风"],
+        "avoided_colors": ["米白色"]
       }
     }
   ]

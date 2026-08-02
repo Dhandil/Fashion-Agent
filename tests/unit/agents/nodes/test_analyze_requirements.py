@@ -58,6 +58,89 @@ def test_analysis_does_not_expand_shopping_permission() -> None:
     assert result["requirement_analysis"].shopping_intent is ShoppingIntent.NONE
 
 
+def test_analysis_respects_explicit_product_search_negation() -> None:
+    """验证“不用查商品”同时收紧购物权限和错误购物意图。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.SHOPPING,
+            shopping_intent=ShoppingIntent.EXPLICIT,
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(
+                    content=("今天上海35度，给我通勤穿搭，不用查商品。"),
+                ),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.intent is RequestIntent.OUTFIT
+    assert analysis.shopping_intent is ShoppingIntent.NONE
+
+
+def test_analysis_does_not_infer_wardrobe_from_wearing_words() -> None:
+    """验证“想穿黑色”不等于授权读取个人衣橱。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            scenario="通勤",
+            needs_wardrobe=True,
+            wardrobe_preferred=True,
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(
+                    content="这次通勤想穿黑色和简约风。",
+                ),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.needs_wardrobe is False
+    assert analysis.wardrobe_preferred is False
+
+
+def test_complete_weather_query_does_not_ask_for_weather() -> None:
+    """验证地点和日期齐全后应查询工具，而不是追问天气事实。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            scenario="通勤",
+            location="上海",
+            target_date="明天",
+            needs_weather=True,
+            is_sufficient=False,
+            missing_fields=("weather",),
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(
+                    content=("请按明天上海的天气搭配通勤服装。"),
+                ),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.is_sufficient is True
+    assert analysis.missing_fields == ()
+    assert analysis.needs_weather is True
+
+
 def test_analysis_recognises_explicit_product_search() -> None:
     """验证用户原文明示找商品时开放商品查询权限。"""
 

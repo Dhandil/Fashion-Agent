@@ -15,6 +15,8 @@ from langchain_core.messages import (
 from langchain_core.retrievers import BaseRetriever
 from langgraph.checkpoint.memory import InMemorySaver
 
+from app.agents.context_package import ContextBudgetPolicy
+from app.agents.knowledge_context import KnowledgeContextPolicy
 from app.agents.schemas.outfit import (
     OutfitGenerationResult,
 )
@@ -54,6 +56,12 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
     fake_retriever = Mock()
     fake_settings = Mock(
         agent_context_max_chars=4_321,
+        agent_explicit_memory_max_chars=1_111,
+        agent_historical_memory_max_chars=1_222,
+        agent_knowledge_max_chars=1_333,
+        rag_context_max_documents=5,
+        rag_context_max_fragment_chars=1_444,
+        rag_context_max_chars=3_555,
         agent_history_max_turns=4,
         agent_history_max_chars=3_210,
         agent_summary_max_chars=1_234,
@@ -84,7 +92,21 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
     assert first_runtime.model is fake_model
     assert first_runtime.checkpointer is fake_checkpointer
     assert first_runtime.retriever is fake_retriever
-    assert first_runtime.context_max_chars == 4_321
+    assert first_runtime.context_budget_policy == (
+        ContextBudgetPolicy(
+            total_max_chars=4_321,
+            explicit_memory_max_chars=1_111,
+            historical_memory_max_chars=1_222,
+            knowledge_max_chars=1_333,
+        )
+    )
+    assert first_runtime.knowledge_context_policy == (
+        KnowledgeContextPolicy(
+            max_documents=5,
+            max_fragment_chars=1_444,
+            total_max_chars=3_555,
+        )
+    )
     assert first_runtime.history_max_turns == 4
     assert first_runtime.history_max_chars == 3_210
     assert first_runtime.summary_max_chars == 1_234
@@ -174,7 +196,8 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
         outfit_feedback_repository=(fake_feedback_repository),
         style_profile_repository=(fake_style_profile_repository),
         user_id="user-001",
-        context_max_chars=fake_runtime.context_max_chars,
+        context_budget_policy=(fake_runtime.context_budget_policy),
+        knowledge_context_policy=(fake_runtime.knowledge_context_policy),
         history_max_turns=fake_runtime.history_max_turns,
         history_max_chars=fake_runtime.history_max_chars,
         summary_max_chars=fake_runtime.summary_max_chars,
@@ -203,8 +226,22 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
                 source_reference_id="shirt-001",
                 reason="透气并适合通勤",
             ),
+            OutfitItem(
+                role="下装",
+                name="轻薄通勤长裤",
+                source="wardrobe",
+                source_reference_id="pants-001",
+                reason="与衬衫组成完整通勤搭配",
+            ),
+            OutfitItem(
+                role="鞋履",
+                name="透气通勤鞋",
+                source="wardrobe",
+                source_reference_id="shoes-001",
+                reason="适合通勤步行",
+            ),
         ],
-        recommendation_reason="使用已有衬衫完成通勤搭配。",
+        recommendation_reason="使用已有衣物完成通勤搭配。",
     )
     structured_model.invoke.return_value = OutfitGenerationResult(
         outfit=recommendation,
@@ -250,6 +287,18 @@ async def test_user_graph_executes_scoped_wardrobe_tool() -> None:
                 user_id="user-001",
                 name="浅蓝色亚麻衬衫",
                 category="衬衫",
+            ),
+            WardrobeItem(
+                wardrobe_item_id="pants-001",
+                user_id="user-001",
+                name="轻薄通勤长裤",
+                category="下装",
+            ),
+            WardrobeItem(
+                wardrobe_item_id="shoes-001",
+                user_id="user-001",
+                name="透气通勤鞋",
+                category="鞋履",
             ),
         ],
     )

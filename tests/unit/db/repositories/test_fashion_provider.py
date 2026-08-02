@@ -13,6 +13,9 @@ from app.db.repositories.postgres_outfit import (
 from app.db.repositories.postgres_outfit_feedback import (
     PostgresOutfitFeedbackRepository,
 )
+from app.db.repositories.postgres_preference_memory import (
+    PostgresPreferenceMemoryRepository,
+)
 from app.db.repositories.postgres_style_profile import (
     PostgresStyleProfileRepository,
 )
@@ -37,6 +40,10 @@ def test_fashion_repositories_share_database_session() -> None:
         PostgresStyleProfileRepository,
     )
     assert isinstance(
+        repositories.preference_memories,
+        PostgresPreferenceMemoryRepository,
+    )
+    assert isinstance(
         repositories.wardrobe,
         PostgresWardrobeRepository,
     )
@@ -51,6 +58,7 @@ def test_fashion_repositories_share_database_session() -> None:
 
     # 所有仓库必须共享同一个请求级 Session
     assert repositories.style_profiles._session is session
+    assert repositories.preference_memories._session is session
     assert repositories.wardrobe._session is session
     assert repositories.outfits._session is session
     assert repositories.outfit_feedback._session is session

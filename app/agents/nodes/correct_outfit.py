@@ -16,7 +16,8 @@ from app.agents.context import (
     get_current_turn_tool_records,
 )
 from app.agents.context_package import (
-    DEFAULT_CONTEXT_MAX_CHARS,
+    DEFAULT_CONTEXT_BUDGET_POLICY,
+    ContextBudgetPolicy,
     ContextCandidate,
     ContextPackage,
     ContextPriority,
@@ -32,14 +33,41 @@ from app.agents.style_constraints import (
     get_effective_style_constraints,
     serialize_style_constraints,
 )
-from app.core.observability import log_event
+from app.core.observability import (
+    log_event,
+    observe_operation,
+)
 from app.domain.entities.outfit import OutfitRecommendation
+from app.domain.entities.outfit_validation import (
+    OutfitIssueCode,
+    OutfitIssueSeverity,
+)
 from app.domain.entities.weather import WeatherContext
+from app.domain.policies.outfit_correction import (
+    repair_hot_weather_wardrobe_items,
+)
 from app.domain.policies.wardrobe_candidates import (
     select_eligible_wardrobe_records,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _active_weather(
+    state: ShoppingAgentState,
+) -> WeatherContext | None:
+    """优先使用当前轮天气工具事实，其次使用请求提供天气。"""
+
+    weather_records = get_current_turn_tool_records(
+        state["messages"],
+        "get_weather",
+    )
+    for record in reversed(weather_records):
+        try:
+            return WeatherContext.model_validate(record)
+        except ValueError:
+            continue
+    return state.get("weather_context")
 
 
 def _latest_user_request(state: ShoppingAgentState) -> str:
@@ -55,7 +83,7 @@ def _latest_user_request(state: ShoppingAgentState) -> str:
 
 def _build_correction_context(
     state: ShoppingAgentState,
-    max_chars: int,
+    budget_policy: ContextBudgetPolicy,
 ) -> ContextPackage:
     """只为修正调用选择当前轮真实动态事实。"""
 
@@ -93,13 +121,7 @@ def _build_correction_context(
         state["messages"],
         "get_weather",
     )
-    active_weather = state.get("weather_context")
-    for record in reversed(weather_records):
-        try:
-            active_weather = WeatherContext.model_validate(record)
-            break
-        except ValueError:
-            continue
+    active_weather = _active_weather(state)
 
     raw_wardrobe_records = get_current_turn_tool_records(
         state["messages"],
@@ -151,7 +173,7 @@ def _build_correction_context(
 
     return build_context_package(
         tuple(candidates),
-        max_chars=max_chars,
+        budget_policy=budget_policy,
     )
 
 
@@ -166,7 +188,7 @@ def _decode_values(
 
 def create_outfit_correction_node(
     model: BaseChatModel,
-    context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
+    context_budget_policy: ContextBudgetPolicy = (DEFAULT_CONTEXT_BUDGET_POLICY),
 ) -> Callable[[ShoppingAgentState], dict[str, Any]]:
     """创建绑定结构化模型的单次 Outfit 修正节点。"""
 
@@ -189,9 +211,51 @@ def create_outfit_correction_node(
                 "outfit_correction_attempts": 1,
             }
 
+        error_codes = {
+            issue.code
+            for issue in report.issues
+            if issue.severity is OutfitIssueSeverity.ERROR
+        }
+        if error_codes == {
+            OutfitIssueCode.HOT_WEATHER_CONFLICT,
+        }:
+            raw_wardrobe_records = (
+                get_current_turn_tool_records(
+                    state["messages"],
+                    "search_wardrobe",
+                )
+            )
+            effective_constraints = (
+                get_effective_style_constraints(state)
+            )
+            selection = select_eligible_wardrobe_records(
+                raw_wardrobe_records,
+                weather=_active_weather(state),
+                avoided_styles=(effective_constraints.avoided_styles),
+                avoided_colors=(effective_constraints.avoided_colors),
+                avoided_materials=(effective_constraints.avoided_materials),
+            )
+            repaired = repair_hot_weather_wardrobe_items(
+                original_recommendation,
+                wardrobe_records=raw_wardrobe_records,
+                selection=selection,
+            )
+            if repaired is not None:
+                log_event(
+                    logger,
+                    "agent.outfit.correction.completed",
+                    produced_outfit=True,
+                    degraded=False,
+                    strategy="deterministic_hot_weather",
+                )
+                return {
+                    "outfit_recommendation": repaired,
+                    "outfit_correction_attempts": 1,
+                }
+
         context_package = _build_correction_context(
             state,
-            max_chars=context_max_chars,
+            budget_policy=context_budget_policy,
         )
         diagnostics = context_package.diagnostics
         log_event(
@@ -204,12 +268,20 @@ def create_outfit_correction_node(
             input_chars=diagnostics.input_chars,
             selected_chars=diagnostics.selected_chars,
             omitted_count=len(diagnostics.omitted_keys),
+            priority_limited_count=len(
+                diagnostics.priority_limited_keys,
+            ),
+            provenance_conflict_count=len(
+                diagnostics.provenance_conflict_keys,
+            ),
+            input_estimated_tokens=(diagnostics.input_estimated_tokens),
+            selected_estimated_tokens=(diagnostics.selected_estimated_tokens),
         )
         requirements = _decode_values(
             context_package,
             ContextSource.REQUIREMENT_ANALYSIS,
         )
-        style_constraints = _decode_values(
+        decoded_style_constraints = _decode_values(
             context_package,
             ContextSource.EFFECTIVE_STYLE_CONSTRAINTS,
         )
@@ -227,7 +299,11 @@ def create_outfit_correction_node(
             ),
             "validation_issues": [issue.model_dump(mode="json") for issue in report.issues],
             "requirement_analysis": (requirements[0] if requirements else None),
-            "effective_style_constraints": (style_constraints[0] if style_constraints else None),
+            "effective_style_constraints": (
+                decoded_style_constraints[0]
+                if decoded_style_constraints
+                else None
+            ),
             "wardrobe_items": _decode_values(
                 context_package,
                 ContextSource.WARDROBE,
@@ -246,19 +322,24 @@ def create_outfit_correction_node(
         corrected_recommendation: OutfitRecommendation | None = None
         degraded = False
         try:
-            raw_result = structured_model.invoke(
-                [
-                    SystemMessage(
-                        content=(OUTFIT_CORRECTION_SYSTEM_PROMPT),
-                    ),
-                    HumanMessage(
-                        content=json.dumps(
-                            payload,
-                            ensure_ascii=False,
+            with observe_operation(
+                logger,
+                "agent.llm",
+                purpose="outfit_correction",
+            ):
+                raw_result = structured_model.invoke(
+                    [
+                        SystemMessage(
+                            content=(OUTFIT_CORRECTION_SYSTEM_PROMPT),
                         ),
-                    ),
-                ],
-            )
+                        HumanMessage(
+                            content=json.dumps(
+                                payload,
+                                ensure_ascii=False,
+                            ),
+                        ),
+                    ],
+                )
             corrected_recommendation = OutfitGenerationResult.model_validate(
                 raw_result,
             ).outfit

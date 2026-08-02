@@ -1,10 +1,14 @@
 import json
+import logging
 from decimal import Decimal
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+from app.core.observability import observe_operation
 from app.domain.repositories.product import ProductRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ProductSearchInput(BaseModel):
@@ -55,23 +59,31 @@ def create_product_search_tool(
     ) -> str:
         """根据关键词、品类和预算搜索有库存的服装商品。"""
 
-        # 异步等待商品仓库完成查询
-        products = await repository.search(
-            query=query,
-            category=category,
-            max_price=max_price,
-            limit=limit,
-        )
+        with observe_operation(
+            logger,
+            "agent.tool",
+            tool_name="search_products",
+        ) as observation:
+            # 异步等待商品仓库完成查询
+            products = await repository.search(
+                query=query,
+                category=category,
+                max_price=max_price,
+                limit=limit,
+            )
 
-        # 将商品实体转换成可供模型读取的 JSON 字符串
-        product_data = [
-            product.model_dump(mode="json")
-            for product in products
-        ]
+            # 将商品实体转换成可供模型读取的 JSON 字符串
+            product_data = [
+                product.model_dump(mode="json")
+                for product in products
+            ]
+            observation.add_fields(
+                result_count=len(product_data),
+            )
 
-        return json.dumps(
-            product_data,
-            ensure_ascii=False,
-        )
+            return json.dumps(
+                product_data,
+                ensure_ascii=False,
+            )
 
     return search_products

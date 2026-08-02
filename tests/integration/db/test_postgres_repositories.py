@@ -1,6 +1,7 @@
 """PostgreSQL 用户时尚数据仓库集成测试。"""
 
 import os
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -9,19 +10,26 @@ from app.db.repositories.fashion_provider import (
     create_postgres_fashion_repositories,
 )
 from app.db.session import get_session_factory
-from app.domain.entities.style_profile import (
-    StyleProfile,
-)
 from app.domain.entities.outfit import (
     Outfit,
     OutfitItem,
     OutfitItemSource,
 )
+from app.domain.entities.preference_candidate import (
+    PreferenceCandidateCategory,
+    PreferenceDirection,
+)
+from app.domain.entities.preference_memory import (
+    PreferenceMemory,
+    PreferenceMemorySource,
+)
+from app.domain.entities.style_profile import (
+    StyleProfile,
+)
 from app.domain.entities.wardrobe_item import (
     WardrobeItem,
     WardrobeItemStatus,
 )
-
 
 # 只有明确启用 PostgreSQL 集成测试时才连接本地数据库
 pytestmark = pytest.mark.skipif(
@@ -292,5 +300,125 @@ async def test_outfit_update_replaces_child_items() -> None:
             )
             assert found_outfit.is_favorite is True
 
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.anyio
+async def test_preference_memory_round_trip_with_postgres() -> None:
+    """验证已确认偏好的来源和时间能够真实持久化。"""
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        repositories = (
+            create_postgres_fashion_repositories(
+                session,
+            )
+        )
+        profile = StyleProfile(
+            user_id="integration-memory-user",
+            preferred_styles=("休闲",),
+        )
+        confirmed_at = datetime(
+            2026,
+            8,
+            2,
+            10,
+            tzinfo=UTC,
+        )
+        memory = PreferenceMemory(
+            preference_memory_id=(
+                "pm_0123456789abcdef0123456789abcdef"
+            ),
+            user_id=profile.user_id,
+            category=PreferenceCandidateCategory.STYLE,
+            value="休闲",
+            direction=PreferenceDirection.PREFER,
+            source=(
+                PreferenceMemorySource.OUTFIT_FEEDBACK_CONFIRMATION
+            ),
+            source_reference_ids=(
+                "outfit-001",
+                "outfit-002",
+            ),
+            confirmed_at=confirmed_at,
+            last_confirmed_at=confirmed_at,
+        )
+
+        try:
+            await repositories.style_profiles.save(
+                profile,
+            )
+            await repositories.preference_memories.save(
+                memory,
+            )
+
+            found = (
+                await repositories.preference_memories.get_by_identity(
+                    user_id=profile.user_id,
+                    category=(
+                        PreferenceCandidateCategory.STYLE
+                    ),
+                    value="休闲",
+                )
+            )
+            listed = (
+                await repositories.preference_memories.list_by_user_id(
+                    profile.user_id,
+                )
+            )
+
+            assert found == memory
+            assert listed == (memory,)
+
+            found_by_id = (
+                await repositories.preference_memories.get_by_id(
+                    user_id=profile.user_id,
+                    preference_memory_id=(
+                        memory.preference_memory_id
+                    ),
+                )
+            )
+            assert found_by_id == memory
+
+            updated_memory = PreferenceMemory.model_validate(
+                {
+                    **memory.model_dump(),
+                    "expires_at": (
+                        confirmed_at + timedelta(days=30)
+                    ),
+                },
+            )
+            await repositories.preference_memories.save(
+                updated_memory,
+            )
+            assert (
+                await repositories.preference_memories.get_by_id(
+                    user_id=profile.user_id,
+                    preference_memory_id=(
+                        memory.preference_memory_id
+                    ),
+                )
+                == updated_memory
+            )
+
+            assert (
+                await repositories.preference_memories.delete_by_id(
+                    user_id=profile.user_id,
+                    preference_memory_id=(
+                        memory.preference_memory_id
+                    ),
+                )
+                is True
+            )
+            assert (
+                await repositories.preference_memories.delete_by_id(
+                    user_id=profile.user_id,
+                    preference_memory_id=(
+                        memory.preference_memory_id
+                    ),
+                )
+                is False
+            )
         finally:
             await session.rollback()

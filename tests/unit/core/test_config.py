@@ -25,6 +25,9 @@ def test_settings_use_default_values() -> None:
     )
     assert settings.rag_candidate_k == 24
     assert settings.agent_context_max_chars == 12_000
+    assert settings.agent_explicit_memory_max_chars == 3_000
+    assert settings.agent_historical_memory_max_chars == 3_000
+    assert settings.agent_knowledge_max_chars == 4_000
     assert settings.agent_history_max_turns == 6
     assert settings.agent_history_max_chars == 8_000
     assert settings.agent_summary_max_chars == 2_000
@@ -50,6 +53,9 @@ def test_settings_reject_invalid_context_budget(
         ("AGENT_HISTORY_MAX_TURNS", "0"),
         ("AGENT_HISTORY_MAX_CHARS", "999"),
         ("AGENT_SUMMARY_MAX_CHARS", "199"),
+        ("AGENT_EXPLICIT_MEMORY_MAX_CHARS", "199"),
+        ("AGENT_HISTORICAL_MEMORY_MAX_CHARS", "199"),
+        ("AGENT_KNOWLEDGE_MAX_CHARS", "199"),
     ),
 )
 def test_settings_reject_invalid_history_window(

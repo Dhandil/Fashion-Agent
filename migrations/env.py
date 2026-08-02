@@ -18,6 +18,9 @@ from app.db.models.outfit import (
 from app.db.models.outfit_feedback import (
     OutfitFeedbackModel,
 )
+from app.db.models.preference_memory import (
+    PreferenceMemoryModel,
+)
 from app.db.models.product import ProductModel
 from app.db.models.style_profile import (
     StyleProfileModel,
@@ -69,6 +72,7 @@ _registered_models = (
     OutfitModel,
     OutfitItemModel,
     OutfitFeedbackModel,
+    PreferenceMemoryModel,
 )
 
 # 所有 SQLAlchemy 模型共享同一个 Base.metadata

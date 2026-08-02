@@ -6,6 +6,8 @@ from app.api.exception_handlers import (
     outfit_not_found_handler,
     outfit_recommendation_not_found_handler,
     preference_candidate_unavailable_handler,
+    preference_memory_not_found_handler,
+    preference_memory_update_conflict_handler,
     style_profile_update_conflict_handler,
     wardrobe_item_not_found_handler,
 )
@@ -20,6 +22,8 @@ from app.core.exceptions import (
     OutfitNotFoundError,
     OutfitRecommendationNotFoundError,
     PreferenceCandidateUnavailableError,
+    PreferenceMemoryNotFoundError,
+    PreferenceMemoryUpdateConflictError,
     StyleProfileUpdateConflictError,
     WardrobeItemNotFoundError,
 )
@@ -70,6 +74,14 @@ def create_app() -> FastAPI:
     application.add_exception_handler(
         PreferenceCandidateUnavailableError,
         preference_candidate_unavailable_handler,
+    )
+    application.add_exception_handler(
+        PreferenceMemoryNotFoundError,
+        preference_memory_not_found_handler,
+    )
+    application.add_exception_handler(
+        PreferenceMemoryUpdateConflictError,
+        preference_memory_update_conflict_handler,
     )
     application.add_exception_handler(
         StyleProfileUpdateConflictError,

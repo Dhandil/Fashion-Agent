@@ -22,7 +22,10 @@ from app.agents.schemas.requirements import (
     ShoppingIntent,
 )
 from app.agents.state.shopping import ShoppingAgentState
-from app.core.observability import log_event
+from app.core.observability import (
+    log_event,
+    observe_operation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,12 @@ _SHOPPING_NEGATIONS = (
     "不要买",
     "无需购买",
     "不需要购买",
+    "不查商品",
+    "不用查商品",
+    "不要查商品",
+    "无需查商品",
+    "不需要查商品",
+    "别查商品",
 )
 _WARDROBE_TERMS = (
     "衣橱",
@@ -77,6 +86,12 @@ _OUTFIT_SCENARIO_TERMS = (
     "日常",
     "上课",
     "校园",
+)
+_OUTFIT_REQUEST_TERMS = (
+    "搭配",
+    "穿搭",
+    "怎么穿",
+    "服装建议",
 )
 
 
@@ -111,6 +126,14 @@ def _has_outfit_scenario_signal(text: str) -> bool:
     return any(term in text for term in _OUTFIT_SCENARIO_TERMS)
 
 
+def _has_outfit_request_signal(text: str) -> bool:
+    """识别用户正在请求穿搭方案而非商品购买。"""
+
+    return _has_outfit_scenario_signal(text) or any(
+        term in text for term in _OUTFIT_REQUEST_TERMS
+    )
+
+
 def _is_currently_mentioned(
     value: str,
     current_request: str,
@@ -141,8 +164,19 @@ def _fallback_analysis(
     wardrobe_is_explicit = _has_explicit_wardrobe_intent(
         current_request,
     )
+    outfit_is_explicit = _has_outfit_request_signal(
+        current_request,
+    )
     return OutfitRequirementAnalysis(
-        intent=(RequestIntent.SHOPPING if shopping_is_explicit else RequestIntent.OTHER),
+        intent=(
+            RequestIntent.SHOPPING
+            if shopping_is_explicit
+            else (
+                RequestIntent.OUTFIT
+                if outfit_is_explicit
+                else RequestIntent.OTHER
+            )
+        ),
         wardrobe_preferred=wardrobe_is_explicit,
         needs_wardrobe=wardrobe_is_explicit,
         shopping_intent=(ShoppingIntent.EXPLICIT if shopping_is_explicit else ShoppingIntent.NONE),
@@ -163,10 +197,25 @@ def _apply_deterministic_permissions(
     explicit_wardrobe = _has_explicit_wardrobe_intent(
         current_request,
     )
+    wardrobe_required = (
+        explicit_wardrobe
+        or analysis.intent is RequestIntent.OUTFIT_ADJUSTMENT
+    )
+    resolved_intent = analysis.intent
+    if (
+        resolved_intent is RequestIntent.SHOPPING
+        and not explicit_shopping
+    ):
+        resolved_intent = (
+            RequestIntent.OUTFIT
+            if _has_outfit_request_signal(current_request)
+            else RequestIntent.OTHER
+        )
     updates: dict[str, object] = {
+        "intent": resolved_intent,
         "shopping_intent": (ShoppingIntent.EXPLICIT if explicit_shopping else ShoppingIntent.NONE),
-        "needs_wardrobe": (analysis.needs_wardrobe or explicit_wardrobe),
-        "wardrobe_preferred": (analysis.wardrobe_preferred or explicit_wardrobe),
+        "needs_wardrobe": wardrobe_required,
+        "wardrobe_preferred": wardrobe_required,
     }
 
     # 避免项必须能在当前用户文本中核对，不能从摘要或历史消息复制。
@@ -215,6 +264,27 @@ def _apply_deterministic_permissions(
             ),
         },
     )
+
+    # 地点和日期已齐全时，实时天气应由工具查询，不应继续追问用户提供 weather。
+    if (
+        analysis.needs_weather
+        and analysis.location
+        and analysis.target_date
+        and RequirementField.WEATHER in analysis.missing_fields
+    ):
+        remaining_missing_fields = tuple(
+            field
+            for field in analysis.missing_fields
+            if field is not RequirementField.WEATHER
+        )
+        updates.update(
+            {
+                "is_sufficient": (
+                    not remaining_missing_fields
+                ),
+                "missing_fields": remaining_missing_fields,
+            },
+        )
 
     # 全新完整穿搭如果连使用场景都没有，无法判断正式度和功能需求。
     # 局部调整可以沿用 previous_outfit，因此不应用这条规则。
@@ -324,19 +394,24 @@ def create_requirement_analysis_node(
         }
 
         try:
-            raw_analysis = structured_model.invoke(
-                [
-                    SystemMessage(
-                        content=(REQUIREMENT_ANALYSIS_SYSTEM_PROMPT),
-                    ),
-                    HumanMessage(
-                        content=json.dumps(
-                            payload,
-                            ensure_ascii=False,
+            with observe_operation(
+                logger,
+                "agent.llm",
+                purpose="requirement_analysis",
+            ):
+                raw_analysis = structured_model.invoke(
+                    [
+                        SystemMessage(
+                            content=(REQUIREMENT_ANALYSIS_SYSTEM_PROMPT),
                         ),
-                    ),
-                ],
-            )
+                        HumanMessage(
+                            content=json.dumps(
+                                payload,
+                                ensure_ascii=False,
+                            ),
+                        ),
+                    ],
+                )
             analysis = OutfitRequirementAnalysis.model_validate(
                 raw_analysis,
             )

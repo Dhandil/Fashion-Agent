@@ -1,5 +1,4 @@
 import logging
-from time import perf_counter
 from uuid import uuid4
 
 from fastapi import APIRouter
@@ -12,7 +11,11 @@ from app.api.dependencies.identity import (
     CurrentUserDependency,
 )
 from app.api.schemas.chat import ChatRequest, ChatResponse
-from app.core.observability import log_event
+from app.core.observability import (
+    anonymize_identifier,
+    log_event,
+    observe_operation,
+)
 from app.core.request_context import get_request_id
 from app.domain.entities.weather import (
     WeatherContext,
@@ -44,6 +47,12 @@ async def chat(
 
     # 用户 ID 加入 Checkpointer 的线程键，避免不同用户复用会话 ID
     thread_id = f"user:{current_user.user_id}:conversation:{conversation_id}"
+    anonymous_user_id = anonymize_identifier(
+        current_user.user_id,
+    )
+    anonymous_conversation_id = anonymize_identifier(
+        conversation_id,
+    )
 
     weather_context = (
         WeatherContext(
@@ -54,68 +63,67 @@ async def chat(
         else None
     )
 
-    started_at = perf_counter()
     log_event(
         logger,
         "agent.graph.started",
         conversation_is_new=request.conversation_id is None,
         has_weather=weather_context is not None,
+        anonymous_user_id=anonymous_user_id,
+        anonymous_conversation_id=(anonymous_conversation_id),
     )
 
     # 将 API 请求转换为 LangChain 消息并执行工作流
-    result = await graph.ainvoke(
-        {
-            "messages": [
-                HumanMessage(content=request.message),
-            ],
-            # 每轮都明确写入天气；None 会清除 Checkpointer 中的过期天气
-            "weather_context": weather_context,
-        },
-        config={
-            "configurable": {
-                "thread_id": thread_id,
+    with observe_operation(
+        logger,
+        "agent.graph",
+        anonymous_user_id=anonymous_user_id,
+        anonymous_conversation_id=(anonymous_conversation_id),
+    ) as graph_observation:
+        result = await graph.ainvoke(
+            {
+                "messages": [
+                    HumanMessage(content=request.message),
+                ],
+                # 每轮都明确写入天气；None 会清除 Checkpointer 中的过期天气
+                "weather_context": weather_context,
             },
-            # metadata 可被 LangGraph/LangSmith 等后续观测后端直接读取
-            "metadata": {
-                "request_id": get_request_id(),
+            config={
+                "configurable": {
+                    "thread_id": thread_id,
+                },
+                # metadata 可被 LangGraph/LangSmith 等后续观测后端直接读取
+                "metadata": {
+                    "request_id": get_request_id(),
+                },
             },
-        },
-    )
+        )
+        # 在计时结束前补充不含用户正文的业务结果。
+        knowledge_sources = result.get(
+            "knowledge_sources",
+            [],
+        )
+        outfit_recommendation = result.get(
+            "outfit_recommendation",
+        )
+        outfit_gap_report = result.get(
+            "outfit_gap_report",
+        )
+        feasibility_report = result.get(
+            "outfit_feasibility_report",
+        )
+        graph_observation.add_fields(
+            source_count=len(knowledge_sources),
+            has_outfit=(outfit_recommendation is not None),
+            has_outfit_gap=(outfit_gap_report is not None),
+            outfit_issue_count=(
+                len(feasibility_report.issues)
+                if feasibility_report is not None
+                else 0
+            ),
+        )
 
     # 读取工作流最终状态中的最后一条消息
     last_message = result["messages"][-1]
-
-    # 读取 RAG Node 保存的知识来源
-    knowledge_sources = result.get(
-        "knowledge_sources",
-        [],
-    )
-
-    # 普通知识问答可能没有结构化穿搭推荐
-    outfit_recommendation = result.get(
-        "outfit_recommendation",
-    )
-    outfit_gap_report = result.get(
-        "outfit_gap_report",
-    )
-    feasibility_report = result.get(
-        "outfit_feasibility_report",
-    )
-
-    log_event(
-        logger,
-        "agent.graph.completed",
-        duration_ms=round(
-            (perf_counter() - started_at) * 1000,
-            2,
-        ),
-        source_count=len(knowledge_sources),
-        has_outfit=outfit_recommendation is not None,
-        has_outfit_gap=outfit_gap_report is not None,
-        outfit_issue_count=(
-            len(feasibility_report.issues) if feasibility_report is not None else 0
-        ),
-    )
 
     # 将 Agent 消息转换成 API 响应
     return ChatResponse(

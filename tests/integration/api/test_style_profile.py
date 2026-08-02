@@ -1,5 +1,6 @@
 """用户长期穿搭档案 API 测试。"""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import (
     AsyncMock,
     Mock,
@@ -22,10 +23,22 @@ from app.domain.entities.outfit_feedback import (
     OutfitFeedback,
     OutfitFeedbackSentiment,
 )
+from app.domain.entities.preference_candidate import (
+    PreferenceCandidateCategory,
+    PreferenceDirection,
+    create_preference_candidate_id,
+)
+from app.domain.entities.preference_memory import (
+    PreferenceMemory,
+    PreferenceMemorySource,
+)
 from app.domain.entities.style_profile import StyleProfile
 from app.domain.repositories.outfit import OutfitRepository
 from app.domain.repositories.outfit_feedback import (
     OutfitFeedbackRepository,
+)
+from app.domain.repositories.preference_memory import (
+    PreferenceMemoryRepository,
 )
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
@@ -50,10 +63,310 @@ def create_repositories(
 
     return FashionRepositories(
         style_profiles=repository,
+        preference_memories=AsyncMock(
+            spec=PreferenceMemoryRepository,
+        ),
         wardrobe=Mock(),
         outfits=Mock(),
         outfit_feedback=Mock(),
     )
+
+
+def create_preference_memory() -> PreferenceMemory:
+    """创建长期偏好 API 测试记录。"""
+
+    confirmed_at = datetime(
+        2026,
+        8,
+        2,
+        10,
+        tzinfo=UTC,
+    )
+    return PreferenceMemory(
+        preference_memory_id=(
+            "pm_0123456789abcdef0123456789abcdef"
+        ),
+        user_id="user-001",
+        category=PreferenceCandidateCategory.STYLE,
+        value="休闲",
+        direction=PreferenceDirection.PREFER,
+        source=(
+            PreferenceMemorySource.OUTFIT_FEEDBACK_CONFIRMATION
+        ),
+        source_reference_ids=("outfit-001",),
+        confirmed_at=confirmed_at,
+        last_confirmed_at=confirmed_at,
+    )
+
+
+def test_delete_style_profile_is_idempotent() -> None:
+    """验证删除长期档案返回 204，且不存在时不泄露状态差异。"""
+
+    repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    repository.delete_by_user_id.return_value = False
+    repositories = create_repositories(repository)
+
+    async def override_repositories() -> FashionRepositories:
+        """提供当前用户没有持久化档案的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[get_settings] = (
+        override_settings
+    )
+    application.dependency_overrides[get_fashion_repositories] = (
+        override_repositories
+    )
+    client = TestClient(application)
+
+    try:
+        response = client.delete(
+            "/api/v1/style-profile",
+            headers={"X-User-ID": "user-001"},
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    assert response.content == b""
+    repository.delete_by_user_id.assert_awaited_once_with(
+        "user-001",
+    )
+
+
+def test_get_preference_memories_returns_audit_without_user_id() -> None:
+    """验证用户能查看来源和确认时间，但响应不暴露内部用户 ID。"""
+
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    confirmed_at = datetime(
+        2026,
+        8,
+        2,
+        10,
+        tzinfo=UTC,
+    )
+    memory_repository.list_by_user_id.return_value = (
+        PreferenceMemory(
+            preference_memory_id=(
+                "pm_0123456789abcdef0123456789abcdef"
+            ),
+            user_id="user-001",
+            category=PreferenceCandidateCategory.STYLE,
+            value="休闲",
+            direction=PreferenceDirection.PREFER,
+            source=(
+                PreferenceMemorySource.OUTFIT_FEEDBACK_CONFIRMATION
+            ),
+            source_reference_ids=(
+                "outfit-001",
+                "outfit-002",
+            ),
+            confirmed_at=confirmed_at,
+            last_confirmed_at=confirmed_at,
+        ),
+    )
+    repositories = FashionRepositories(
+        style_profiles=style_repository,
+        preference_memories=memory_repository,
+        wardrobe=Mock(),
+        outfits=Mock(),
+        outfit_feedback=Mock(),
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供固定的长期偏好审计记录。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[
+        get_settings
+    ] = override_settings
+    application.dependency_overrides[
+        get_fashion_repositories
+    ] = override_repositories
+    client = TestClient(application)
+
+    try:
+        response = client.get(
+            "/api/v1/style-profile/memories",
+            headers={"X-User-ID": "user-001"},
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["include_expired"] is False
+    assert body["items"][0]["source"] == (
+        "outfit_feedback_confirmation"
+    )
+    assert body["items"][0]["source_reference_ids"] == [
+        "outfit-001",
+        "outfit-002",
+    ]
+    assert "user_id" not in body["items"][0]
+
+
+def test_patch_preference_memory_expiry() -> None:
+    """验证用户可以设置长期偏好的过期时间。"""
+
+    memory = create_preference_memory()
+    expires_at = memory.last_confirmed_at + timedelta(days=30)
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    memory_repository.get_by_id.return_value = memory
+    memory_repository.save.side_effect = lambda item: item
+    repositories = FashionRepositories(
+        style_profiles=style_repository,
+        preference_memories=memory_repository,
+        wardrobe=Mock(),
+        outfits=Mock(),
+        outfit_feedback=Mock(),
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供固定的长期偏好记录。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[get_settings] = (
+        override_settings
+    )
+    application.dependency_overrides[get_fashion_repositories] = (
+        override_repositories
+    )
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/style-profile/memories/"
+            f"{memory.preference_memory_id}",
+            headers={"X-User-ID": "user-001"},
+            json={"expires_at": expires_at.isoformat()},
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["expires_at"] == (
+        expires_at.isoformat().replace("+00:00", "Z")
+    )
+
+
+def test_patch_missing_preference_memory_returns_404() -> None:
+    """验证不存在或不属于当前用户的记录返回结构化 404。"""
+
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    memory_repository.get_by_id.return_value = None
+    repositories = FashionRepositories(
+        style_profiles=style_repository,
+        preference_memories=memory_repository,
+        wardrobe=Mock(),
+        outfits=Mock(),
+        outfit_feedback=Mock(),
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供不存在偏好记录的假仓库。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[get_settings] = (
+        override_settings
+    )
+    application.dependency_overrides[get_fashion_repositories] = (
+        override_repositories
+    )
+    client = TestClient(application)
+
+    try:
+        response = client.patch(
+            "/api/v1/style-profile/memories/"
+            "pm_0123456789abcdef0123456789abcdef",
+            headers={"X-User-ID": "user-001"},
+            json={"expires_at": None},
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert response.json()["code"] == (
+        "preference_memory_not_found"
+    )
+
+
+def test_delete_preference_memory_is_idempotent() -> None:
+    """验证单条删除同步档案且不会暴露记录是否存在。"""
+
+    memory = create_preference_memory()
+    style_repository = AsyncMock(
+        spec=StyleProfileRepository,
+    )
+    style_repository.get_by_user_id.return_value = StyleProfile(
+        user_id="user-001",
+        preferred_styles=("休闲",),
+    )
+    style_repository.save.side_effect = lambda profile: profile
+    memory_repository = AsyncMock(
+        spec=PreferenceMemoryRepository,
+    )
+    memory_repository.get_by_id.return_value = memory
+    memory_repository.delete_by_id.return_value = True
+    repositories = FashionRepositories(
+        style_profiles=style_repository,
+        preference_memories=memory_repository,
+        wardrobe=Mock(),
+        outfits=Mock(),
+        outfit_feedback=Mock(),
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        """提供可删除的长期偏好记录。"""
+
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[get_settings] = (
+        override_settings
+    )
+    application.dependency_overrides[get_fashion_repositories] = (
+        override_repositories
+    )
+    client = TestClient(application)
+
+    try:
+        response = client.delete(
+            "/api/v1/style-profile/memories/"
+            f"{memory.preference_memory_id}",
+            headers={"X-User-ID": "user-001"},
+        )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    saved_profile = style_repository.save.await_args.args[0]
+    assert saved_profile.preferred_styles == ()
 
 
 def test_get_style_profile_returns_empty_profile() -> None:
@@ -516,11 +829,13 @@ def test_get_preference_candidates_returns_evidence() -> None:
     ]
     repositories = FashionRepositories(
         style_profiles=style_profile_repository,
+        preference_memories=AsyncMock(
+            spec=PreferenceMemoryRepository,
+        ),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=feedback_repository,
     )
-
     async def override_repositories() -> FashionRepositories:
         """提供候选分析使用的假仓库。"""
 
@@ -552,7 +867,19 @@ def test_get_preference_candidates_returns_evidence() -> None:
     assert response.json() == {
         "items": [
             {
+                "candidate_id": create_preference_candidate_id(
+                    category=(
+                        PreferenceCandidateCategory.STYLE
+                    ),
+                    value="休闲",
+                    direction=PreferenceDirection.PREFER,
+                    evidence_outfit_ids=(
+                        "outfit-001",
+                        "outfit-002",
+                    ),
+                ),
                 "category": "style",
+                "source": "outfit_feedback",
                 "value": "休闲",
                 "direction": "prefer",
                 "evidence_count": 2,
@@ -631,9 +958,16 @@ def test_confirm_preference_candidate_updates_profile() -> None:
     ]
     repositories = FashionRepositories(
         style_profiles=style_profile_repository,
+        preference_memories=(memory_repository := AsyncMock(
+            spec=PreferenceMemoryRepository,
+        )),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=feedback_repository,
+    )
+    memory_repository.get_by_identity.return_value = None
+    memory_repository.save.side_effect = (
+        lambda memory: memory
     )
 
     async def override_repositories() -> FashionRepositories:
@@ -657,6 +991,21 @@ def test_confirm_preference_candidate_updates_profile() -> None:
                 "X-User-ID": "user-001",
             },
             json={
+                "candidate_id": (
+                    create_preference_candidate_id(
+                        category=(
+                            PreferenceCandidateCategory.STYLE
+                        ),
+                        value="休闲",
+                        direction=(
+                            PreferenceDirection.PREFER
+                        ),
+                        evidence_outfit_ids=(
+                            "outfit-001",
+                            "outfit-002",
+                        ),
+                    )
+                ),
                 "category": "style",
                 "value": "休闲",
                 "direction": "prefer",
@@ -690,6 +1039,9 @@ def test_confirm_preference_candidate_rejects_stale_candidate() -> None:
     feedback_repository.search.return_value = []
     repositories = FashionRepositories(
         style_profiles=style_profile_repository,
+        preference_memories=AsyncMock(
+            spec=PreferenceMemoryRepository,
+        ),
         wardrobe=Mock(),
         outfits=outfit_repository,
         outfit_feedback=feedback_repository,
@@ -716,6 +1068,7 @@ def test_confirm_preference_candidate_rejects_stale_candidate() -> None:
                 "X-User-ID": "user-001",
             },
             json={
+                "candidate_id": ("pc_" + "0" * 32),
                 "category": "style",
                 "value": "休闲",
                 "direction": "prefer",
