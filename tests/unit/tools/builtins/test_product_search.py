@@ -1,6 +1,8 @@
-import json, pytest
+import json
 from decimal import Decimal
 from unittest.mock import Mock
+
+import pytest
 
 from app.domain.entities.product import Product
 from app.domain.repositories.product import ProductRepository

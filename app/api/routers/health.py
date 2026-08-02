@@ -1,8 +1,13 @@
 from fastapi import APIRouter
 
-from app.api.schemas.health import HealthResponse
+from app.api.dependencies.database import DatabaseSession
+from app.api.schemas.health import (
+    HealthResponse,
+    ReadinessChecks,
+    ReadinessResponse,
+)
 from app.core.config import get_settings
-
+from app.services.health import ensure_database_ready
 
 # 创建健康检查路由对象
 router = APIRouter(tags=["health"])
@@ -24,4 +29,21 @@ def health_check() -> HealthResponse:
         status="ok",
         app_name=settings.app_name,
         environment=settings.app_env,
+    )
+
+
+@router.get(
+    "/health/ready",
+    response_model=ReadinessResponse,
+    summary="数据库就绪检查",
+)
+async def readiness_check(
+    session: DatabaseSession,
+) -> ReadinessResponse:
+    """确认应用进程和 PostgreSQL 均可处理业务请求。"""
+
+    await ensure_database_ready(session)
+    return ReadinessResponse(
+        status="ready",
+        checks=ReadinessChecks(database="ok"),
     )

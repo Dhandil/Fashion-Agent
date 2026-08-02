@@ -4,7 +4,6 @@ from pydantic import TypeAdapter
 
 from app.domain.entities.product import Product
 
-
 # 创建可重复使用的 Product 列表校验器
 PRODUCT_LIST_ADAPTER = TypeAdapter(
     list[Product],

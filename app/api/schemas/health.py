@@ -12,3 +12,16 @@ class HealthResponse(BaseModel):
 
     # 当前运行环境，例如 development
     environment: str
+
+
+class ReadinessChecks(BaseModel):
+    """当前 readiness 端点覆盖的基础设施状态。"""
+
+    database: str
+
+
+class ReadinessResponse(BaseModel):
+    """应用能够处理持久化业务请求时的响应。"""
+
+    status: str
+    checks: ReadinessChecks

@@ -1,6 +1,6 @@
-import pytest
-
 from decimal import Decimal
+
+import pytest
 
 from app.db.repositories.in_memory_product import (
     InMemoryProductRepository,

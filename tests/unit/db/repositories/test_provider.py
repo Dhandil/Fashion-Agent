@@ -5,6 +5,7 @@ from app.db.repositories.provider import (
     get_product_repository,
 )
 
+
 @pytest.mark.anyio
 async def test_get_product_repository_loads_sample_products() -> None:
     """验证提供者能够加载样例商品并创建仓库。"""

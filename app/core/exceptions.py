@@ -6,6 +6,10 @@ class FashionAgentError(Exception):
     """
 
 
+class ServiceNotReadyError(FashionAgentError):
+    """应用进程存活，但必要基础设施尚不可用。"""
+
+
 class ConfigurationError(FashionAgentError):
     """配置错误。
 

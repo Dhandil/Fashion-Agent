@@ -11,7 +11,6 @@ from app.db.repositories.product_loader import (
 )
 from app.domain.repositories.product import ProductRepository
 
-
 # 根据当前文件的位置，定位项目根目录下的商品数据文件
 PRODUCT_DATA_FILE = (
     Path(__file__).resolve().parents[3]

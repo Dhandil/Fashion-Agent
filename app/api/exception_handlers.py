@@ -23,6 +23,22 @@ async def configuration_error_handler(
     )
 
 
+async def service_not_ready_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将基础设施未就绪转换成不泄露连接详情的 503。"""
+
+    error_response = ErrorResponse(
+        code="service_not_ready",
+        message=str(exc),
+    )
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=error_response.model_dump(),
+    )
+
+
 async def outfit_recommendation_not_found_handler(
     _request: Request,
     exc: Exception,

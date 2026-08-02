@@ -890,6 +890,26 @@ Chroma
 
 测试默认不调用真实付费模型和生产外部服务，除非明确标记为手动或端到端测试。
 
+提交前统一运行 `python -m scripts.check_quality`。该命令检查受保护路径、Git
+空白错误、全仓 Ruff、mypy 和默认测试。Docker 中的 PostgreSQL 可用时运行
+`python -m scripts.check_quality --postgres`，额外验证 Alembic 模型一致性和
+真实 Repository 往返。质量门为跨平台 Python 脚本，不依赖 PowerShell 或 Bash。
+
+`python -m scripts.smoke_api` 用于对已启动服务进行只读冒烟检查。它不调用 LLM、
+不触发知识索引，也不创建、修改或删除用户数据；所有需要身份的 GET 请求使用
+独立开发身份，验证健康、数据库就绪、档案、偏好记忆、衣橱和 Outfit 列表的
+最小响应契约。
+
+容器探针应区分两个端点：
+
+- `GET /api/v1/health` 只证明 FastAPI 进程能够响应，可作为 liveness；
+- `GET /api/v1/health/ready` 使用当前请求 Session 执行只读 `SELECT 1`，确认
+  PostgreSQL 可用后返回 `ready`，可作为 readiness。
+
+数据库不可用时 readiness 返回稳定的 `service_not_ready` 和 HTTP 503，不把
+连接地址、账号、密码或底层驱动异常写入响应。LLM、天气和 Chroma 不属于 API
+接收持久化请求的硬依赖，因此当前不纳入 readiness，避免外部服务波动重启应用。
+
 ---
 
 ## 16. 演进原则

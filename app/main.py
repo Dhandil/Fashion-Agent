@@ -8,6 +8,7 @@ from app.api.exception_handlers import (
     preference_candidate_unavailable_handler,
     preference_memory_not_found_handler,
     preference_memory_update_conflict_handler,
+    service_not_ready_handler,
     style_profile_update_conflict_handler,
     wardrobe_item_not_found_handler,
 )
@@ -24,6 +25,7 @@ from app.core.exceptions import (
     PreferenceCandidateUnavailableError,
     PreferenceMemoryNotFoundError,
     PreferenceMemoryUpdateConflictError,
+    ServiceNotReadyError,
     StyleProfileUpdateConflictError,
     WardrobeItemNotFoundError,
 )
@@ -55,6 +57,10 @@ def create_app() -> FastAPI:
     application.add_exception_handler(
         ConfigurationError,
         configuration_error_handler,
+    )
+    application.add_exception_handler(
+        ServiceNotReadyError,
+        service_not_ready_handler,
     )
 
     # 为所有 HTTP 请求生成或传播可跨日志关联的 request_id

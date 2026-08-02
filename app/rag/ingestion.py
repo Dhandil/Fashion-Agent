@@ -1,5 +1,5 @@
-from pathlib import Path
 from hashlib import sha256
+from pathlib import Path
 
 from langchain_core.vectorstores import VectorStore
 from langchain_text_splitters.base import TextSplitter
