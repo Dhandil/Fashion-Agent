@@ -7,7 +7,10 @@ from app.api.schemas.health import (
     ReadinessResponse,
 )
 from app.core.config import get_settings
-from app.services.health import ensure_database_ready
+from app.services.health import (
+    ensure_database_ready,
+    ensure_short_term_memory_ready,
+)
 
 # 创建健康检查路由对象
 router = APIRouter(tags=["health"])
@@ -40,10 +43,14 @@ def health_check() -> HealthResponse:
 async def readiness_check(
     session: DatabaseSession,
 ) -> ReadinessResponse:
-    """确认应用进程和 PostgreSQL 均可处理业务请求。"""
+    """确认 PostgreSQL 和短期记忆均可处理业务请求。"""
 
     await ensure_database_ready(session)
+    memory_status = await ensure_short_term_memory_ready()
     return ReadinessResponse(
         status="ready",
-        checks=ReadinessChecks(database="ok"),
+        checks=ReadinessChecks(
+            database="ok",
+            short_term_memory=memory_status,
+        ),
     )

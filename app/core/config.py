@@ -35,6 +35,22 @@ class Settings(BaseSettings):
     # 是否输出 SQLAlchemy 执行的 SQL，生产环境应保持关闭
     database_echo: bool = False
 
+    # LangGraph 短期记忆后端：本地测试默认使用进程内存
+    short_term_memory_backend: Literal[
+        "memory",
+        "redis",
+    ] = "memory"
+
+    # Redis Checkpointer 连接地址；使用 SecretStr 避免密码进入日志
+    redis_url: SecretStr | None = None
+
+    # Redis 会话在无活动后保留 7 天，读取会刷新过期时间
+    redis_checkpoint_ttl_minutes: int = Field(
+        default=10_080,
+        ge=1,
+        le=525_600,
+    )
+
     # OpenAI 兼容接口的基础地址
     llm_base_url: str | None = None
 

@@ -290,6 +290,63 @@ def test_chat_generates_conversation_id() -> None:
     )
 
 
+def test_delete_conversation_removes_current_user_state() -> None:
+    """验证用户可以幂等删除自己的短期会话状态。"""
+
+    delete_state = AsyncMock()
+
+    with patch(
+        "app.api.routers.chat.delete_conversation_state",
+        delete_state,
+    ):
+        response = client.delete(
+            "/api/v1/chat/conversation-001",
+            headers={"X-User-ID": "user-001"},
+        )
+
+    assert response.status_code == 204
+    assert response.content == b""
+    delete_state.assert_awaited_once_with(
+        user_id="user-001",
+        conversation_id="conversation-001",
+    )
+
+
+def test_delete_conversation_requires_current_user() -> None:
+    """验证匿名请求不能删除任何短期会话。"""
+
+    delete_state = AsyncMock()
+
+    with patch(
+        "app.api.routers.chat.delete_conversation_state",
+        delete_state,
+    ):
+        response = client.delete(
+            "/api/v1/chat/conversation-001",
+        )
+
+    assert response.status_code == 422
+    delete_state.assert_not_awaited()
+
+
+def test_delete_conversation_rejects_oversized_id() -> None:
+    """验证会话 ID 继续遵守聊天请求中的 100 字符上限。"""
+
+    delete_state = AsyncMock()
+
+    with patch(
+        "app.api.routers.chat.delete_conversation_state",
+        delete_state,
+    ):
+        response = client.delete(
+            f"/api/v1/chat/{'x' * 101}",
+            headers={"X-User-ID": "user-001"},
+        )
+
+    assert response.status_code == 422
+    delete_state.assert_not_awaited()
+
+
 def test_chat_returns_structured_outfit_when_graph_provides_one() -> None:
     """验证聊天接口能够返回 Graph 生成的结构化 Outfit。"""
 

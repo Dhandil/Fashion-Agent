@@ -13,6 +13,7 @@ from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
 from app.domain.repositories.outfit import OutfitRepository
+from app.memory.short_term.thread import build_conversation_thread_id
 
 # 固定命名空间保证同一用户、同一会话重复确认时得到相同 Outfit ID
 OUTFIT_ID_NAMESPACE = UUID(
@@ -69,9 +70,10 @@ async def save_confirmed_outfit(
 ) -> Outfit:
     """读取当前用户会话中的推荐并保存。"""
 
-    # thread_id 规则必须与聊天接口保持一致，且包含 user_id 隔离用户
-    thread_id = (
-        f"user:{user_id}:conversation:{conversation_id}"
+    # 使用统一规则，保证与聊天和会话删除接口读取相同状态
+    thread_id = build_conversation_thread_id(
+        user_id=user_id,
+        conversation_id=conversation_id,
     )
     state_snapshot = await graph.aget_state(
         {

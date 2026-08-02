@@ -47,13 +47,14 @@ PostgreSQL 和基础可观测性等核心链路，并持续通过确定性测试
 python -m scripts.check_quality
 ```
 
-PostgreSQL 容器健康且数据库已经迁移到最新版本时，可以运行完整质量门：
+PostgreSQL 和 Redis 容器健康且数据库已经迁移到最新版本时，可以运行完整质量门：
 
 ```powershell
-python -m scripts.check_quality --postgres
+python -m scripts.check_quality --postgres --redis
 ```
 
-完整模式会额外执行 Alembic 模型一致性检查和真实 PostgreSQL Repository 测试。
+完整模式会额外执行 Alembic 模型一致性、真实 PostgreSQL Repository 测试和
+Redis Checkpointer 跨实例恢复测试。
 脚本会先阻止 `.env`、原始知识文件、Chroma 运行数据或虚拟环境被 Git 跟踪。
 
 应用与 PostgreSQL 已启动时，可以执行不调用模型、不会写入业务数据的 API 冒烟检查：
@@ -64,6 +65,16 @@ python -m scripts.smoke_api
 
 它只使用隔离的开发身份读取进程健康、数据库就绪、Style Profile、偏好记忆、
 衣橱和已保存 Outfit 列表。服务运行在其他地址时可通过 `--base-url` 指定。
+
+需要验证真实 RAG 和 LLM 时，必须显式允许模型调用：
+
+```powershell
+python -m scripts.smoke_agent --allow-model-call
+```
+
+该命令可能下载 Embedding 模型并产生一次模型 API 费用，因此不属于默认质量门。
+首次运行会把模型写入 Docker 的 Hugging Face 缓存卷，可能需要数分钟。请求发出后
+应等待脚本明确成功或失败；中断客户端不保证已经到达服务端的模型调用会同步取消。
 
 ## Docker Compose
 
@@ -79,6 +90,6 @@ docker compose -f deployments/docker/compose.yaml config --quiet
 docker compose -f deployments/docker/compose.yaml up --build -d
 ```
 
-Compose 会先等待 PostgreSQL 健康，再运行一次 Alembic migration，成功后启动 API。
-应用使用非 root 用户；原始知识库以只读方式挂载，Chroma 和 Hugging Face 缓存
-独立持久化，不会被复制进镜像。
+Compose 会等待 PostgreSQL 与 Redis 健康，再运行一次 Alembic migration，成功后
+启动 API。应用使用非 root 用户；原始知识库以只读方式挂载，Chroma、Redis 数据
+和 Hugging Face 缓存独立持久化，不会被复制进镜像。

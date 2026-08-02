@@ -34,6 +34,33 @@ services:
       retries: 10
       start_period: 10s
 
+  redis:
+    # Redis 8 内置 RedisJSON 和 RediSearch，满足 LangGraph Checkpointer 要求
+    image: redis:8-alpine
+    restart: unless-stopped
+
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+      ]
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - fashion_agent_redis_data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   migrate:
     # App 和迁移任务使用同一个不可变镜像，避免代码与表结构版本不一致
     image: fashion-agent-api:local
@@ -82,6 +109,9 @@ services:
       DATABASE_URL: >-
         postgresql+asyncpg://${POSTGRES_USER:-fashion_agent}:${POSTGRES_PASSWORD:-fashion_agent_dev}@postgres:5432/${POSTGRES_DB:-fashion_agent}
       DATABASE_ECHO: "false"
+      SHORT_TERM_MEMORY_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CHECKPOINT_TTL_MINUTES: ${REDIS_CHECKPOINT_TTL_MINUTES:-10080}
       EMBEDDING_DEVICE: cpu
       CHROMA_PERSIST_DIRECTORY: /app/data/chroma
       KNOWLEDGE_REPOSITORY_PATH: /app/data/raw/Fashion-Agent-Knowledge
@@ -110,6 +140,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
@@ -129,3 +161,4 @@ services:
 volumes:
   fashion_agent_postgres_data:
   fashion_agent_huggingface_cache:
+  fashion_agent_redis_data:

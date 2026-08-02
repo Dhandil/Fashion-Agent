@@ -18,6 +18,7 @@ class ReadinessChecks(BaseModel):
     """当前 readiness 端点覆盖的基础设施状态。"""
 
     database: str
+    short_term_memory: str
 
 
 class ReadinessResponse(BaseModel):

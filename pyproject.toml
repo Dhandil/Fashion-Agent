@@ -33,6 +33,12 @@ dependencies = [
     # Agent 状态图和工作流编排框架
     "langgraph>=1.2,<2.0",
 
+    # Redis 短期记忆和 LangGraph Checkpointer
+    "langgraph-checkpoint-redis>=0.5.1,<0.6.0",
+
+    # Redis 异步客户端，也用于 readiness 检查
+    "redis>=7.4,<8.0",
+
     # LangChain 与 Chroma 向量数据库适配器
     "langchain-chroma>=1.1,<2.0",
 

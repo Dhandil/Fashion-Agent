@@ -7,6 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.db.session import close_database_connections
+from app.memory.short_term.checkpointer import (
+    close_short_term_checkpointer,
+    initialize_short_term_checkpointer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +21,13 @@ async def application_lifespan(
 ) -> AsyncIterator[None]:
     """记录进程生命周期，并在退出时释放基础设施资源。"""
 
+    await initialize_short_term_checkpointer()
     logger.info("Fashion-Agent application started")
     try:
         yield
     finally:
-        await close_database_connections()
+        try:
+            await close_short_term_checkpointer()
+        finally:
+            await close_database_connections()
         logger.info("Fashion-Agent application stopped")

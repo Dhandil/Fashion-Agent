@@ -52,12 +52,14 @@ def test_postgres_checks_are_explicitly_opt_in() -> None:
         check.name
         for check in build_quality_checks(
             include_postgres=False,
+            include_redis=False,
         )
     }
     postgres_names = {
         check.name
         for check in build_quality_checks(
             include_postgres=True,
+            include_redis=False,
         )
     }
 
@@ -65,6 +67,28 @@ def test_postgres_checks_are_explicitly_opt_in() -> None:
     assert "PostgreSQL 真实仓库测试" not in default_names
     assert "Alembic 模型一致性检查" in postgres_names
     assert "PostgreSQL 真实仓库测试" in postgres_names
+
+
+def test_redis_checks_are_explicitly_opt_in() -> None:
+    """验证只有显式参数才连接 Redis 运行真实持久化测试。"""
+
+    default_names = {
+        check.name
+        for check in build_quality_checks(
+            include_postgres=False,
+            include_redis=False,
+        )
+    }
+    redis_names = {
+        check.name
+        for check in build_quality_checks(
+            include_postgres=False,
+            include_redis=True,
+        )
+    }
+
+    assert "Redis Checkpointer 持久化测试" not in default_names
+    assert "Redis Checkpointer 持久化测试" in redis_names
 
 
 def test_configure_utf8_output_is_safe_under_pytest() -> None:

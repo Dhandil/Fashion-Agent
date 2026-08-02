@@ -99,8 +99,9 @@ def read_tracked_paths() -> tuple[str, ...]:
 def build_quality_checks(
     *,
     include_postgres: bool,
+    include_redis: bool = False,
 ) -> tuple[QualityCheck, ...]:
-    """根据是否启用 PostgreSQL 组合质量检查。"""
+    """根据是否启用真实基础设施组合质量检查。"""
 
     python = sys.executable
     checks: list[QualityCheck] = [
@@ -158,6 +159,28 @@ def build_quality_checks(
             ),
         )
 
+    if include_redis:
+        checks.append(
+            QualityCheck(
+                name="Redis Checkpointer 持久化测试",
+                command=(
+                    python,
+                    "-m",
+                    "pytest",
+                    "tests/integration/memory",
+                    "-q",
+                ),
+                environment={
+                    "DEBUG": "false",
+                    "RUN_REDIS_TESTS": "true",
+                    "REDIS_URL": os.getenv(
+                        "REDIS_URL",
+                        "redis://localhost:6379/0",
+                    ),
+                },
+            ),
+        )
+
     return tuple(checks)
 
 
@@ -196,6 +219,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="同时检查 Alembic 并运行真实 PostgreSQL 集成测试。",
     )
+    parser.add_argument(
+        "--redis",
+        action="store_true",
+        help="同时运行真实 Redis Checkpointer 持久化测试。",
+    )
     return parser.parse_args()
 
 
@@ -219,6 +247,7 @@ def main() -> int:
         check.name
         for check in build_quality_checks(
             include_postgres=args.postgres,
+            include_redis=args.redis,
         )
         if not run_check(check)
     )

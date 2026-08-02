@@ -10,14 +10,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 先复制依赖声明和应用包，使业务外文件变化不会破坏依赖安装缓存。
-COPY pyproject.toml README.md ./
-COPY app ./app
-
-# RAG 当前固定使用 CPU；先安装 CPU 版 PyTorch，避免拉取体积巨大的 CUDA 运行库。
+# RAG 当前固定使用 CPU。该层不依赖项目文件，配置或业务代码变化不会重复下载。
 ARG PYTORCH_CPU_INDEX_URL=https://download.pytorch.org/whl/cpu
-RUN python -m pip install "torch>=2.2,<3.0" --index-url "${PYTORCH_CPU_INDEX_URL}" \
-    && python -m pip install .
+RUN python -m pip install "torch>=2.2,<3.0" --index-url "${PYTORCH_CPU_INDEX_URL}"
+
+# 使用当前 pip 解析现代包索引；缓存挂载只存在于 BuildKit，不进入最终镜像。
+RUN --mount=type=cache,target=/root/.cache/pip \
+    PIP_NO_CACHE_DIR=0 python -m pip install "pip>=26.1,<27.0"
+
+# 依赖层只由项目声明决定；普通业务代码变化不会重新安装第三方包。
+COPY pyproject.toml README.md ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    PIP_NO_CACHE_DIR=0 python -c "import subprocess, tomllib; dependencies = tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']; subprocess.check_call(['python', '-m', 'pip', 'install', *dependencies])"
+
+# 最后复制应用并以无依赖模式安装本地包，最大化前面依赖层的缓存复用。
+COPY app ./app
+RUN python -m pip install . --no-deps
 
 # Alembic 迁移和内存商品样例是运行时需要的非包资源。
 COPY alembic.ini ./

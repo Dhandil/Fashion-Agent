@@ -47,7 +47,7 @@ LangGraph Fashion Agent
 Fashion-Agent 可以读取和组合多个来源的信息，但必须保持来源边界：
 
 - 用户档案和衣橱来自 PostgreSQL。
-- 当前对话状态来自 Memory，生产环境目标为 Redis。
+- 当前对话状态来自 Memory；本机默认内存，Compose 使用 Redis。
 - 服装通用知识来自 Chroma。
 - 具体商品、价格和库存来自商品工具或授权外部服务。
 - 天气等动态信息来自对应 API 或 MCP 工具。
@@ -715,15 +715,23 @@ RAG 结果只能作为参考知识。具体用户数据以 PostgreSQL 为准，�
 
 ### 11.1 短期 Memory
 
-当前开发环境使用 LangGraph `InMemorySaver`。
-
-生产目标是 Redis Checkpointer，并支持：
+短期记忆后端通过配置选择：本机默认使用 LangGraph `InMemorySaver`，Compose
+默认使用异步 Redis Checkpointer。Redis 实现支持：
 
 - `conversation_id` 与 `thread_id` 映射
 - 会话 TTL
 - 多实例共享
 - 服务重启后恢复
 - 会话隔离
+
+Redis Checkpointer 在应用 lifespan 启动阶段创建索引，关闭阶段释放异步连接池。
+会话默认在 7 天无活动后过期，读取会刷新 TTL；Redis 配置缺失或连接失败时不
+静默回退内存，避免多实例部署在未告警的情况下丢失会话连续性。
+
+聊天、Outfit 确认和会话删除统一使用
+`user:{user_id}:conversation:{conversation_id}` 作为线程键。用户通过
+`DELETE /api/v1/chat/{conversation_id}` 幂等结束会话；服务端只删除包含当前
+用户 ID 的线程，避免不同用户使用相同会话 ID 时互相影响。
 
 ### 11.2 长期资料
 
@@ -848,24 +856,27 @@ Fashion-Agent/
 ```text
 Docker Compose
 ├── postgres（持久化 Volume + pg_isready）
+├── redis（Redis 8 + AOF + 持久化 Volume）
 ├── migrate（一次性 alembic upgrade head）
-└── app（非 root FastAPI + PostgreSQL readiness）
+└── app（非 root FastAPI + PostgreSQL/Redis readiness）
     ├── data/raw/Fashion-Agent-Knowledge（只读 Bind Mount）
     ├── data/chroma（可重建的运行时 Bind Mount）
     └── Hugging Face 模型缓存（独立 Volume）
 ```
 
-Compose 只有在 PostgreSQL 健康且 migration 成功退出后才启动 App。停止 App 时，
-FastAPI lifespan 会释放 SQLAlchemy Engine 连接池；容器 init 负责转发终止信号。
+Compose 只有在 PostgreSQL、Redis 健康且 migration 成功退出后才启动 App。停止
+App 时，FastAPI lifespan 会释放 Redis Checkpointer 与 SQLAlchemy Engine 连接池；
+容器 init 负责转发终止信号。
 构建上下文通过 `.dockerignore` 排除 `.env`、虚拟环境、知识原文、Chroma 数据、
-模型权重和测试缓存。后续可以增加 Redis、反向代理、监控和任务 Worker，或将
-Chroma 切换为独立服务。
+模型权重和测试缓存。后续可以增加反向代理、监控和任务 Worker，或将 Chroma
+切换为独立服务。
 
 本地 Compose 从受保护 `.env` 注入 LLM 等配置，并用容器网络地址覆盖数据库连接；
 生产环境中的 Secret 不写入镜像、Compose 文件或 Git，应由部署平台注入。
 当前镜像构建显式使用 PyTorch CPU Wheel，与 `EMBEDDING_DEVICE=cpu` 一致，避免
-下载和打包不需要的 CUDA 运行库。首次构建完成后 Docker 会复用依赖层；构建缓存
-属于可回收数据，不应在未确认其他构建需求前自动清理。
+下载和打包不需要的 CUDA 运行库。PyTorch、第三方依赖和本地应用包分为三个构建
+层：业务代码变化只重新安装无依赖的本地包，依赖声明变化也不会使 PyTorch 层
+失效。构建缓存属于可回收数据，不应在未确认其他构建需求前自动清理。
 
 ---
 
@@ -907,6 +918,12 @@ Chroma 切换为独立服务。
 不触发知识索引，也不创建、修改或删除用户数据；所有需要身份的 GET 请求使用
 独立开发身份，验证健康、数据库就绪、档案、偏好记忆、衣橱和 Outfit 列表的
 最小响应契约。
+
+`python -m scripts.smoke_agent --allow-model-call` 是显式授权的真实链路检查。它
+调用一次聊天 API，要求返回非空回答、会话 ID 和至少一个 RAG 来源，并只输出
+安全摘要与来源，不输出完整模型回答。该检查会加载 Embedding、读取 Chroma 并
+调用付费聊天模型，因此不属于默认质量门。Docker 环境把 Hugging Face 缓存放在
+命名卷中，首次下载完成后可跨容器重启复用。
 
 容器探针应区分两个端点：
 

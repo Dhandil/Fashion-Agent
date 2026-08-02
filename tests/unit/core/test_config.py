@@ -17,6 +17,9 @@ def test_settings_use_default_values() -> None:
     assert settings.app_port == 8000
     assert settings.debug is False
     assert settings.log_level == "INFO"
+    assert settings.short_term_memory_backend == "memory"
+    assert settings.redis_url is None
+    assert settings.redis_checkpoint_ttl_minutes == 10_080
     assert settings.weather_provider_backend == "disabled"
     assert settings.weather_timeout_seconds == 10.0
     assert settings.knowledge_repository_path == ("./data/raw/Fashion-Agent-Knowledge")
@@ -140,6 +143,49 @@ def test_settings_read_database_environment_variables(
 
     # Pydantic 应将字符串 true 转换为布尔值
     assert settings.database_echo is True
+
+
+def test_settings_read_redis_environment_variables(
+    monkeypatch,
+) -> None:
+    """验证 Redis 短期记忆配置可以从环境变量读取。"""
+
+    monkeypatch.setenv("SHORT_TERM_MEMORY_BACKEND", "redis")
+    monkeypatch.setenv(
+        "REDIS_URL",
+        "redis://:test-secret@localhost:6379/0",
+    )
+    monkeypatch.setenv("REDIS_CHECKPOINT_TTL_MINUTES", "60")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.short_term_memory_backend == "redis"
+    assert settings.redis_url is not None
+    assert settings.redis_url.get_secret_value() == (
+        "redis://:test-secret@localhost:6379/0"
+    )
+    assert "test-secret" not in str(settings.redis_url)
+    assert settings.redis_checkpoint_ttl_minutes == 60
+
+
+@pytest.mark.parametrize(
+    ("variable_name", "value"),
+    (
+        ("SHORT_TERM_MEMORY_BACKEND", "filesystem"),
+        ("REDIS_CHECKPOINT_TTL_MINUTES", "0"),
+    ),
+)
+def test_settings_reject_invalid_short_term_memory_config(
+    monkeypatch,
+    variable_name: str,
+    value: str,
+) -> None:
+    """验证无效短期记忆后端和 TTL 会被配置模型拒绝。"""
+
+    monkeypatch.setenv(variable_name, value)
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
 
 
 def test_settings_reject_invalid_repository_backend(

@@ -32,7 +32,7 @@ READ_ONLY_CHECKS = (
         authenticated=False,
     ),
     SmokeCheck(
-        name="数据库就绪检查",
+        name="基础设施就绪检查",
         path="/api/v1/health/ready",
         required_keys=("status", "checks"),
         authenticated=False,
@@ -90,11 +90,16 @@ def validate_payload(
         )
     if check.path == "/api/v1/health" and payload["status"] != "ok":
         raise SmokeCheckError("健康检查状态不是 ok")
-    if check.path == "/api/v1/health/ready" and (
-        payload["status"] != "ready"
-        or payload["checks"] != {"database": "ok"}
-    ):
-        raise SmokeCheckError("数据库就绪检查状态异常")
+    if check.path == "/api/v1/health/ready":
+        checks = payload["checks"]
+        if (
+            payload["status"] != "ready"
+            or not isinstance(checks, dict)
+            or checks.get("database") != "ok"
+            or checks.get("short_term_memory")
+            not in {"memory", "ok"}
+        ):
+            raise SmokeCheckError("基础设施就绪检查状态异常")
 
 
 def run_smoke_checks(

@@ -60,7 +60,10 @@ def test_readiness_check_returns_database_status() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ready",
-        "checks": {"database": "ok"},
+        "checks": {
+            "database": "ok",
+            "short_term_memory": "memory",
+        },
     }
 
 

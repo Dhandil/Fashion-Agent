@@ -1,7 +1,8 @@
 import logging
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Path, Response
 from langchain_core.messages import HumanMessage
 
 from app.api.dependencies.agent import (
@@ -21,6 +22,8 @@ from app.domain.entities.weather import (
     WeatherContext,
     WeatherDataSource,
 )
+from app.memory.short_term.thread import build_conversation_thread_id
+from app.services.conversation import delete_conversation_state
 
 # 创建聊天接口路由
 router = APIRouter(
@@ -46,7 +49,10 @@ async def chat(
     conversation_id = request.conversation_id or str(uuid4())
 
     # 用户 ID 加入 Checkpointer 的线程键，避免不同用户复用会话 ID
-    thread_id = f"user:{current_user.user_id}:conversation:{conversation_id}"
+    thread_id = build_conversation_thread_id(
+        user_id=current_user.user_id,
+        conversation_id=conversation_id,
+    )
     anonymous_user_id = anonymize_identifier(
         current_user.user_id,
     )
@@ -134,3 +140,34 @@ async def chat(
         sources=knowledge_sources,
         outfit_issues=(list(feasibility_report.issues) if feasibility_report is not None else []),
     )
+
+
+@router.delete(
+    "/{conversation_id}",
+    status_code=204,
+    summary="结束并删除当前用户的短期会话",
+)
+async def delete_conversation(
+    conversation_id: Annotated[
+        str,
+        Path(min_length=1, max_length=100),
+    ],
+    current_user: CurrentUserDependency,
+) -> Response:
+    """幂等删除当前用户在 Checkpointer 中的完整会话状态。"""
+
+    await delete_conversation_state(
+        user_id=current_user.user_id,
+        conversation_id=conversation_id,
+    )
+    log_event(
+        logger,
+        "agent.conversation.deleted",
+        anonymous_user_id=anonymize_identifier(
+            current_user.user_id,
+        ),
+        anonymous_conversation_id=anonymize_identifier(
+            conversation_id,
+        ),
+    )
+    return Response(status_code=204)

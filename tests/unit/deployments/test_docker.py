@@ -36,6 +36,9 @@ def test_compose_separates_migration_and_app() -> None:
     assert app["depends_on"]["postgres"]["condition"] == (
         "service_healthy"
     )
+    assert app["depends_on"]["redis"]["condition"] == (
+        "service_healthy"
+    )
 
 
 def test_compose_preserves_data_boundaries() -> None:
@@ -73,6 +76,24 @@ def test_compose_uses_database_readiness() -> None:
     assert "/api/v1/health/ready" in health_command
 
 
+def test_compose_provides_persistent_redis_8() -> None:
+    """验证短期记忆使用具备必要模块的持久化 Redis 8。"""
+
+    compose = load_compose()
+    services = compose["services"]
+    volumes = compose["volumes"]
+    assert isinstance(services, dict)
+    assert isinstance(volumes, dict)
+
+    redis = services["redis"]
+    app = services["app"]
+    assert redis["image"].startswith("redis:8")
+    assert "fashion_agent_redis_data:/data" in redis["volumes"]
+    assert "fashion_agent_redis_data" in volumes
+    assert app["environment"]["SHORT_TERM_MEMORY_BACKEND"] == "redis"
+    assert app["environment"]["REDIS_URL"] == "redis://redis:6379/0"
+
+
 def test_dockerfile_runs_as_non_root_python_311() -> None:
     """验证运行镜像版本、用户和复制边界。"""
 
@@ -84,8 +105,19 @@ def test_dockerfile_runs_as_non_root_python_311() -> None:
     assert "download.pytorch.org/whl/cpu" in dockerfile
     assert "PIP_DEFAULT_TIMEOUT=600" in dockerfile
     assert "PIP_RETRIES=10" in dockerfile
+    assert "PIP_NO_CACHE_DIR=0" in dockerfile
+    assert "--mount=type=cache,target=/root/.cache/pip" in dockerfile
+    assert "python -m pip install . --no-deps" in dockerfile
     assert "COPY ." not in dockerfile
     assert "EXPOSE 8000" in dockerfile
+
+    # 大体积 PyTorch 层必须位于项目文件 COPY 之前，避免代码变化重复下载
+    assert dockerfile.index("torch>=2.2,<3.0") < dockerfile.index(
+        "COPY pyproject.toml README.md ./"
+    )
+    assert dockerfile.index("COPY pyproject.toml README.md ./") < (
+        dockerfile.index("COPY app ./app")
+    )
 
 
 def test_dockerignore_excludes_secrets_and_runtime_data() -> None:

@@ -46,7 +46,10 @@ def test_run_smoke_checks_uses_only_get_and_scopes_user() -> None:
         elif request.url.path == "/api/v1/health/ready":
             payload = {
                 "status": "ready",
-                "checks": {"database": "ok"},
+                "checks": {
+                    "database": "ok",
+                    "short_term_memory": "memory",
+                },
             }
         elif request.url.path == "/api/v1/style-profile":
             payload = {

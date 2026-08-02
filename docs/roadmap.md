@@ -380,14 +380,14 @@ Tool。
 
 #### 5.4.2 短期记忆
 
-当前 `InMemorySaver` 继续用于本地开发。生产目标是可配置的异步 Redis
+本地开发继续默认使用 `InMemorySaver`，Compose 已使用可配置的异步 Redis
 Checkpointer：
 
 ```text
 development
 → InMemorySaver
 
-production
+compose / production
 → Redis Checkpointer
 ```
 
@@ -402,14 +402,15 @@ production
 
 - `user_id + conversation_id` 会话隔离
 - [已完成] 模型输入侧限制最近完整消息轮数和历史字符量
-- 最后活动时间和自动刷新 TTL
+- [已完成] 7 天无活动 TTL，并在读取会话时自动刷新
 - 最大消息数、最大状态大小和检查点数量限制
-- 查询、删除和显式结束会话
+- [已完成] 使用用户隔离的幂等 DELETE API 显式结束并删除会话
 - 用户删除账户时清理会话数据
-- 多 API 实例共享
-- Redis 不可用时的明确降级和健康检查
+- [已完成] 使用 Redis 8 持久化 Volume 支持多 API 实例共享和进程重启恢复
+- [已完成] Redis 不可用时明确失败，并纳入 readiness，不静默降级到内存
+- [已完成] 增加真实跨 Saver 实例恢复、测试会话删除和可选质量门
 
-Redis Checkpointer 需要增加依赖和 Docker 服务，实施前必须经过用户同意。
+后续继续补充会话查询、账户删除联动和检查点数量治理。
 
 #### 5.4.3 长期记忆
 
@@ -493,7 +494,7 @@ Style Profile 或衣橱隐私数据。需要定义脱敏、采样、保留和用
 4. [已完成] 使用统一操作计时记录 Graph、LLM、RAG、Tool 和天气 Provider 的
    成功耗时、失败类型及非敏感结果数量；可用时记录 LLM Token 用量。
 5. [已完成] 使用进程级随机 HMAC 对用户和会话 ID 匿名化，避免日志保存原始标识。
-6. 经用户同意后接入 Redis Checkpointer、TTL 和会话生命周期。
+6. [已完成] 接入 Redis Checkpointer、TTL、readiness 和显式会话删除生命周期。
 7. 经用户同意后使用 OpenTelemetry，并把 LangSmith 保持为可选开发工具。
 
 ### 5.5 已完成第一版：结构化需求分析
@@ -645,7 +646,7 @@ Fashion-Agent 不负责下单、支付、物流和售后。
 核心单 Agent 产品闭环稳定后，再完善：
 
 - JWT 或 OAuth 真实身份认证
-- [已完成 API + PostgreSQL] 完整 Docker Compose；Redis 在短期记忆阶段加入
+- [已完成 API + PostgreSQL + Redis] 完整 Docker Compose 与持久化 Volume
 - Redis 高可用、容量、备份和故障恢复
 - OpenTelemetry Collector 与生产观测后端
 - 限流、超时、重试和熔断
@@ -738,6 +739,10 @@ Docker 部署进度：
 - [已完成] 独立挂载只读知识、Chroma 数据和 Hugging Face 模型缓存
 - [已完成] 使用 CPU 版 PyTorch 构建完整镜像，migration 正常退出、App healthy，
   容器内运行身份、CPU 运行时、6 项 API 冒烟和优雅关闭均已真实验证
+- [已完成] 增加必须显式授权的真实 Agent 冒烟脚本及无网络契约测试；容器内已完成
+  BGE、正式 Chroma 与 DeepSeek 端到端验证，返回 3 个带稳定 fragment_id 的来源
+- [已完成] 首次运行生成约 93 MB Hugging Face 模型缓存，后续容器重启复用命名卷；
+  真实模型冒烟不进入默认质量门，避免日常测试产生网络依赖和 API 费用
 
 需求分析评测的第一批基础设施已完成：
 
