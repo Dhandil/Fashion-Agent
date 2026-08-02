@@ -18,6 +18,13 @@ from app.agents.nodes.generate_outfit import (
 from app.agents.schemas.outfit import (
     OutfitGenerationResult,
 )
+from app.agents.schemas.requirements import (
+    OutfitRequirementAnalysis,
+    RequestIntent,
+)
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.agents.state.shopping import ShoppingAgentState
 from app.domain.entities.outfit import (
     OutfitItem,
@@ -318,3 +325,188 @@ def test_generate_outfit_discards_invalid_structured_result() -> None:
     assert generate_outfit(state) == {
         "outfit_recommendation": None,
     }
+
+
+def test_generation_context_excludes_unavailable_and_hot_items() -> None:
+    """验证模型看不到未干衣物和高温下的厚重单品。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    structured_model.invoke.return_value = OutfitGenerationResult(outfit=None)
+    messages = [
+        HumanMessage(content="用我的衣橱搭配高温通勤服装"),
+        ToolMessage(
+            name="search_wardrobe",
+            tool_call_id="wardrobe-filter-call",
+            content=json.dumps(
+                [
+                    {
+                        "wardrobe_item_id": "shirt-ready",
+                        "name": "亚麻衬衫",
+                        "status": "available",
+                    },
+                    {
+                        "wardrobe_item_id": "shirt-drying",
+                        "name": "棉衬衫",
+                        "status": "unavailable",
+                        "notes": "清洗后还没有晾干",
+                    },
+                    {
+                        "wardrobe_item_id": "coat-heavy",
+                        "name": "厚羊毛大衣",
+                        "status": "available",
+                    },
+                ],
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    generate_outfit = create_outfit_generation_node(model)
+
+    generate_outfit(
+        {
+            "messages": messages,
+            "weather_context": WeatherContext(
+                location="上海",
+                target_date="2026-08-02",
+                temperature_max_c=35,
+                source="user_provided",
+            ),
+        },
+    )
+
+    generation_message = structured_model.invoke.call_args.args[0][1]
+    payload = json.loads(generation_message.content)
+    candidate_ids = {record["wardrobe_item_id"] for record in payload["wardrobe_items"]}
+    assert candidate_ids == {"shirt-ready"}
+
+
+def test_generation_context_excludes_current_avoidances() -> None:
+    """验证当前轮明确避雷项不会作为生成候选提供给模型。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    structured_model.invoke.return_value = OutfitGenerationResult(
+        outfit=None,
+    )
+    messages = [
+        HumanMessage(content="不要黑色、羊毛和街头风"),
+        ToolMessage(
+            name="search_wardrobe",
+            tool_call_id="wardrobe-avoidance-call",
+            content=json.dumps(
+                [
+                    {
+                        "wardrobe_item_id": "safe-shirt",
+                        "name": "米白棉衬衫",
+                        "colors": ["米白"],
+                        "materials": ["棉"],
+                        "style_tags": ["简约"],
+                        "status": "available",
+                    },
+                    {
+                        "wardrobe_item_id": "black-shirt",
+                        "name": "深色衬衫",
+                        "colors": ["黑色"],
+                        "status": "available",
+                    },
+                    {
+                        "wardrobe_item_id": "wool-shirt",
+                        "name": "混纺衬衫",
+                        "materials": ["羊毛混纺"],
+                        "status": "available",
+                    },
+                    {
+                        "wardrobe_item_id": "street-shirt",
+                        "name": "印花衬衫",
+                        "style_tags": ["街头风"],
+                        "status": "available",
+                    },
+                ],
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    generate_outfit = create_outfit_generation_node(model)
+
+    generate_outfit(
+        {
+            "messages": messages,
+            "requirement_analysis": (
+                OutfitRequirementAnalysis(
+                    intent=RequestIntent.OUTFIT,
+                    avoided_colors=("黑色",),
+                    avoided_materials=("羊毛",),
+                    avoided_styles=("街头风",),
+                )
+            ),
+        },
+    )
+
+    generation_message = structured_model.invoke.call_args.args[0][1]
+    payload = json.loads(generation_message.content)
+    assert [record["wardrobe_item_id"] for record in payload["wardrobe_items"]] == ["safe-shirt"]
+
+
+def test_current_preference_overrides_profile_avoidance() -> None:
+    """验证本轮主动选择黑色时不会沿用长期黑色避雷项。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    structured_model.invoke.return_value = OutfitGenerationResult(
+        outfit=None,
+    )
+    generate_outfit = create_outfit_generation_node(model)
+    messages = [
+        HumanMessage(content="这次我想穿黑色通勤服装"),
+        ToolMessage(
+            name="search_wardrobe",
+            tool_call_id="profile-override-call",
+            content=json.dumps(
+                [
+                    {
+                        "wardrobe_item_id": "black-shirt",
+                        "name": "黑色衬衫",
+                        "colors": ["黑色"],
+                        "status": "available",
+                    },
+                    {
+                        "wardrobe_item_id": "white-shirt",
+                        "name": "白色衬衫",
+                        "colors": ["白色"],
+                        "status": "available",
+                    },
+                ],
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+
+    generate_outfit(
+        {
+            "messages": messages,
+            "requirement_analysis": (
+                OutfitRequirementAnalysis(
+                    intent=RequestIntent.OUTFIT,
+                    color_preferences=("黑色",),
+                )
+            ),
+            "style_profile_snapshot": (
+                StyleProfileSnapshot(
+                    avoided_colors=("黑色",),
+                )
+            ),
+        },
+    )
+
+    generation_message = structured_model.invoke.call_args.args[0][1]
+    payload = json.loads(generation_message.content)
+    assert {record["wardrobe_item_id"] for record in payload["wardrobe_items"]} == {
+        "black-shirt",
+        "white-shirt",
+    }
+    assert payload["effective_style_constraints"]["preferred_colors"] == ["黑色"]
+    assert payload["effective_style_constraints"]["avoided_colors"] == []

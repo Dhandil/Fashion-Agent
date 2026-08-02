@@ -22,4 +22,11 @@ OUTFIT_CORRECTION_SYSTEM_PROMPT = """
     厚呢、厚羊毛大衣等所有明显厚重保暖单品；不能因为它存在于衣橱中而保留。
 14. 输出前逐项复核 validation_issues；如果任一阻断错误仍适用于新方案，
     应继续修改当前输出，而不是返回仍然违规的方案。
+15. wardrobe_items 是当前轮经过可用性和高置信度天气冲突过滤后的候选；
+    不得继续引用原方案中已经不在 wardrobe_items 内的衣橱 ID。
+16. validation_issues 包含 avoided_style、avoided_color 或 avoided_material 时，
+    必须删除或替换冲突单品；当前轮明确避免项优先于原方案和长期偏好。
+17. 不得把当前轮避免项写成用户永久偏好，也不得通过改写单品名称隐藏冲突。
+18. effective_style_constraints 已经执行“当前明确要求 > 长期档案”；
+    修正时必须使用这组最终约束，历史反馈和原方案都不能覆盖它。
 """.strip()

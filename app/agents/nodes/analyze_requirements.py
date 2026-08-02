@@ -150,6 +150,24 @@ def _apply_deterministic_permissions(
         "wardrobe_preferred": (analysis.wardrobe_preferred or explicit_wardrobe),
     }
 
+    # 当前轮明确避免项优先于同一轮喜欢项，避免模型输出自相矛盾。
+    avoided_style_keys = {value.casefold() for value in analysis.avoided_styles}
+    avoided_color_keys = {value.casefold() for value in analysis.avoided_colors}
+    updates.update(
+        {
+            "style_preferences": tuple(
+                value
+                for value in analysis.style_preferences
+                if value.casefold() not in avoided_style_keys
+            ),
+            "color_preferences": tuple(
+                value
+                for value in analysis.color_preferences
+                if value.casefold() not in avoided_color_keys
+            ),
+        },
+    )
+
     # 全新完整穿搭如果连使用场景都没有，无法判断正式度和功能需求。
     # 局部调整可以沿用 previous_outfit，因此不应用这条规则。
     if analysis.intent is RequestIntent.OUTFIT:

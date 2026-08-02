@@ -13,6 +13,9 @@ from app.agents.schemas.requirements import (
     OutfitRequirementAnalysis,
     RequestIntent,
 )
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.domain.entities.outfit import (
     OutfitItem,
     OutfitRecommendation,
@@ -53,7 +56,7 @@ def _recommendation() -> OutfitRecommendation:
 
 
 def _state_with_wardrobe_records(
-    records: list[dict[str, str]],
+    records: list[dict[str, object]],
 ) -> dict:
     """创建包含当前轮衣橱 ToolMessage 的状态。"""
 
@@ -130,3 +133,64 @@ def test_first_validation_failure_waits_for_correction() -> None:
     assert report.is_executable is False
     assert "outfit_recommendation" not in result
     assert "messages" not in result
+
+
+def test_profile_avoidance_blocks_conflicting_outfit() -> None:
+    """验证长期档案避雷项参与最终确定性检查。"""
+
+    state = _state_with_wardrobe_records(
+        [
+            {
+                "wardrobe_item_id": item_id,
+                "status": "available",
+                **({"colors": ["黑色"]} if item_id == "shoes-001" else {}),
+            }
+            for item_id in (
+                "upper-001",
+                "lower-001",
+                "shoes-001",
+            )
+        ],
+    )
+    state["style_profile_snapshot"] = StyleProfileSnapshot(
+        avoided_colors=("黑色",),
+    )
+
+    result = validate_outfit(state)
+
+    report = result["outfit_feasibility_report"]
+    assert report.is_executable is False
+    assert any(issue.code is OutfitIssueCode.AVOIDED_COLOR for issue in report.issues)
+
+
+def test_current_preference_overrides_profile_avoidance_in_validation() -> None:
+    """验证本轮正向颜色要求在最终检查中覆盖长期避雷项。"""
+
+    state = _state_with_wardrobe_records(
+        [
+            {
+                "wardrobe_item_id": item_id,
+                "status": "available",
+                **({"colors": ["黑色"]} if item_id == "shoes-001" else {}),
+            }
+            for item_id in (
+                "upper-001",
+                "lower-001",
+                "shoes-001",
+            )
+        ],
+    )
+    state["requirement_analysis"] = OutfitRequirementAnalysis(
+        intent=RequestIntent.OUTFIT,
+        scenario="通勤",
+        color_preferences=("黑色",),
+        needs_wardrobe=True,
+    )
+    state["style_profile_snapshot"] = StyleProfileSnapshot(
+        avoided_colors=("黑色",),
+    )
+
+    result = validate_outfit(state)
+
+    report = result["outfit_feasibility_report"]
+    assert report.is_executable is True

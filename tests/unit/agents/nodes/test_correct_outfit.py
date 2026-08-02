@@ -14,6 +14,9 @@ from app.agents.schemas.requirements import (
     OutfitRequirementAnalysis,
     RequestIntent,
 )
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.domain.entities.outfit import (
     OutfitItem,
     OutfitRecommendation,
@@ -24,6 +27,7 @@ from app.domain.entities.outfit_validation import (
     OutfitIssueCode,
     OutfitIssueSeverity,
 )
+from app.domain.entities.weather import WeatherContext
 
 
 def _original_outfit() -> OutfitRecommendation:
@@ -161,3 +165,86 @@ def test_correction_failure_keeps_original_for_final_check() -> None:
 
     assert result["outfit_recommendation"] == (state["outfit_recommendation"])
     assert result["outfit_correction_attempts"] == 1
+
+
+def test_correction_context_uses_only_eligible_wardrobe_items() -> None:
+    """验证修正同样不能重新选中未干或高温冲突衣物。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    structured_model.invoke.return_value = OutfitGenerationResult(
+        outfit=_corrected_outfit(),
+    )
+    state = _invalid_state()
+    wardrobe_message = state["messages"][1]
+    wardrobe_message.content = json.dumps(
+        [
+            {
+                "wardrobe_item_id": "upper-001",
+                "name": "亚麻衬衫",
+                "status": "available",
+            },
+            {
+                "wardrobe_item_id": "lower-001",
+                "name": "直筒长裤",
+                "status": "available",
+            },
+            {
+                "wardrobe_item_id": "shoes-001",
+                "name": "乐福鞋",
+                "status": "available",
+            },
+            {
+                "wardrobe_item_id": "shirt-drying",
+                "name": "棉衬衫",
+                "status": "unavailable",
+                "notes": "尚未晾干",
+            },
+            {
+                "wardrobe_item_id": "coat-heavy",
+                "name": "厚羊毛大衣",
+                "status": "available",
+            },
+            {
+                "wardrobe_item_id": "shirt-black",
+                "name": "黑色衬衫",
+                "colors": ["黑色"],
+                "status": "available",
+            },
+            {
+                "wardrobe_item_id": "shirt-neon",
+                "name": "荧光色衬衫",
+                "colors": ["荧光色"],
+                "status": "available",
+            },
+        ],
+        ensure_ascii=False,
+    )
+    state["requirement_analysis"] = OutfitRequirementAnalysis(
+        intent=RequestIntent.OUTFIT,
+        scenario="通勤",
+        needs_wardrobe=True,
+        avoided_colors=("黑色",),
+    )
+    state["style_profile_snapshot"] = StyleProfileSnapshot(
+        avoided_colors=("荧光色",),
+    )
+    state["weather_context"] = WeatherContext(
+        location="上海",
+        target_date="2026-08-02",
+        temperature_max_c=35,
+        source="user_provided",
+    )
+    node = create_outfit_correction_node(model)
+
+    node(state)
+
+    correction_message = structured_model.invoke.call_args.args[0][1]
+    payload = json.loads(correction_message.content)
+    candidate_ids = {record["wardrobe_item_id"] for record in payload["wardrobe_items"]}
+    assert candidate_ids == {
+        "upper-001",
+        "lower-001",
+        "shoes-001",
+    }

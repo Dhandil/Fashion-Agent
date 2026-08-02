@@ -54,6 +54,7 @@ def test_prepare_turn_preserves_current_outfit_as_baseline() -> None:
         "knowledge_context": "",
         "knowledge_sources": [],
         "style_profile_context": "",
+        "style_profile_snapshot": None,
         "outfit_feedback_context": "",
         "recent_outfits_context": "",
         "previous_outfit_recommendation": (recommendation),
@@ -82,6 +83,7 @@ def test_prepare_turn_keeps_existing_baseline_when_no_new_outfit() -> None:
         "knowledge_context": "",
         "knowledge_sources": [],
         "style_profile_context": "",
+        "style_profile_snapshot": None,
         "outfit_feedback_context": "",
         "recent_outfits_context": "",
     }
@@ -105,5 +107,6 @@ def test_prepare_turn_clears_previous_derived_context() -> None:
     assert result["knowledge_context"] == ""
     assert result["knowledge_sources"] == []
     assert result["style_profile_context"] == ""
+    assert result["style_profile_snapshot"] is None
     assert result["outfit_feedback_context"] == ""
     assert result["recent_outfits_context"] == ""

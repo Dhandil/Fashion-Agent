@@ -6,6 +6,9 @@ from langgraph.graph.message import add_messages
 from app.agents.schemas.requirements import (
     OutfitRequirementAnalysis,
 )
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
@@ -40,6 +43,9 @@ class ShoppingAgentState(TypedDict):
 
     # 用户明确维护的长期穿搭档案
     style_profile_context: NotRequired[str]
+
+    # 不含用户 ID 的结构化长期档案，用于确定性偏好合并
+    style_profile_snapshot: NotRequired[StyleProfileSnapshot | None]
 
     # Agent 生成的结构化穿搭推荐；普通问答时可以不存在
     outfit_recommendation: NotRequired[OutfitRecommendation | None]

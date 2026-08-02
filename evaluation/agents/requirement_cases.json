@@ -184,6 +184,54 @@
         "shopping_intent": "none",
         "missing_fields_contains": []
       }
+    },
+    {
+      "case_id": "preference-avoid-color",
+      "category": "preference_boundary",
+      "messages": [
+        {"role": "user", "content": "帮我搭配夏天通勤服装，不要黑色，以浅蓝和米白为主。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": [],
+        "avoided_colors": ["黑色"]
+      }
+    },
+    {
+      "case_id": "preference-avoid-material",
+      "category": "preference_boundary",
+      "messages": [
+        {"role": "user", "content": "用我的衣橱搭配周末穿搭，不要羊毛材质，我穿着会扎。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": true,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": [],
+        "avoided_materials": ["羊毛"]
+      }
+    },
+    {
+      "case_id": "preference-current-style-override",
+      "category": "preference_boundary",
+      "messages": [
+        {"role": "user", "content": "我平时喜欢街头风，但这次面试不要街头风，要正式简洁。"}
+      ],
+      "expected": {
+        "intent": "outfit",
+        "is_sufficient": true,
+        "needs_wardrobe": false,
+        "needs_weather": false,
+        "shopping_intent": "none",
+        "missing_fields_contains": [],
+        "avoided_styles": ["街头风"]
+      }
     }
   ]
 }

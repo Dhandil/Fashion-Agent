@@ -2,6 +2,9 @@
 
 from collections.abc import Awaitable, Callable
 
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.agents.state.shopping import ShoppingAgentState
 from app.domain.entities.style_profile import StyleProfile
 from app.domain.repositories.style_profile import (
@@ -52,19 +55,12 @@ def build_style_profile_context(
                 f"- {label}：{'、'.join(values)}",
             )
 
-    if (
-        profile.typical_budget_min is not None
-        or profile.typical_budget_max is not None
-    ):
+    if profile.typical_budget_min is not None or profile.typical_budget_max is not None:
         minimum = (
-            str(profile.typical_budget_min)
-            if profile.typical_budget_min is not None
-            else "未设置"
+            str(profile.typical_budget_min) if profile.typical_budget_min is not None else "未设置"
         )
         maximum = (
-            str(profile.typical_budget_max)
-            if profile.typical_budget_max is not None
-            else "未设置"
+            str(profile.typical_budget_max) if profile.typical_budget_max is not None else "未设置"
         )
         context_records.append(
             f"- 常用预算范围：{minimum} 至 {maximum} 元",
@@ -83,13 +79,21 @@ def create_load_style_profile_node(
     user_id: str,
 ) -> Callable[
     [ShoppingAgentState],
-    Awaitable[dict[str, str]],
+    Awaitable[
+        dict[
+            str,
+            str | StyleProfileSnapshot | None,
+        ]
+    ],
 ]:
     """创建绑定当前用户与请求级档案仓库的加载节点。"""
 
     async def load_style_profile(
         _state: ShoppingAgentState,
-    ) -> dict[str, str]:
+    ) -> dict[
+        str,
+        str | StyleProfileSnapshot | None,
+    ]:
         """读取当前 Style Profile 并覆盖旧的档案上下文。"""
 
         profile = await repository.get_by_user_id(
@@ -98,9 +102,10 @@ def create_load_style_profile_node(
 
         return {
             "style_profile_context": (
-                build_style_profile_context(profile)
-                if profile is not None
-                else ""
+                build_style_profile_context(profile) if profile is not None else ""
+            ),
+            "style_profile_snapshot": (
+                StyleProfileSnapshot.from_profile(profile) if profile is not None else None
             ),
         }
 

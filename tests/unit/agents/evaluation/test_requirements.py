@@ -46,14 +46,14 @@ def _case(
 
 
 def test_committed_suite_covers_requirement_boundaries() -> None:
-    """验证可提交案例集覆盖当前六类路由边界。"""
+    """验证可提交案例集覆盖路由、权限和当前偏好边界。"""
 
     suite = load_requirement_evaluation_suite(
         Path("evaluation/agents/requirement_cases.json"),
     )
 
     assert suite.schema_version == "1.0"
-    assert len(suite.cases) == 12
+    assert len(suite.cases) == 15
     assert {case.category for case in suite.cases} == {
         "knowledge",
         "incomplete",
@@ -61,6 +61,7 @@ def test_committed_suite_covers_requirement_boundaries() -> None:
         "adjustment",
         "shopping",
         "shopping_boundary",
+        "preference_boundary",
     }
 
 

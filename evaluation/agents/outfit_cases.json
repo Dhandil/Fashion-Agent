@@ -85,6 +85,58 @@
       }
     },
     {
+      "case_id": "generation-current-avoidance",
+      "category": "preference",
+      "mode": "generation",
+      "user_request": "用我的衣橱搭配通勤服装，这次不要黑色和羊毛材质。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "avoided_colors": ["黑色"],
+        "avoided_materials": ["羊毛"]
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-safe-001", "name": "米白棉衬衫", "category": "上装", "colors": ["米白"], "materials": ["棉"], "status": "available"},
+        {"wardrobe_item_id": "lower-safe-001", "name": "藏蓝棉质长裤", "category": "下装", "colors": ["藏蓝"], "materials": ["棉"], "status": "available"},
+        {"wardrobe_item_id": "shoes-safe-001", "name": "棕色乐福鞋", "category": "鞋履", "colors": ["棕色"], "materials": ["合成革"], "status": "available"},
+        {"wardrobe_item_id": "outer-conflict-001", "name": "黑色羊毛西装外套", "category": "外套", "colors": ["黑色"], "materials": ["羊毛混纺"], "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "forbidden",
+        "require_source_integrity": true
+      }
+    },
+    {
+      "case_id": "generation-current-preference-override",
+      "category": "preference",
+      "mode": "generation",
+      "user_request": "虽然我的长期档案避免黑色，但这次通勤我明确想穿黑色。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "通勤",
+        "color_preferences": ["黑色"],
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true
+      },
+      "style_profile_snapshot": {
+        "preferred_styles": ["简约"],
+        "avoided_colors": ["黑色"]
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-black-001", "name": "黑色棉质衬衫", "category": "上装", "colors": ["黑色"], "materials": ["棉"], "status": "available"},
+        {"wardrobe_item_id": "lower-grey-001", "name": "灰色直筒长裤", "category": "下装", "colors": ["灰色"], "materials": ["棉"], "status": "available"},
+        {"wardrobe_item_id": "shoes-brown-001", "name": "棕色乐福鞋", "category": "鞋履", "colors": ["棕色"], "materials": ["合成革"], "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "executable",
+        "correction": "forbidden",
+        "require_source_integrity": true
+      }
+    },
+    {
       "case_id": "correction-missing-core-roles",
       "category": "completeness",
       "mode": "correction",

@@ -11,6 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.agents.nodes.validate_outfit import validate_outfit
 from app.agents.schemas.requirements import OutfitRequirementAnalysis
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.agents.state.shopping import ShoppingAgentState
 from app.domain.entities.outfit import OutfitRecommendation
 from app.domain.entities.outfit_validation import (
@@ -58,10 +61,12 @@ class OutfitEvaluationCase(BaseModel):
         "completeness",
         "source_integrity",
         "scenario",
+        "preference",
     ]
     mode: OutfitEvaluationMode
     user_request: str = Field(min_length=1)
     requirement_analysis: OutfitRequirementAnalysis
+    style_profile_snapshot: StyleProfileSnapshot | None = None
     wardrobe_records: tuple[dict[str, Any], ...] = ()
     product_records: tuple[dict[str, Any], ...] = ()
     weather_context: WeatherContext | None = None
@@ -243,6 +248,8 @@ def _create_case_state(
     }
     if case.weather_context is not None:
         state["weather_context"] = case.weather_context
+    if case.style_profile_snapshot is not None:
+        state["style_profile_snapshot"] = case.style_profile_snapshot
     if case.previous_outfit is not None:
         state["previous_outfit_recommendation"] = case.previous_outfit
     return state

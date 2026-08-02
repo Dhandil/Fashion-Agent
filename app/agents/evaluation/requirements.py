@@ -37,6 +37,9 @@ class RequirementEvaluationExpectation(BaseModel):
     needs_weather: bool
     shopping_intent: ShoppingIntent
     missing_fields_contains: tuple[RequirementField, ...] = ()
+    avoided_styles: tuple[str, ...] = ()
+    avoided_colors: tuple[str, ...] = ()
+    avoided_materials: tuple[str, ...] = ()
 
 
 class RequirementEvaluationCase(BaseModel):
@@ -52,6 +55,7 @@ class RequirementEvaluationCase(BaseModel):
         "adjustment",
         "shopping",
         "shopping_boundary",
+        "preference_boundary",
     ]
     messages: tuple[RequirementEvaluationMessage, ...] = Field(
         min_length=1,
@@ -180,6 +184,9 @@ def evaluate_requirement_case(
         "needs_wardrobe",
         "needs_weather",
         "shopping_intent",
+        "avoided_styles",
+        "avoided_colors",
+        "avoided_materials",
     ):
         if getattr(actual, field_name) != getattr(
             expected,

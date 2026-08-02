@@ -175,3 +175,36 @@ def test_weekend_signal_is_enough_for_basic_outfit() -> None:
     assert analysis.is_sufficient is True
     assert analysis.missing_fields == ()
     assert analysis.shopping_intent is ShoppingIntent.NONE
+
+
+def test_current_avoidance_overrides_same_preference() -> None:
+    """验证本轮明确避免项会移除模型输出中的同项喜欢偏好。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            scenario="面试",
+            style_preferences=("街头风", "简约"),
+            color_preferences=("黑色", "米白"),
+            avoided_styles=("街头风",),
+            avoided_colors=("黑色",),
+            avoided_materials=("羊毛",),
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(
+                    content=("这次面试不要街头风和黑色，也不要羊毛。"),
+                ),
+            ],
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.style_preferences == ("简约",)
+    assert analysis.color_preferences == ("米白",)
+    assert analysis.avoided_styles == ("街头风",)
+    assert analysis.avoided_colors == ("黑色",)
+    assert analysis.avoided_materials == ("羊毛",)

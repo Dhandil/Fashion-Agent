@@ -28,8 +28,16 @@ from app.agents.prompts.outfit_correction import (
 )
 from app.agents.schemas.outfit import OutfitGenerationResult
 from app.agents.state.shopping import ShoppingAgentState
+from app.agents.style_constraints import (
+    get_effective_style_constraints,
+    serialize_style_constraints,
+)
 from app.core.observability import log_event
 from app.domain.entities.outfit import OutfitRecommendation
+from app.domain.entities.weather import WeatherContext
+from app.domain.policies.wardrobe_candidates import (
+    select_eligible_wardrobe_records,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +73,55 @@ def _build_correction_context(
                 truncatable=False,
             ),
         )
-
-    for source, tool_name in (
-        (ContextSource.WARDROBE, "search_wardrobe"),
-        (ContextSource.PRODUCTS, "search_products"),
-        (ContextSource.WEATHER_TOOL, "get_weather"),
-    ):
-        records = get_current_turn_tool_records(
-            state["messages"],
-            tool_name,
+    style_constraints = get_effective_style_constraints(
+        state,
+    )
+    if not style_constraints.is_empty:
+        candidates.append(
+            ContextCandidate(
+                key="effective_style_constraints",
+                source=(ContextSource.EFFECTIVE_STYLE_CONSTRAINTS),
+                priority=ContextPriority.CURRENT_FACT,
+                content=serialize_style_constraints(
+                    style_constraints,
+                ),
+                truncatable=False,
+            ),
         )
+
+    weather_records = get_current_turn_tool_records(
+        state["messages"],
+        "get_weather",
+    )
+    active_weather = state.get("weather_context")
+    for record in reversed(weather_records):
+        try:
+            active_weather = WeatherContext.model_validate(record)
+            break
+        except ValueError:
+            continue
+
+    raw_wardrobe_records = get_current_turn_tool_records(
+        state["messages"],
+        "search_wardrobe",
+    )
+    wardrobe_records = select_eligible_wardrobe_records(
+        raw_wardrobe_records,
+        weather=active_weather,
+        avoided_styles=(style_constraints.avoided_styles),
+        avoided_colors=(style_constraints.avoided_colors),
+        avoided_materials=(style_constraints.avoided_materials),
+    ).eligible_records
+    product_records = get_current_turn_tool_records(
+        state["messages"],
+        "search_products",
+    )
+
+    for source, records in (
+        (ContextSource.WARDROBE, wardrobe_records),
+        (ContextSource.PRODUCTS, product_records),
+        (ContextSource.WEATHER_TOOL, weather_records),
+    ):
         for index, record in enumerate(records):
             candidates.append(
                 ContextCandidate(
@@ -162,6 +209,10 @@ def create_outfit_correction_node(
             context_package,
             ContextSource.REQUIREMENT_ANALYSIS,
         )
+        style_constraints = _decode_values(
+            context_package,
+            ContextSource.EFFECTIVE_STYLE_CONSTRAINTS,
+        )
         provided_weather = _decode_values(
             context_package,
             ContextSource.WEATHER,
@@ -176,6 +227,7 @@ def create_outfit_correction_node(
             ),
             "validation_issues": [issue.model_dump(mode="json") for issue in report.issues],
             "requirement_analysis": (requirements[0] if requirements else None),
+            "effective_style_constraints": (style_constraints[0] if style_constraints else None),
             "wardrobe_items": _decode_values(
                 context_package,
                 ContextSource.WARDROBE,

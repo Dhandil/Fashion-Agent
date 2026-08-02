@@ -101,7 +101,7 @@ def test_committed_suite_covers_generation_and_correction() -> None:
         Path("evaluation/agents/outfit_cases.json"),
     )
 
-    assert len(suite.cases) == 6
+    assert len(suite.cases) == 8
     assert {case.mode for case in suite.cases} == {
         "generation",
         "correction",
@@ -113,7 +113,13 @@ def test_committed_suite_covers_generation_and_correction() -> None:
         "completeness",
         "source_integrity",
         "scenario",
+        "preference",
     }
+    override_case = next(
+        case for case in suite.cases if case.case_id == "generation-current-preference-override"
+    )
+    assert override_case.style_profile_snapshot is not None
+    assert override_case.style_profile_snapshot.avoided_colors == ("黑色",)
 
 
 def test_generation_first_pass_reports_no_correction() -> None:

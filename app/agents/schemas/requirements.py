@@ -63,6 +63,10 @@ class OutfitRequirementAnalysis(BaseModel):
     )
     style_preferences: tuple[str, ...] = ()
     color_preferences: tuple[str, ...] = ()
+    # 只表示当前轮明确避免的内容，不自动写入长期 Style Profile
+    avoided_styles: tuple[str, ...] = ()
+    avoided_colors: tuple[str, ...] = ()
+    avoided_materials: tuple[str, ...] = ()
     wardrobe_preferred: bool = False
     needs_wardrobe: bool = False
     needs_weather: bool = False

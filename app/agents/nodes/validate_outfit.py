@@ -7,6 +7,9 @@ from langchain_core.messages import AIMessage
 
 from app.agents.context import get_current_turn_tool_records
 from app.agents.state.shopping import ShoppingAgentState
+from app.agents.style_constraints import (
+    get_effective_style_constraints,
+)
 from app.core.observability import log_event
 from app.domain.entities.outfit_validation import (
     OutfitIssueSeverity,
@@ -66,6 +69,7 @@ def validate_outfit(
         requirement_analysis=state.get(
             "requirement_analysis",
         ),
+        style_constraints=(get_effective_style_constraints(state)),
     )
     error_issues = tuple(
         issue for issue in report.issues if issue.severity is OutfitIssueSeverity.ERROR

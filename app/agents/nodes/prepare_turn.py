@@ -26,6 +26,7 @@ def create_prepare_turn_node() -> Callable[
             "knowledge_context": "",
             "knowledge_sources": [],
             "style_profile_context": "",
+            "style_profile_snapshot": None,
             "outfit_feedback_context": "",
             "recent_outfits_context": "",
         }

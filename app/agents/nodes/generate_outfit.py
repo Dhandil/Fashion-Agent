@@ -31,11 +31,18 @@ from app.agents.schemas.outfit import (
     OutfitGenerationResult,
 )
 from app.agents.state.shopping import ShoppingAgentState
+from app.agents.style_constraints import (
+    get_effective_style_constraints,
+    serialize_style_constraints,
+)
 from app.core.observability import log_event
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
 from app.domain.entities.weather import WeatherContext
+from app.domain.policies.wardrobe_candidates import (
+    select_eligible_wardrobe_records,
+)
 from app.domain.policies.weather import (
     build_weather_outfit_guidance,
 )
@@ -96,6 +103,21 @@ def _create_generation_context_package(
                 source=(ContextSource.REQUIREMENT_ANALYSIS),
                 priority=ContextPriority.CURRENT_FACT,
                 content=(requirement_analysis.model_dump_json()),
+                truncatable=False,
+            ),
+        )
+    style_constraints = get_effective_style_constraints(
+        state,
+    )
+    if not style_constraints.is_empty:
+        candidates.append(
+            ContextCandidate(
+                key="effective_style_constraints",
+                source=(ContextSource.EFFECTIVE_STYLE_CONSTRAINTS),
+                priority=ContextPriority.CURRENT_FACT,
+                content=serialize_style_constraints(
+                    style_constraints,
+                ),
                 truncatable=False,
             ),
         )
@@ -247,7 +269,7 @@ def create_outfit_generation_node(
     ) -> dict[str, OutfitRecommendation | None]:
         """根据当前轮次工具结果生成并校验结构化 Outfit。"""
 
-        wardrobe_records = get_current_turn_tool_records(
+        raw_wardrobe_records = get_current_turn_tool_records(
             state["messages"],
             "search_wardrobe",
         )
@@ -268,6 +290,15 @@ def create_outfit_generation_node(
             )
             or weather_context
         )
+        style_constraints = get_effective_style_constraints(state)
+        wardrobe_selection = select_eligible_wardrobe_records(
+            raw_wardrobe_records,
+            weather=active_weather,
+            avoided_styles=(style_constraints.avoided_styles),
+            avoided_colors=(style_constraints.avoided_colors),
+            avoided_materials=(style_constraints.avoided_materials),
+        )
+        wardrobe_records = wardrobe_selection.eligible_records
 
         context_package = _create_generation_context_package(
             state=state,
@@ -290,6 +321,9 @@ def create_outfit_generation_node(
             duplicate_count=len(diagnostics.duplicate_keys),
             omitted_count=len(diagnostics.omitted_keys),
             truncated_count=len(diagnostics.truncated_keys),
+            excluded_wardrobe_count=len(
+                wardrobe_selection.exclusions,
+            ),
         )
 
         decoded_weather = _decode_context_values(
@@ -312,6 +346,10 @@ def create_outfit_generation_node(
             context_package,
             ContextSource.REQUIREMENT_ANALYSIS,
         )
+        decoded_style_constraints = _decode_context_values(
+            context_package,
+            ContextSource.EFFECTIVE_STYLE_CONSTRAINTS,
+        )
 
         generation_context = {
             # JSON Mode 不会自动把 Schema 发给模型，因此显式提供
@@ -325,6 +363,9 @@ def create_outfit_generation_node(
                 AIMessage,
             ),
             "requirement_analysis": (decoded_requirements[0] if decoded_requirements else None),
+            "effective_style_constraints": (
+                decoded_style_constraints[0] if decoded_style_constraints else None
+            ),
             "knowledge_context": context_package.combined_content_for(
                 ContextSource.KNOWLEDGE,
             ),

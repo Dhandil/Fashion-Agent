@@ -24,6 +24,9 @@ class OutfitIssueCode(StrEnum):
     HOT_WEATHER_CONFLICT = "hot_weather_conflict"
     COLD_WEATHER_RISK = "cold_weather_risk"
     PRECIPITATION_RISK = "precipitation_risk"
+    AVOIDED_STYLE = "avoided_style"
+    AVOIDED_COLOR = "avoided_color"
+    AVOIDED_MATERIAL = "avoided_material"
 
 
 class OutfitFeasibilityIssue(BaseModel):

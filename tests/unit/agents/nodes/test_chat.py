@@ -5,6 +5,13 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agents.nodes.chat import create_chat_node
 from app.agents.prompts.shopping import SHOPPING_ASSISTANT_SYSTEM_PROMPT
+from app.agents.schemas.requirements import (
+    OutfitRequirementAnalysis,
+    RequestIntent,
+)
+from app.agents.schemas.style_profile import (
+    StyleProfileSnapshot,
+)
 from app.agents.state.shopping import ShoppingAgentState
 from app.domain.entities.outfit import (
     OutfitItem,
@@ -147,6 +154,42 @@ def test_chat_node_includes_explicit_style_profile() -> None:
     assert "喜欢的风格：休闲" in (system_message.content)
     assert "应优先于历史反馈使用" in (system_message.content)
     assert "以当前需求为准" in (system_message.content)
+
+
+def test_chat_node_includes_resolved_style_constraints() -> None:
+    """验证聊天模型收到当前要求覆盖长期避雷后的确定性结果。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(
+        content="这次可以按黑色搭配。",
+    )
+    chat_node = create_chat_node(model)
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="这次我想穿黑色",
+            ),
+        ],
+        "requirement_analysis": (
+            OutfitRequirementAnalysis(
+                intent=RequestIntent.OUTFIT,
+                color_preferences=("黑色",),
+            )
+        ),
+        "style_profile_snapshot": (
+            StyleProfileSnapshot(
+                avoided_colors=("黑色",),
+            )
+        ),
+    }
+
+    chat_node(state)
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "effective_style_constraints" in (system_message.content)
+    assert '"preferred_colors": ["黑色"]' in (system_message.content)
+    assert '"avoided_colors": []' in (system_message.content)
+    assert "历史反馈不得覆盖这组约束" in (system_message.content)
 
 
 def test_chat_node_includes_recent_outfits_as_soft_constraint() -> None:

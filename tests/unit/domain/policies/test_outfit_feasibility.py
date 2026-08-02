@@ -185,3 +185,76 @@ def test_weather_warning_does_not_block_otherwise_valid_outfit() -> None:
     assert report.is_executable is True
     assert report.issues[0].code is (OutfitIssueCode.PRECIPITATION_RISK)
     assert report.issues[0].severity is (OutfitIssueSeverity.WARNING)
+
+
+def test_current_avoidances_block_structured_wardrobe_item() -> None:
+    """验证衣橱结构化字段命中当前避雷项时方案不可执行。"""
+
+    wardrobe_records = (
+        {
+            "wardrobe_item_id": "upper-001",
+            "status": "available",
+            "colors": ["黑色"],
+            "materials": ["羊毛混纺"],
+            "style_tags": ["街头风"],
+        },
+        {
+            "wardrobe_item_id": "lower-001",
+            "status": "available",
+        },
+        {
+            "wardrobe_item_id": "shoes-001",
+            "status": "available",
+        },
+    )
+    analysis = OutfitRequirementAnalysis(
+        intent=RequestIntent.OUTFIT,
+        scenario="通勤",
+        needs_wardrobe=True,
+        avoided_colors=("黑色",),
+        avoided_materials=("羊毛",),
+        avoided_styles=("街头风",),
+    )
+
+    report = evaluate_outfit_feasibility(
+        _complete_outfit(),
+        wardrobe_records=wardrobe_records,
+        requirement_analysis=analysis,
+    )
+
+    assert report.is_executable is False
+    assert {issue.code for issue in report.issues} >= {
+        OutfitIssueCode.AVOIDED_COLOR,
+        OutfitIssueCode.AVOIDED_MATERIAL,
+        OutfitIssueCode.AVOIDED_STYLE,
+    }
+
+
+def test_current_avoidance_checks_recommended_item_name() -> None:
+    """验证无结构化来源的建议单品也会按名称检查明确避雷项。"""
+
+    recommendation = OutfitRecommendation(
+        name="通勤鞋建议",
+        scenario="通勤",
+        items=(
+            OutfitItem(
+                role="鞋履",
+                name="黑色乐福鞋",
+                source="recommendation",
+            ),
+        ),
+        recommendation_reason="补充一双通勤鞋。",
+    )
+    analysis = OutfitRequirementAnalysis(
+        intent=RequestIntent.OUTFIT_ADJUSTMENT,
+        scenario="通勤",
+        avoided_colors=("黑色",),
+    )
+
+    report = evaluate_outfit_feasibility(
+        recommendation,
+        requirement_analysis=analysis,
+    )
+
+    assert report.is_executable is False
+    assert any(issue.code is OutfitIssueCode.AVOIDED_COLOR for issue in report.issues)

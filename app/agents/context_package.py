@@ -26,6 +26,7 @@ class ContextSource(StrEnum):
     WARDROBE = "wardrobe"
     PRODUCTS = "products"
     REQUIREMENT_ANALYSIS = "requirement_analysis"
+    EFFECTIVE_STYLE_CONSTRAINTS = "effective_style_constraints"
     STYLE_PROFILE = "style_profile"
     PREVIOUS_OUTFIT = "previous_outfit"
     OUTFIT_FEEDBACK = "outfit_feedback"

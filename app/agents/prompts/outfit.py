@@ -47,4 +47,12 @@ OUTFIT_GENERATION_SYSTEM_PROMPT = """
     厚呢或其他明显厚重保暖单品，即使它们存在于 wardrobe_items 中。
 30. 衣橱中同时存在适合与不适合当前天气的单品时，只选择适合项；
     “用户拥有该单品”不代表“本次必须使用该单品”。
+31. wardrobe_items 已经过当前可用性和高置信度天气冲突过滤；
+    不得猜测或恢复未出现在 wardrobe_items 中的其他衣橱单品。
+32. requirement_analysis 中的 avoided_styles、avoided_colors 和
+    avoided_materials 是当前轮明确约束，优先级高于 Style Profile、历史反馈和
+    previous_outfit；不得选择或建议其中明确避免的风格、颜色或材质。
+33. 当前轮避免项只约束本次输出，不得把它们描述成用户永久偏好。
+34. effective_style_constraints 是当前要求与长期档案确定性合并后的结果；
+    avoided_* 必须遵守，preferred_* 是有效正向偏好，历史反馈不得覆盖它。
 """.strip()

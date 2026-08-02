@@ -19,6 +19,9 @@ from app.domain.entities.outfit_validation import (
     OutfitIssueSeverity,
 )
 from app.domain.entities.weather import WeatherContext
+from app.domain.policies.style_constraints import (
+    EffectiveStyleConstraints,
+)
 
 _UPPER_ROLE_TERMS = (
     "上装",
@@ -227,6 +230,123 @@ def _check_core_roles(
     ]
 
 
+def _record_values(
+    record: Mapping[str, Any] | None,
+    field_name: str,
+) -> tuple[str, ...]:
+    """从真实工具记录中读取结构化偏好字段。"""
+
+    if record is None:
+        return ()
+    value = record.get(field_name)
+    if isinstance(value, str):
+        return (value.casefold(),)
+    if isinstance(value, Sequence):
+        return tuple(item.casefold() for item in value if isinstance(item, str))
+    return ()
+
+
+def _contains_avoided_value(
+    values: Sequence[str],
+    avoided_values: Sequence[str],
+) -> bool:
+    """判断结构化值或单品名称是否包含当前轮明确避免项。"""
+
+    normalized_avoidances = tuple(
+        value.strip().casefold() for value in avoided_values if value.strip()
+    )
+    return any(
+        avoided in value or value in avoided
+        for value in values
+        for avoided in normalized_avoidances
+    )
+
+
+def _check_explicit_avoidances(
+    recommendation: OutfitRecommendation,
+    wardrobe_records: Sequence[Mapping[str, Any]],
+    product_records: Sequence[Mapping[str, Any]],
+    analysis: OutfitRequirementAnalysis | None,
+    style_constraints: EffectiveStyleConstraints | None,
+) -> list[OutfitFeasibilityIssue]:
+    """阻止当前有效约束中避免的颜色、材质或风格进入方案。"""
+
+    if style_constraints is not None:
+        avoided_materials = style_constraints.avoided_materials
+        avoided_colors = style_constraints.avoided_colors
+        avoided_styles = style_constraints.avoided_styles
+    elif analysis is not None:
+        avoided_materials = analysis.avoided_materials
+        avoided_colors = analysis.avoided_colors
+        avoided_styles = analysis.avoided_styles
+    else:
+        return []
+    wardrobe_by_id = _record_by_id(
+        wardrobe_records,
+        "wardrobe_item_id",
+    )
+    product_by_id = _record_by_id(
+        product_records,
+        "product_id",
+    )
+    issues: list[OutfitFeasibilityIssue] = []
+
+    for item in (
+        *recommendation.items,
+        *recommendation.alternatives,
+    ):
+        record: Mapping[str, Any] | None = None
+        if item.source is OutfitItemSource.WARDROBE:
+            record = wardrobe_by_id.get(
+                item.source_reference_id or "",
+            )
+        elif item.source is OutfitItemSource.PRODUCT:
+            record = product_by_id.get(
+                item.source_reference_id or "",
+            )
+
+        item_name = (item.name.casefold(),)
+        checks = (
+            (
+                OutfitIssueCode.AVOIDED_MATERIAL,
+                "materials",
+                avoided_materials,
+                "方案使用了当前有效约束中避免的材质。",
+            ),
+            (
+                OutfitIssueCode.AVOIDED_COLOR,
+                "colors",
+                avoided_colors,
+                "方案使用了当前有效约束中避免的颜色。",
+            ),
+            (
+                OutfitIssueCode.AVOIDED_STYLE,
+                "style_tags",
+                avoided_styles,
+                "方案使用了当前有效约束中避免的风格。",
+            ),
+        )
+        for code, field_name, avoided_values, message in checks:
+            values = (
+                *_record_values(record, field_name),
+                *item_name,
+            )
+            if _contains_avoided_value(
+                values,
+                avoided_values,
+            ):
+                issues.append(
+                    OutfitFeasibilityIssue(
+                        code=code,
+                        severity=OutfitIssueSeverity.ERROR,
+                        message=message,
+                        item_reference_id=(item.source_reference_id),
+                    ),
+                )
+
+    return issues
+
+
 def _check_scenario(
     recommendation: OutfitRecommendation,
     analysis: OutfitRequirementAnalysis | None,
@@ -336,6 +456,7 @@ def evaluate_outfit_feasibility(
     product_records: Sequence[Mapping[str, Any]] = (),
     weather: WeatherContext | None = None,
     requirement_analysis: (OutfitRequirementAnalysis | None) = None,
+    style_constraints: EffectiveStyleConstraints | None = None,
 ) -> OutfitFeasibilityReport:
     """汇总来源、完整性、场景和天气规则并生成稳定报告。"""
 
@@ -344,6 +465,13 @@ def evaluate_outfit_feasibility(
             recommendation,
             wardrobe_records,
             product_records,
+        ),
+        *_check_explicit_avoidances(
+            recommendation,
+            wardrobe_records,
+            product_records,
+            requirement_analysis,
+            style_constraints,
         ),
         *_check_core_roles(
             recommendation,

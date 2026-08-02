@@ -24,21 +24,11 @@ def create_style_profile() -> StyleProfile:
             "简约",
             "休闲",
         ),
-        avoided_styles=(
-            "街头",
-        ),
-        preferred_colors=(
-            "浅蓝色",
-        ),
-        avoided_colors=(
-            "荧光色",
-        ),
-        preferred_fits=(
-            "宽松",
-        ),
-        avoided_materials=(
-            "粗糙羊毛",
-        ),
+        avoided_styles=("街头",),
+        preferred_colors=("浅蓝色",),
+        avoided_colors=("荧光色",),
+        preferred_fits=("宽松",),
+        avoided_materials=("粗糙羊毛",),
         common_scenarios=(
             "通勤",
             "周末出游",
@@ -71,9 +61,7 @@ async def test_load_style_profile_uses_current_user() -> None:
     repository = AsyncMock(
         spec=StyleProfileRepository,
     )
-    repository.get_by_user_id.return_value = (
-        create_style_profile()
-    )
+    repository.get_by_user_id.return_value = create_style_profile()
     node = create_load_style_profile_node(
         repository=repository,
         user_id="user-001",
@@ -85,9 +73,14 @@ async def test_load_style_profile_uses_current_user() -> None:
         },
     )
 
-    assert "喜欢的风格：简约、休闲" in (
-        result["style_profile_context"]
+    assert "喜欢的风格：简约、休闲" in (result["style_profile_context"])
+    snapshot = result["style_profile_snapshot"]
+    assert snapshot is not None
+    assert snapshot.preferred_styles == (
+        "简约",
+        "休闲",
     )
+    assert "user_id" not in snapshot.model_dump()
     repository.get_by_user_id.assert_awaited_once_with(
         "user-001",
     )
@@ -115,4 +108,5 @@ async def test_load_style_profile_clears_missing_profile() -> None:
 
     assert result == {
         "style_profile_context": "",
+        "style_profile_snapshot": None,
     }

@@ -26,6 +26,9 @@ def test_requirement_analysis_accepts_minimal_missing_fields() -> None:
         RequirementField.SCENARIO,
         RequirementField.LOCATION,
     )
+    assert analysis.avoided_styles == ()
+    assert analysis.avoided_colors == ()
+    assert analysis.avoided_materials == ()
 
 
 def test_requirement_analysis_rejects_inconsistent_sufficiency() -> None:
