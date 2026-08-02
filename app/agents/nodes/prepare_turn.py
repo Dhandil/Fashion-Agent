@@ -19,6 +19,7 @@ def create_prepare_turn_node() -> Callable[
         updates: dict[str, object] = {
             # 防止普通知识问答返回上一轮的旧结构化推荐
             "outfit_recommendation": None,
+            "outfit_gap_report": None,
             "outfit_feasibility_report": None,
             "outfit_correction_attempts": 0,
             "tool_policy_rejection_count": 0,

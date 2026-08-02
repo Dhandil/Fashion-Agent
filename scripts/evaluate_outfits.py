@@ -76,6 +76,7 @@ def _print_report(report: OutfitEvaluationReport) -> None:
         print(
             f"[{status}] {result.case_id} "
             f"initial={result.initial_executable} "
+            f"gap={result.gap_produced} "
             f"corrected={result.correction_succeeded} "
             f"final={result.final_disposition} "
             f"source_integrity={result.source_integrity} "

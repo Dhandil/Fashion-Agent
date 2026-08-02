@@ -12,10 +12,16 @@ from app.agents.schemas.style_profile import (
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
+from app.domain.entities.outfit_gap import (
+    OutfitGapReport,
+)
 from app.domain.entities.outfit_validation import (
     OutfitFeasibilityReport,
 )
 from app.domain.entities.weather import WeatherContext
+from app.memory.short_term.conversation_summary import (
+    ConversationSummary,
+)
 
 
 class ShoppingAgentState(TypedDict):
@@ -41,6 +47,9 @@ class ShoppingAgentState(TypedDict):
     # 用户近期保存的 Outfit，用于减少连续重复相同衣物组合
     recent_outfits_context: NotRequired[str]
 
+    # 已退出最近消息窗口的人机文本提取式摘要，只用于理解连续意图
+    conversation_summary: NotRequired[ConversationSummary | None]
+
     # 用户明确维护的长期穿搭档案
     style_profile_context: NotRequired[str]
 
@@ -49,6 +58,9 @@ class ShoppingAgentState(TypedDict):
 
     # Agent 生成的结构化穿搭推荐；普通问答时可以不存在
     outfit_recommendation: NotRequired[OutfitRecommendation | None]
+
+    # 无法形成可执行 Outfit 时返回的结构化缺口
+    outfit_gap_report: NotRequired[OutfitGapReport | None]
 
     # 结构化推荐经过确定性规则检查后的结果
     outfit_feasibility_report: NotRequired[OutfitFeasibilityReport | None]

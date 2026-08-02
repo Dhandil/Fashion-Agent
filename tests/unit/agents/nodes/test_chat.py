@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -59,6 +59,62 @@ def test_chat_node_invokes_bound_model() -> None:
     # 验证节点返回模型产生的新消息
     assert len(result["messages"]) == 1
     assert result["messages"][0].content == "请告诉我你的预算"
+
+
+def test_chat_node_sends_only_recent_complete_turns() -> None:
+    """验证聊天节点限制旧消息，同时只记录不含正文的窗口指标。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(content="当前回复")
+    chat_node = create_chat_node(
+        model,
+        history_max_turns=2,
+        history_max_chars=10_000,
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(content="应被移除的第一轮"),
+            AIMessage(content="应被移除的第一轮回复"),
+            HumanMessage(content="保留的第二轮"),
+            AIMessage(content="保留的第二轮回复"),
+            HumanMessage(content="当前第三轮"),
+        ],
+    }
+
+    with patch(
+        "app.agents.nodes.chat.log_event",
+    ) as mocked_log_event:
+        result = chat_node(state)
+
+    sent_messages = model.invoke.call_args.args[0]
+    assert [message.content for message in sent_messages[1:]] == [
+        "保留的第二轮",
+        "保留的第二轮回复",
+        "当前第三轮",
+    ]
+    summary = result["conversation_summary"]
+    assert summary is not None
+    assert "用户：应被移除的第一轮" in summary.content
+    assert "助手：应被移除的第一轮回复" in (summary.content)
+    assert "conversation_summary" in sent_messages[0].content
+    assert "不得用它确认衣橱状态" in (sent_messages[0].content)
+
+    window_call = next(
+        call
+        for call in mocked_log_event.call_args_list
+        if call.args[1] == "agent.conversation_window.built"
+    )
+    assert window_call.kwargs["input_turns"] == 3
+    assert window_call.kwargs["selected_turns"] == 2
+    assert window_call.kwargs["omitted_messages"] == 2
+    assert "content" not in window_call.kwargs
+    summary_call = next(
+        call
+        for call in mocked_log_event.call_args_list
+        if call.args[1] == "agent.conversation_summary.updated"
+    )
+    assert summary_call.kwargs["covered_message_count"] == 2
+    assert "content" not in summary_call.kwargs
 
 
 def test_chat_node_includes_knowledge_context() -> None:

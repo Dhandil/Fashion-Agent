@@ -137,6 +137,79 @@
       }
     },
     {
+      "case_id": "generation-wardrobe-gap-no-shopping",
+      "category": "wardrobe",
+      "mode": "generation",
+      "user_request": "只用我的衣橱搭配通勤服装，不要查询商品。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "shopping_intent": "none"
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-only-001", "name": "白色棉质衬衫", "category": "上装", "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "rejected",
+        "correction": "forbidden",
+        "require_source_integrity": true,
+        "require_gap": true,
+        "gap_shopping_search_allowed": false
+      }
+    },
+    {
+      "case_id": "generation-wardrobe-gap-shopping-allowed",
+      "category": "shopping",
+      "mode": "generation",
+      "user_request": "用我的衬衫搭配通勤服装，如果缺少单品可以查询商品。",
+      "requirement_analysis": {
+        "intent": "shopping",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "shopping_intent": "explicit"
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-only-shopping-001", "name": "白色棉质衬衫", "category": "上装", "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "rejected",
+        "correction": "forbidden",
+        "require_source_integrity": true,
+        "require_gap": true,
+        "gap_shopping_search_allowed": true
+      }
+    },
+    {
+      "case_id": "generation-avoidance-removes-all",
+      "category": "preference",
+      "mode": "generation",
+      "user_request": "只用我的衣橱搭配通勤服装，这次不要黑色和羊毛。",
+      "requirement_analysis": {
+        "intent": "outfit",
+        "scenario": "通勤",
+        "wardrobe_preferred": true,
+        "needs_wardrobe": true,
+        "shopping_intent": "none",
+        "avoided_colors": ["黑色"],
+        "avoided_materials": ["羊毛"]
+      },
+      "wardrobe_records": [
+        {"wardrobe_item_id": "upper-conflict-001", "name": "黑色羊毛衬衫", "category": "上装", "colors": ["黑色"], "materials": ["羊毛"], "status": "available"},
+        {"wardrobe_item_id": "lower-conflict-001", "name": "黑色长裤", "category": "下装", "colors": ["黑色"], "materials": ["棉"], "status": "available"},
+        {"wardrobe_item_id": "shoes-conflict-001", "name": "黑色皮鞋", "category": "鞋履", "colors": ["黑色"], "materials": ["皮革"], "status": "available"}
+      ],
+      "expected": {
+        "final_disposition": "rejected",
+        "correction": "forbidden",
+        "require_source_integrity": true,
+        "require_gap": true,
+        "gap_shopping_search_allowed": false
+      }
+    },
+    {
       "case_id": "correction-missing-core-roles",
       "category": "completeness",
       "mode": "correction",

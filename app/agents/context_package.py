@@ -29,6 +29,7 @@ class ContextSource(StrEnum):
     EFFECTIVE_STYLE_CONSTRAINTS = "effective_style_constraints"
     STYLE_PROFILE = "style_profile"
     PREVIOUS_OUTFIT = "previous_outfit"
+    CONVERSATION_SUMMARY = "conversation_summary"
     OUTFIT_FEEDBACK = "outfit_feedback"
     RECENT_OUTFITS = "recent_outfits"
     KNOWLEDGE = "knowledge"

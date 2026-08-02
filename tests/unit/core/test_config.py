@@ -25,6 +25,9 @@ def test_settings_use_default_values() -> None:
     )
     assert settings.rag_candidate_k == 24
     assert settings.agent_context_max_chars == 12_000
+    assert settings.agent_history_max_turns == 6
+    assert settings.agent_history_max_chars == 8_000
+    assert settings.agent_summary_max_chars == 2_000
 
 
 def test_settings_reject_invalid_context_budget(
@@ -36,6 +39,27 @@ def test_settings_reject_invalid_context_budget(
         "AGENT_CONTEXT_MAX_CHARS",
         "999",
     )
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize(
+    ("variable_name", "value"),
+    (
+        ("AGENT_HISTORY_MAX_TURNS", "0"),
+        ("AGENT_HISTORY_MAX_CHARS", "999"),
+        ("AGENT_SUMMARY_MAX_CHARS", "199"),
+    ),
+)
+def test_settings_reject_invalid_history_window(
+    monkeypatch,
+    variable_name: str,
+    value: str,
+) -> None:
+    """验证历史消息轮数和字符预算不能低于安全下限。"""
+
+    monkeypatch.setenv(variable_name, value)
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)

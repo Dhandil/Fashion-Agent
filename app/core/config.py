@@ -112,6 +112,27 @@ class Settings(BaseSettings):
         le=100_000,
     )
 
+    # 聊天模型最多接收的最近完整对话轮数；当前轮始终保留
+    agent_history_max_turns: int = Field(
+        default=6,
+        ge=1,
+        le=50,
+    )
+
+    # 聊天模型历史消息的字符预算；当前工具调用链不会被截断
+    agent_history_max_chars: int = Field(
+        default=8_000,
+        ge=1_000,
+        le=100_000,
+    )
+
+    # 提取式滚动摘要的字符预算，不额外调用模型
+    agent_summary_max_chars: int = Field(
+        default=2_000,
+        ge=200,
+        le=20_000,
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

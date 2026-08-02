@@ -54,6 +54,9 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
     fake_retriever = Mock()
     fake_settings = Mock(
         agent_context_max_chars=4_321,
+        agent_history_max_turns=4,
+        agent_history_max_chars=3_210,
+        agent_summary_max_chars=1_234,
     )
 
     with (
@@ -82,6 +85,9 @@ def test_get_shopping_agent_runtime_caches_shared_resources() -> None:
     assert first_runtime.checkpointer is fake_checkpointer
     assert first_runtime.retriever is fake_retriever
     assert first_runtime.context_max_chars == 4_321
+    assert first_runtime.history_max_turns == 4
+    assert first_runtime.history_max_chars == 3_210
+    assert first_runtime.summary_max_chars == 1_234
 
     mocked_create_model.assert_called_once_with()
     mocked_get_checkpointer.assert_called_once_with()
@@ -169,6 +175,9 @@ def test_create_user_shopping_graph_keeps_request_tools_uncached() -> None:
         style_profile_repository=(fake_style_profile_repository),
         user_id="user-001",
         context_max_chars=fake_runtime.context_max_chars,
+        history_max_turns=fake_runtime.history_max_turns,
+        history_max_chars=fake_runtime.history_max_chars,
+        summary_max_chars=fake_runtime.summary_max_chars,
     )
 
 

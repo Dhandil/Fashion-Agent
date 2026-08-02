@@ -31,4 +31,7 @@ REQUIREMENT_ANALYSIS_SYSTEM_PROMPT = """
     color_preferences 不包含黑色。
 14. “不想买”“不要推荐商品”等购物否定只影响 shopping_intent，不能误填为
     风格、颜色或材质避免项。
+15. conversation_summary 只是已退出最近窗口的人机文本摘要，不能作为衣橱状态、
+    商品价格与库存、实时天气或购物授权的依据；这些动态事实只能来自当前请求和
+    当前轮有效工具结果。摘要中的避免项也不能写入本轮 avoided_* 字段。
 """.strip()

@@ -46,6 +46,8 @@ class OutfitEvaluationExpectation(BaseModel):
     final_disposition: FinalDisposition
     correction: CorrectionExpectation = "allowed"
     require_source_integrity: bool = True
+    require_gap: bool = False
+    gap_shopping_search_allowed: bool | None = None
 
 
 class OutfitEvaluationCase(BaseModel):
@@ -122,6 +124,8 @@ class OutfitCaseResult:
     initial_issue_codes: tuple[OutfitIssueCode, ...]
     final_issue_codes: tuple[OutfitIssueCode, ...]
     mismatched_expectations: tuple[str, ...]
+    gap_produced: bool = False
+    expected_final_disposition: FinalDisposition = "executable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,14 +151,19 @@ class OutfitEvaluationReport:
     @property
     def initial_executable_count(self) -> int:
         return sum(
-            result.initial_executable for result in self.results if result.mode == "generation"
+            result.initial_executable
+            for result in self.results
+            if result.mode == "generation" and result.expected_final_disposition == "executable"
         )
 
     @property
     def generation_count(self) -> int:
         """返回真正由模型生成初稿的案例数。"""
 
-        return sum(result.mode == "generation" for result in self.results)
+        return sum(
+            result.mode == "generation" and result.expected_final_disposition == "executable"
+            for result in self.results
+        )
 
     @property
     def initial_pass_rate(self) -> float:
@@ -289,6 +298,8 @@ def evaluate_outfit_case(
         state["outfit_recommendation"] = case.initial_outfit
 
     initial_outfit_produced = state.get("outfit_recommendation") is not None
+    gap_report = state.get("outfit_gap_report")
+    gap_produced = gap_report is not None
     _merge_state(state, validate_outfit(state))
     initial_report = state.get("outfit_feasibility_report")
     initial_executable = bool(
@@ -328,6 +339,13 @@ def evaluate_outfit_case(
         mismatches.append("correction_forbidden")
     if expected.require_source_integrity and not source_integrity:
         mismatches.append("source_integrity")
+    if expected.require_gap and not gap_produced:
+        mismatches.append("gap_required")
+    if expected.gap_shopping_search_allowed is not None and (
+        gap_report is None
+        or gap_report.shopping_search_allowed is not expected.gap_shopping_search_allowed
+    ):
+        mismatches.append("gap_shopping_search_allowed")
 
     return OutfitCaseResult(
         case_id=case.case_id,
@@ -343,6 +361,8 @@ def evaluate_outfit_case(
         initial_issue_codes=_issue_codes(initial_report),
         final_issue_codes=final_issue_codes,
         mismatched_expectations=tuple(mismatches),
+        gap_produced=gap_produced,
+        expected_final_disposition=(expected.final_disposition),
     )
 
 
@@ -393,13 +413,14 @@ def render_outfit_baseline(
         "",
         "## 案例结果",
         "",
-        "| case_id | 模式 | 首次通过 | 修正 | 最终状态 | 来源真实 | 结果 |",
-        "|---|---|---|---|---|---|---|",
+        "| case_id | 模式 | 首次通过 | 缺口 | 修正 | 最终状态 | 来源真实 | 结果 |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     lines.extend(
         (
             f"| {result.case_id} | {result.mode} | "
             f"{'是' if result.initial_executable else '否'} | "
+            f"{'是' if result.gap_produced else '否'} | "
             f"{'成功' if result.correction_succeeded else ('失败' if result.correction_attempted else '未执行')} | "
             f"{result.final_disposition} | "
             f"{'是' if result.source_integrity else '否'} | "

@@ -57,6 +57,13 @@ from app.domain.repositories.outfit_feedback import (
 from app.domain.repositories.style_profile import (
     StyleProfileRepository,
 )
+from app.memory.short_term.conversation_summary import (
+    DEFAULT_SUMMARY_MAX_CHARS,
+)
+from app.memory.short_term.conversation_window import (
+    DEFAULT_HISTORY_MAX_CHARS,
+    DEFAULT_HISTORY_MAX_TURNS,
+)
 
 ShoppingGraph: TypeAlias = CompiledStateGraph[
     ShoppingAgentState,
@@ -76,6 +83,9 @@ def create_shopping_graph(
     style_profile_repository: (StyleProfileRepository | None) = None,
     user_id: str | None = None,
     context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
+    history_max_turns: int = DEFAULT_HISTORY_MAX_TURNS,
+    history_max_chars: int = DEFAULT_HISTORY_MAX_CHARS,
+    summary_max_chars: int = DEFAULT_SUMMARY_MAX_CHARS,
 ) -> ShoppingGraph:
     """创建并编译个人穿搭 Agent 工作流。"""
 
@@ -119,6 +129,9 @@ def create_shopping_graph(
     chat_node = create_chat_node(
         tool_enabled_model,
         context_max_chars=context_max_chars,
+        history_max_turns=history_max_turns,
+        history_max_chars=history_max_chars,
+        summary_max_chars=summary_max_chars,
     )
 
     # 将聊天节点注册到图中，节点名称为 chat

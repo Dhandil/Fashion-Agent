@@ -36,10 +36,11 @@ from app.agents.style_constraints import (
     serialize_style_constraints,
 )
 from app.core.observability import log_event
-from app.domain.entities.outfit import (
-    OutfitRecommendation,
-)
 from app.domain.entities.weather import WeatherContext
+from app.domain.policies.outfit_coverage import (
+    build_outfit_gap_report,
+    render_outfit_gap_message,
+)
 from app.domain.policies.wardrobe_candidates import (
     select_eligible_wardrobe_records,
 )
@@ -254,7 +255,7 @@ def create_outfit_generation_node(
     context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS,
 ) -> Callable[
     [ShoppingAgentState],
-    dict[str, OutfitRecommendation | None],
+    dict[str, Any],
 ]:
     """创建使用结构化模型输出 Outfit 的节点。"""
 
@@ -266,7 +267,7 @@ def create_outfit_generation_node(
 
     def generate_outfit(
         state: ShoppingAgentState,
-    ) -> dict[str, OutfitRecommendation | None]:
+    ) -> dict[str, Any]:
         """根据当前轮次工具结果生成并校验结构化 Outfit。"""
 
         raw_wardrobe_records = get_current_turn_tool_records(
@@ -299,6 +300,31 @@ def create_outfit_generation_node(
             avoided_materials=(style_constraints.avoided_materials),
         )
         wardrobe_records = wardrobe_selection.eligible_records
+        gap_report = build_outfit_gap_report(
+            analysis=state.get("requirement_analysis"),
+            wardrobe_records=wardrobe_records,
+            product_records=product_records,
+        )
+        if gap_report is not None:
+            log_event(
+                logger,
+                "agent.outfit.gap_detected",
+                missing_role_count=len(
+                    gap_report.missing_roles,
+                ),
+                shopping_search_allowed=(gap_report.shopping_search_allowed),
+            )
+            return {
+                "outfit_recommendation": None,
+                "outfit_gap_report": gap_report,
+                "messages": [
+                    AIMessage(
+                        content=render_outfit_gap_message(
+                            gap_report,
+                        ),
+                    ),
+                ],
+            }
 
         context_package = _create_generation_context_package(
             state=state,

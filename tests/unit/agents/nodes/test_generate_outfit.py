@@ -303,6 +303,51 @@ def test_generate_outfit_allows_model_to_skip_outfit() -> None:
     }
 
 
+def test_generate_outfit_returns_gap_without_calling_model() -> None:
+    """验证衣橱核心角色不足时直接返回缺口且不浪费模型调用。"""
+
+    model = Mock(spec=BaseChatModel)
+    structured_model = Mock()
+    model.with_structured_output.return_value = structured_model
+    generate_outfit = create_outfit_generation_node(model)
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(content="用我的衣橱搭配通勤服装"),
+            ToolMessage(
+                name="search_wardrobe",
+                tool_call_id="wardrobe-gap-call",
+                content=json.dumps(
+                    [
+                        {
+                            "wardrobe_item_id": "upper-only",
+                            "name": "白色衬衫",
+                            "category": "上装",
+                            "status": "available",
+                        },
+                    ],
+                    ensure_ascii=False,
+                ),
+            ),
+        ],
+        "requirement_analysis": (
+            OutfitRequirementAnalysis(
+                intent=RequestIntent.OUTFIT,
+                scenario="通勤",
+                needs_wardrobe=True,
+            )
+        ),
+    }
+
+    result = generate_outfit(state)
+
+    assert result["outfit_recommendation"] is None
+    gap_report = result["outfit_gap_report"]
+    assert [role.value for role in gap_report.missing_roles] == ["下装", "鞋履"]
+    assert gap_report.shopping_search_allowed is False
+    assert "不会自动查询商品" in (result["messages"][0].content)
+    structured_model.invoke.assert_not_called()
+
+
 def test_generate_outfit_discards_invalid_structured_result() -> None:
     """验证结构不完整时保留文本回复并丢弃 Outfit。"""
 

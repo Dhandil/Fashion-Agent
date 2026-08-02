@@ -26,6 +26,13 @@ from app.domain.repositories.wardrobe import (
 )
 from app.llm.providers.openai_compatible import create_chat_model
 from app.memory.short_term.checkpointer import get_short_term_checkpointer
+from app.memory.short_term.conversation_summary import (
+    DEFAULT_SUMMARY_MAX_CHARS,
+)
+from app.memory.short_term.conversation_window import (
+    DEFAULT_HISTORY_MAX_CHARS,
+    DEFAULT_HISTORY_MAX_TURNS,
+)
 from app.rag.retrievers.provider import get_knowledge_retriever
 from app.tools.registry.provider import (
     create_request_tool_registry,
@@ -43,6 +50,9 @@ class ShoppingAgentRuntime:
     checkpointer: BaseCheckpointSaver[str]
     retriever: BaseRetriever
     context_max_chars: int = DEFAULT_CONTEXT_MAX_CHARS
+    history_max_turns: int = DEFAULT_HISTORY_MAX_TURNS
+    history_max_chars: int = DEFAULT_HISTORY_MAX_CHARS
+    summary_max_chars: int = DEFAULT_SUMMARY_MAX_CHARS
 
 
 @lru_cache
@@ -55,6 +65,9 @@ def get_shopping_agent_runtime() -> ShoppingAgentRuntime:
         checkpointer=get_short_term_checkpointer(),
         retriever=get_knowledge_retriever(),
         context_max_chars=settings.agent_context_max_chars,
+        history_max_turns=settings.agent_history_max_turns,
+        history_max_chars=settings.agent_history_max_chars,
+        summary_max_chars=settings.agent_summary_max_chars,
     )
 
 
@@ -88,4 +101,7 @@ def create_user_shopping_graph(
         style_profile_repository=style_profile_repository,
         user_id=user_id,
         context_max_chars=runtime.context_max_chars,
+        history_max_turns=runtime.history_max_turns,
+        history_max_chars=runtime.history_max_chars,
+        summary_max_chars=runtime.summary_max_chars,
     )

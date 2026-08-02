@@ -180,6 +180,52 @@ def test_shopping_graph_remembers_messages_in_same_thread() -> None:
     assert second_call_messages[3].content == "预算 300 元"
 
 
+def test_shopping_graph_persists_summary_for_omitted_turns() -> None:
+    """验证退出模型窗口的旧轮次形成摘要并随同一线程保存。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.side_effect = [
+        AIMessage(content="第一轮回复"),
+        AIMessage(content="第二轮回复"),
+    ]
+    graph = create_shopping_graph(
+        model,
+        InMemorySaver(),
+        history_max_turns=1,
+        history_max_chars=10_000,
+    )
+    config = {
+        "configurable": {
+            "thread_id": "summary-thread",
+        },
+    }
+
+    graph.invoke(
+        {
+            "messages": [
+                HumanMessage(content="第一轮用户要求"),
+            ],
+        },
+        config=config,
+    )
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(content="第二轮用户要求"),
+            ],
+        },
+        config=config,
+    )
+
+    summary = result["conversation_summary"]
+    assert summary is not None
+    assert "用户：第一轮用户要求" in summary.content
+    assert "助手：第一轮回复" in summary.content
+
+    second_call_messages = model.invoke.call_args_list[1].args[0]
+    assert [message.content for message in second_call_messages[1:]] == ["第二轮用户要求"]
+
+
 def test_separately_compiled_graphs_share_checkpointer_history() -> None:
     """验证请求级重新编译 Graph 后仍能恢复同一会话。"""
 

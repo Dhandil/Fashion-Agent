@@ -95,6 +95,9 @@ async def chat(
     outfit_recommendation = result.get(
         "outfit_recommendation",
     )
+    outfit_gap_report = result.get(
+        "outfit_gap_report",
+    )
     feasibility_report = result.get(
         "outfit_feasibility_report",
     )
@@ -108,6 +111,7 @@ async def chat(
         ),
         source_count=len(knowledge_sources),
         has_outfit=outfit_recommendation is not None,
+        has_outfit_gap=outfit_gap_report is not None,
         outfit_issue_count=(
             len(feasibility_report.issues) if feasibility_report is not None else 0
         ),
@@ -118,6 +122,7 @@ async def chat(
         conversation_id=conversation_id,
         message=str(last_message.content),
         outfit=outfit_recommendation,
+        outfit_gap=outfit_gap_report,
         sources=knowledge_sources,
         outfit_issues=(list(feasibility_report.issues) if feasibility_report is not None else []),
     )

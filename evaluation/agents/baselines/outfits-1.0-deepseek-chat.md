@@ -4,25 +4,28 @@
 
 - 执行日期：2026-08-02
 - 模型：`deepseek-v4-flash`
-- 案例数：8
-- 案例验证通过率：8/8 (100.0%)
+- 案例数：11
+- 案例验证通过率：11/11 (100.0%)
 - 首次通过率：5/5 (100.0%)
 - 修正成功率：3/3 (100.0%)
-- 来源真实性：8/8 (100.0%)
-- 最终拒绝数：0
+- 来源真实性：11/11 (100.0%)
+- 最终拒绝数：3
 
 ## 案例结果
 
-| case_id | 模式 | 首次通过 | 修正 | 最终状态 | 来源真实 | 结果 |
-|---|---|---|---|---|---|---|
-| generation-wardrobe-weekend | generation | 是 | 未执行 | executable | 是 | PASS |
-| generation-hot-commute | generation | 是 | 未执行 | executable | 是 | PASS |
-| generation-product-gap | generation | 是 | 未执行 | executable | 是 | PASS |
-| generation-current-avoidance | generation | 是 | 未执行 | executable | 是 | PASS |
-| generation-current-preference-override | generation | 是 | 未执行 | executable | 是 | PASS |
-| correction-missing-core-roles | correction | 否 | 成功 | executable | 是 | PASS |
-| correction-invented-source | correction | 否 | 成功 | executable | 是 | PASS |
-| correction-scenario-mismatch | correction | 否 | 成功 | executable | 是 | PASS |
+| case_id | 模式 | 首次通过 | 缺口 | 修正 | 最终状态 | 来源真实 | 结果 |
+|---|---|---|---|---|---|---|---|
+| generation-wardrobe-weekend | generation | 是 | 否 | 未执行 | executable | 是 | PASS |
+| generation-hot-commute | generation | 是 | 否 | 未执行 | executable | 是 | PASS |
+| generation-product-gap | generation | 是 | 否 | 未执行 | executable | 是 | PASS |
+| generation-current-avoidance | generation | 是 | 否 | 未执行 | executable | 是 | PASS |
+| generation-current-preference-override | generation | 是 | 否 | 未执行 | executable | 是 | PASS |
+| generation-wardrobe-gap-no-shopping | generation | 否 | 是 | 未执行 | rejected | 是 | PASS |
+| generation-wardrobe-gap-shopping-allowed | generation | 否 | 是 | 未执行 | rejected | 是 | PASS |
+| generation-avoidance-removes-all | generation | 否 | 是 | 未执行 | rejected | 是 | PASS |
+| correction-missing-core-roles | correction | 否 | 否 | 成功 | executable | 是 | PASS |
+| correction-invented-source | correction | 否 | 否 | 成功 | executable | 是 | PASS |
+| correction-scenario-mismatch | correction | 否 | 否 | 成功 | executable | 是 | PASS |
 
 该报告只保存聚合指标和稳定状态，不保存衣橱正文、商品正文、
 API Key 或完整模型响应。
@@ -58,6 +61,19 @@ API Key 或完整模型响应。
 真实。因此当前组合验证覆盖为8/8；这是最近7条验证结果与新增1条定向结果的
 组合，不是同一次执行全部8条所得的快照。
 
+随后增加“衣橱只有上装且用户明确不查询商品”的结构化缺口案例。系统在模型
+调用前确定缺少下装和鞋履，返回可机器读取的缺口与安全下一步，不生成虚构
+Outfit、不进入修正，也不查询商品。该案例无需调用 DeepSeek，定向执行通过。
+因此当前组合验证覆盖为9/9；这是既有8条组合结果与新增1条确定性结果的组合，
+不是同一次执行全部9条所得的快照。
+
+随后增加两条确定性边界案例：第一条允许商品搜索但当前没有已返回的商品候选，
+缺口结果正确开放 `search_products` 下一步；第二条衣橱单品全部命中本轮黑色或
+羊毛避雷条件，过滤后正确报告全部核心角色缺失。两条案例都在模型调用前完成，
+没有调用 DeepSeek、没有虚构 Outfit，也没有进入修正。因此当前组合验证覆盖为
+11/11；这是既有9条组合结果与新增2条确定性结果的组合，不是同一次执行全部
+11条所得的快照。
+
 ## 结论与局限
 
 - 三条刻意预置错误的案例均在唯一一次修正内成功。
@@ -66,5 +82,7 @@ API Key 或完整模型响应。
   通过率分母。
 - “清洗中”“未干”等原因统一映射为 `unavailable`，没有增加额外领域状态。
 - 当前轮明确避雷项不会自动写入长期 Style Profile。
-- 当前只有8条合成案例，不能代表全部衣橱、天气、场景和商品组合。
+- 当前只有11条合成案例，不能代表全部衣橱、天气、场景和商品组合。
+- 其中3条最终拒绝是预期的安全结果：真实候选无法覆盖核心穿搭角色时，系统
+  返回结构化缺口，不用虚构单品补满方案。
 - 后续增加护理状态、颜色禁忌或新天气规则时必须扩充案例并重建基线。

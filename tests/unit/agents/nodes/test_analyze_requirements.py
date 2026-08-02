@@ -1,9 +1,10 @@
 """结构化需求分析节点测试。"""
 
+import json
 from unittest.mock import Mock
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.agents.nodes.analyze_requirements import (
     create_requirement_analysis_node,
@@ -14,6 +15,9 @@ from app.agents.schemas.requirements import (
     ShoppingIntent,
 )
 from app.agents.state.shopping import ShoppingAgentState
+from app.memory.short_term.conversation_summary import (
+    ConversationSummary,
+)
 
 
 def _create_node(
@@ -208,3 +212,43 @@ def test_current_avoidance_overrides_same_preference() -> None:
     assert analysis.avoided_styles == ("街头风",)
     assert analysis.avoided_colors == ("黑色",)
     assert analysis.avoided_materials == ("羊毛",)
+
+
+def test_summary_is_non_authoritative_for_current_avoidances() -> None:
+    """验证历史摘要不会被提升为本轮明确避雷或重复近期消息。"""
+
+    _, structured_model, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            scenario="通勤",
+            color_preferences=("白色",),
+            avoided_colors=("黑色",),
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(content="以前不要黑色"),
+            AIMessage(content="好的"),
+            HumanMessage(content="这次通勤穿白色"),
+        ],
+        "conversation_summary": ConversationSummary(
+            content="用户：以前不要黑色\n助手：好的",
+            covered_message_count=2,
+        ),
+    }
+
+    result = node(state)
+
+    analysis = result["requirement_analysis"]
+    assert analysis.avoided_colors == ()
+    assert analysis.color_preferences == ("白色",)
+
+    sent_messages = structured_model.invoke.call_args.args[0]
+    payload = json.loads(sent_messages[1].content)
+    assert payload["conversation_summary"] == ("用户：以前不要黑色\n助手：好的")
+    assert payload["recent_conversation"] == [
+        {
+            "role": "user",
+            "content": "这次通勤穿白色",
+        },
+    ]

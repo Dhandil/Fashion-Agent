@@ -111,6 +111,25 @@ def _has_outfit_scenario_signal(text: str) -> bool:
     return any(term in text for term in _OUTFIT_SCENARIO_TERMS)
 
 
+def _is_currently_mentioned(
+    value: str,
+    current_request: str,
+) -> bool:
+    """判断模型提取值是否确实出现在当前用户文本中。"""
+
+    normalised_value = "".join(value.casefold().split())
+    normalised_request = "".join(
+        current_request.casefold().split(),
+    )
+    aliases = {
+        normalised_value,
+        normalised_value.removesuffix("风格"),
+        normalised_value.removesuffix("材质"),
+        normalised_value.removesuffix("颜色"),
+    }
+    return any(alias and alias in normalised_request for alias in aliases)
+
+
 def _fallback_analysis(
     current_request: str,
 ) -> OutfitRequirementAnalysis:
@@ -150,11 +169,40 @@ def _apply_deterministic_permissions(
         "wardrobe_preferred": (analysis.wardrobe_preferred or explicit_wardrobe),
     }
 
+    # 避免项必须能在当前用户文本中核对，不能从摘要或历史消息复制。
+    current_avoided_styles = tuple(
+        value
+        for value in analysis.avoided_styles
+        if _is_currently_mentioned(
+            value,
+            current_request,
+        )
+    )
+    current_avoided_colors = tuple(
+        value
+        for value in analysis.avoided_colors
+        if _is_currently_mentioned(
+            value,
+            current_request,
+        )
+    )
+    current_avoided_materials = tuple(
+        value
+        for value in analysis.avoided_materials
+        if _is_currently_mentioned(
+            value,
+            current_request,
+        )
+    )
+
     # 当前轮明确避免项优先于同一轮喜欢项，避免模型输出自相矛盾。
-    avoided_style_keys = {value.casefold() for value in analysis.avoided_styles}
-    avoided_color_keys = {value.casefold() for value in analysis.avoided_colors}
+    avoided_style_keys = {value.casefold() for value in current_avoided_styles}
+    avoided_color_keys = {value.casefold() for value in current_avoided_colors}
     updates.update(
         {
+            "avoided_styles": current_avoided_styles,
+            "avoided_colors": current_avoided_colors,
+            "avoided_materials": current_avoided_materials,
             "style_preferences": tuple(
                 value
                 for value in analysis.style_preferences
@@ -212,9 +260,16 @@ def _recent_conversation_text(
 ) -> list[dict[str, str]]:
     """提供有限的近期人机文本，排除 ToolMessage 和大块工具结果。"""
 
+    summary = state.get("conversation_summary")
+    covered_message_count = (
+        summary.covered_message_count
+        if summary is not None and summary.covered_message_count <= len(state["messages"])
+        else 0
+    )
+    recent_messages = state["messages"][covered_message_count:]
     records: list[dict[str, str]] = []
     used_chars = 0
-    for message in reversed(state["messages"]):
+    for message in reversed(recent_messages):
         if not isinstance(message, HumanMessage | AIMessage):
             continue
         if not isinstance(message.content, str):
@@ -254,11 +309,17 @@ def create_requirement_analysis_node(
         """分析当前请求，并在失败时安全降级到保守规则。"""
 
         current_request = _latest_user_text(state)
+        conversation_summary = state.get(
+            "conversation_summary",
+        )
         payload = {
             "output_schema": (OutfitRequirementAnalysis.model_json_schema()),
             "current_request": current_request,
             "recent_conversation": _recent_conversation_text(
                 state,
+            ),
+            "conversation_summary": (
+                conversation_summary.content if conversation_summary is not None else ""
             ),
         }
 

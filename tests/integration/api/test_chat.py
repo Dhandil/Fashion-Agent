@@ -20,6 +20,11 @@ from app.domain.entities.outfit import (
     OutfitRecommendation,
     WardrobeGap,
 )
+from app.domain.entities.outfit_gap import (
+    CoreOutfitRole,
+    OutfitGapNextAction,
+    OutfitGapReport,
+)
 from app.domain.entities.outfit_validation import (
     OutfitFeasibilityIssue,
     OutfitFeasibilityReport,
@@ -113,6 +118,7 @@ def test_chat_returns_agent_response() -> None:
         "conversation_id": "test-conversation-id",
         "message": "请告诉我你的预算",
         "outfit": None,
+        "outfit_gap": None,
         "sources": [
             "data/samples/fabrics.md",
         ],
@@ -376,6 +382,67 @@ def test_chat_returns_structured_outfit_when_graph_provides_one() -> None:
             "item_reference_id": None,
         },
     ]
+
+
+def test_chat_returns_structured_outfit_gap() -> None:
+    """验证无法组成完整穿搭时 API 返回缺口而不是虚构 Outfit。"""
+
+    gap = OutfitGapReport(
+        missing_roles=(
+            CoreOutfitRole.LOWER,
+            CoreOutfitRole.FOOTWEAR,
+        ),
+        gaps=(
+            WardrobeGap(
+                role="下装",
+                suggested_item="适合通勤的下装",
+                reason="当前可用衣橱没有下装。",
+            ),
+            WardrobeGap(
+                role="鞋履",
+                suggested_item="适合通勤的鞋履",
+                reason="当前可用衣橱没有鞋履。",
+            ),
+        ),
+        shopping_search_allowed=False,
+        next_actions=(
+            OutfitGapNextAction.ADD_WARDROBE_ITEMS,
+            OutfitGapNextAction.ADJUST_REQUIREMENTS,
+        ),
+        reason="当前真实候选不足以组成完整穿搭。",
+    )
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [
+                AIMessage(
+                    content=("当前衣橱缺少下装和鞋履，本轮不会自动查询商品。"),
+                ),
+            ],
+            "outfit_recommendation": None,
+            "outfit_gap_report": gap,
+        },
+    )
+
+    with patch(
+        ("app.api.dependencies.agent.create_user_shopping_graph"),
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={"X-User-ID": "user-001"},
+            json={
+                "message": "用我的衣橱搭配通勤服装",
+            },
+        )
+
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["outfit"] is None
+    assert response_data["outfit_gap"]["missing_roles"] == ["下装", "鞋履"]
+    assert response_data["outfit_gap"]["shopping_search_allowed"] is False
+    assert "search_products" not in response_data["outfit_gap"]["next_actions"]
+    assert response_data["outfit_issues"] == []
 
 
 def test_chat_passes_user_provided_weather_to_graph() -> None:

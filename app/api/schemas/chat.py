@@ -4,6 +4,7 @@ from app.api.schemas.weather import WeatherContextInput
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
+from app.domain.entities.outfit_gap import OutfitGapReport
 from app.domain.entities.outfit_validation import (
     OutfitFeasibilityIssue,
 )
@@ -43,6 +44,12 @@ class ChatResponse(BaseModel):
     outfit: OutfitRecommendation | None = Field(
         default=None,
         description="本次生成的结构化穿搭推荐",
+    )
+
+    # 当前真实候选不足以生成完整 Outfit 时返回
+    outfit_gap: OutfitGapReport | None = Field(
+        default=None,
+        description="无法形成完整穿搭时的结构化缺口",
     )
 
     # RAG 回答引用的知识来源

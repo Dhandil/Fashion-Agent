@@ -48,6 +48,7 @@ def test_prepare_turn_preserves_current_outfit_as_baseline() -> None:
 
     assert result == {
         "outfit_recommendation": None,
+        "outfit_gap_report": None,
         "outfit_feasibility_report": None,
         "outfit_correction_attempts": 0,
         "tool_policy_rejection_count": 0,
@@ -69,6 +70,7 @@ def test_prepare_turn_keeps_existing_baseline_when_no_new_outfit() -> None:
     state: ShoppingAgentState = {
         "messages": [],
         "outfit_recommendation": None,
+        "outfit_gap_report": None,
         "outfit_feasibility_report": None,
         "previous_outfit_recommendation": (existing_baseline),
     }
@@ -77,6 +79,7 @@ def test_prepare_turn_keeps_existing_baseline_when_no_new_outfit() -> None:
 
     assert result == {
         "outfit_recommendation": None,
+        "outfit_gap_report": None,
         "outfit_feasibility_report": None,
         "outfit_correction_attempts": 0,
         "tool_policy_rejection_count": 0,
@@ -105,6 +108,7 @@ def test_prepare_turn_clears_previous_derived_context() -> None:
     )
 
     assert result["knowledge_context"] == ""
+    assert result["outfit_gap_report"] is None
     assert result["knowledge_sources"] == []
     assert result["style_profile_context"] == ""
     assert result["style_profile_snapshot"] is None

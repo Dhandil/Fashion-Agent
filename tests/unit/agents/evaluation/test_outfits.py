@@ -15,6 +15,11 @@ from app.agents.evaluation.outfits import (
     render_outfit_baseline,
 )
 from app.domain.entities.outfit import OutfitItem, OutfitRecommendation
+from app.domain.entities.outfit_gap import (
+    CoreOutfitRole,
+    OutfitGapNextAction,
+    OutfitGapReport,
+)
 
 
 def _valid_outfit() -> OutfitRecommendation:
@@ -101,7 +106,7 @@ def test_committed_suite_covers_generation_and_correction() -> None:
         Path("evaluation/agents/outfit_cases.json"),
     )
 
-    assert len(suite.cases) == 8
+    assert len(suite.cases) == 11
     assert {case.mode for case in suite.cases} == {
         "generation",
         "correction",
@@ -120,6 +125,10 @@ def test_committed_suite_covers_generation_and_correction() -> None:
     )
     assert override_case.style_profile_snapshot is not None
     assert override_case.style_profile_snapshot.avoided_colors == ("黑色",)
+    shopping_gap_case = next(
+        case for case in suite.cases if case.case_id == "generation-wardrobe-gap-shopping-allowed"
+    )
+    assert shopping_gap_case.expected.gap_shopping_search_allowed is True
 
 
 def test_generation_first_pass_reports_no_correction() -> None:
@@ -142,6 +151,66 @@ def test_generation_first_pass_reports_no_correction() -> None:
     assert result.initial_executable is True
     assert result.correction_attempted is False
     assert result.source_integrity is True
+    correct.assert_not_called()
+
+
+def test_expected_gap_is_counted_as_safe_rejection() -> None:
+    """验证结构化缺口通过评测且不会触发修正节点。"""
+
+    gap_report = OutfitGapReport(
+        missing_roles=(
+            CoreOutfitRole.LOWER,
+            CoreOutfitRole.FOOTWEAR,
+        ),
+        gaps=(
+            {
+                "role": "下装",
+                "suggested_item": "适合通勤的下装",
+                "reason": "当前候选没有下装。",
+            },
+            {
+                "role": "鞋履",
+                "suggested_item": "适合通勤的鞋履",
+                "reason": "当前候选没有鞋履。",
+            },
+        ),
+        shopping_search_allowed=False,
+        next_actions=(
+            OutfitGapNextAction.ADD_WARDROBE_ITEMS,
+            OutfitGapNextAction.ADJUST_REQUIREMENTS,
+        ),
+        reason="当前真实候选不足以组成完整穿搭。",
+    )
+    case = _case(
+        mode="generation",
+        expected_disposition="rejected",
+    ).model_copy(
+        update={
+            "expected": OutfitEvaluationExpectation(
+                final_disposition="rejected",
+                correction="forbidden",
+                require_gap=True,
+                gap_shopping_search_allowed=False,
+            ),
+        },
+    )
+    correct = Mock()
+
+    result = evaluate_outfit_case(
+        case,
+        generate_outfit=Mock(
+            return_value={
+                "outfit_recommendation": None,
+                "outfit_gap_report": gap_report,
+            },
+        ),
+        correct_outfit=correct,
+    )
+
+    assert result.passed is True
+    assert result.gap_produced is True
+    assert result.final_disposition == "rejected"
+    assert result.correction_attempted is False
     correct.assert_not_called()
 
 
@@ -294,6 +363,18 @@ def test_initial_pass_rate_excludes_preloaded_correction_cases() -> None:
                 correction_attempted=True,
                 correction_succeeded=True,
                 final_disposition="executable",
+                **common_values,
+            ),
+            OutfitCaseResult(
+                case_id="expected-gap",
+                mode="generation",
+                initial_outfit_produced=False,
+                initial_executable=False,
+                correction_attempted=False,
+                correction_succeeded=False,
+                final_disposition="rejected",
+                gap_produced=True,
+                expected_final_disposition="rejected",
                 **common_values,
             ),
         ),
