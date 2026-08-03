@@ -12,6 +12,7 @@ from time import perf_counter
 from typing import Any
 
 from app.core.request_context import get_request_id
+from app.observability.telemetry import trace_operation
 
 _ANONYMIZATION_KEY = token_bytes(32)
 
@@ -75,36 +76,39 @@ def observe_operation(
 
     started_at = perf_counter()
     observation = OperationObservation()
-    try:
-        yield observation
-    except Exception as exc:
-        failure_fields = {
-            **fields,
-            **observation.fields,
-            "error_type": type(exc).__name__,
-            "duration_ms": round(
-                (perf_counter() - started_at) * 1000,
-                2,
-            ),
-        }
-        log_event(
-            logger,
-            f"{event}.failed",
-            level=logging.ERROR,
-            **failure_fields,
-        )
-        raise
-    else:
-        completion_fields = {
-            **fields,
-            **observation.fields,
-            "duration_ms": round(
-                (perf_counter() - started_at) * 1000,
-                2,
-            ),
-        }
-        log_event(
-            logger,
-            f"{event}.completed",
-            **completion_fields,
-        )
+    with trace_operation(event, **fields) as span_observation:
+        try:
+            yield observation
+        except Exception as exc:
+            failure_fields = {
+                **fields,
+                **observation.fields,
+                "error_type": type(exc).__name__,
+                "duration_ms": round(
+                    (perf_counter() - started_at) * 1000,
+                    2,
+                ),
+            }
+            span_observation.add_fields(**failure_fields)
+            log_event(
+                logger,
+                f"{event}.failed",
+                level=logging.ERROR,
+                **failure_fields,
+            )
+            raise
+        else:
+            completion_fields = {
+                **fields,
+                **observation.fields,
+                "duration_ms": round(
+                    (perf_counter() - started_at) * 1000,
+                    2,
+                ),
+            }
+            span_observation.add_fields(**completion_fields)
+            log_event(
+                logger,
+                f"{event}.completed",
+                **completion_fields,
+            )

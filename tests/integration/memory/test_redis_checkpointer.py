@@ -87,6 +87,56 @@ async def test_redis_restores_state_across_saver_instances() -> None:
 
 
 @pytest.mark.anyio
+async def test_redis_prunes_old_checkpoints_and_keeps_latest_state() -> None:
+    """验证裁剪历史快照后，最新完整状态仍能继续恢复和累积。"""
+
+    redis_url = os.getenv(
+        "REDIS_URL",
+        "redis://localhost:6379/0",
+    )
+    thread_id = f"fashion-agent-redis-prune-test-{uuid4()}"
+    config = {"configurable": {"thread_id": thread_id}}
+    saver = AsyncRedisSaver(
+        redis_url=redis_url,
+        ttl={"default_ttl": 5, "refresh_on_read": True},
+    )
+    await saver.asetup()
+
+    try:
+        graph = create_test_graph(saver)
+        for value in ("first", "second", "third"):
+            await graph.ainvoke(
+                {"values": [value]},
+                config=config,
+            )
+
+        checkpoints_before = [checkpoint async for checkpoint in saver.alist(config)]
+        assert len(checkpoints_before) > 2
+
+        await saver.aprune(
+            [thread_id],
+            keep_last=2,
+        )
+
+        checkpoints_after = [checkpoint async for checkpoint in saver.alist(config)]
+        assert len(checkpoints_after) == 2
+
+        result = await graph.ainvoke(
+            {"values": ["fourth"]},
+            config=config,
+        )
+        assert result["values"] == [
+            "first",
+            "second",
+            "third",
+            "fourth",
+        ]
+    finally:
+        await saver.adelete_thread(thread_id)
+        await saver.__aexit__(None, None, None)
+
+
+@pytest.mark.anyio
 async def test_project_provider_initializes_and_closes_redis(
     monkeypatch,
 ) -> None:

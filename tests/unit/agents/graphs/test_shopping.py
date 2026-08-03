@@ -187,6 +187,7 @@ def test_shopping_graph_persists_summary_for_omitted_turns() -> None:
     model.invoke.side_effect = [
         AIMessage(content="第一轮回复"),
         AIMessage(content="第二轮回复"),
+        AIMessage(content="第三轮回复"),
     ]
     graph = create_shopping_graph(
         model,
@@ -208,10 +209,30 @@ def test_shopping_graph_persists_summary_for_omitted_turns() -> None:
         },
         config=config,
     )
-    result = graph.invoke(
+    second_result = graph.invoke(
         {
             "messages": [
                 HumanMessage(content="第二轮用户要求"),
+            ],
+        },
+        config=config,
+    )
+
+    second_summary = second_result["conversation_summary"]
+    assert second_summary is not None
+    assert "用户：第一轮用户要求" in second_summary.content
+    assert "助手：第一轮回复" in second_summary.content
+
+    # 已进入摘要的第一轮从持久化 State 删除，快照不会随轮次无限增长。
+    assert [message.content for message in second_result["messages"]] == [
+        "第二轮用户要求",
+        "第二轮回复",
+    ]
+
+    result = graph.invoke(
+        {
+            "messages": [
+                HumanMessage(content="第三轮用户要求"),
             ],
         },
         config=config,
@@ -221,9 +242,20 @@ def test_shopping_graph_persists_summary_for_omitted_turns() -> None:
     assert summary is not None
     assert "用户：第一轮用户要求" in summary.content
     assert "助手：第一轮回复" in summary.content
+    assert "用户：第二轮用户要求" in summary.content
+    assert "助手：第二轮回复" in summary.content
+    assert summary.covered_message_count == 4
 
-    second_call_messages = model.invoke.call_args_list[1].args[0]
-    assert [message.content for message in second_call_messages[1:]] == ["第二轮用户要求"]
+    # 第三轮后 State 仍只保留最近完整一轮，不随累计轮数增长。
+    assert [message.content for message in result["messages"]] == [
+        "第三轮用户要求",
+        "第三轮回复",
+    ]
+
+    third_call_messages = model.invoke.call_args_list[2].args[0]
+    assert [message.content for message in third_call_messages[1:]] == ["第三轮用户要求"]
+    assert "第一轮用户要求" in third_call_messages[0].content
+    assert "第二轮用户要求" in third_call_messages[0].content
 
 
 def test_separately_compiled_graphs_share_checkpointer_history() -> None:

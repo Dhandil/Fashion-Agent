@@ -1,7 +1,12 @@
 from unittest.mock import Mock, patch
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    RemoveMessage,
+    SystemMessage,
+)
 
 from app.agents.context_package import ContextBudgetPolicy
 from app.agents.nodes.chat import create_chat_node
@@ -88,9 +93,7 @@ def test_chat_node_records_llm_usage_without_prompt() -> None:
         )
 
     llm_call = next(
-        call
-        for call in mocked_log_event.call_args_list
-        if call.args[1] == "agent.llm.completed"
+        call for call in mocked_log_event.call_args_list if call.args[1] == "agent.llm.completed"
     )
     assert llm_call.kwargs["purpose"] == "chat"
     assert llm_call.kwargs["input_tokens"] == 20
@@ -113,11 +116,11 @@ def test_chat_node_sends_only_recent_complete_turns() -> None:
     )
     state: ShoppingAgentState = {
         "messages": [
-            HumanMessage(content="应被移除的第一轮"),
-            AIMessage(content="应被移除的第一轮回复"),
-            HumanMessage(content="保留的第二轮"),
-            AIMessage(content="保留的第二轮回复"),
-            HumanMessage(content="当前第三轮"),
+            HumanMessage(content="应被移除的第一轮", id="old-human"),
+            AIMessage(content="应被移除的第一轮回复", id="old-ai"),
+            HumanMessage(content="保留的第二轮", id="kept-human"),
+            AIMessage(content="保留的第二轮回复", id="kept-ai"),
+            HumanMessage(content="当前第三轮", id="current-human"),
         ],
     }
 
@@ -138,6 +141,14 @@ def test_chat_node_sends_only_recent_complete_turns() -> None:
     assert "助手：应被移除的第一轮回复" in (summary.content)
     assert "conversation_summary" in sent_messages[0].content
     assert "不得用它确认衣橱状态" in (sent_messages[0].content)
+
+    removals = result["messages"][:-1]
+    assert all(isinstance(message, RemoveMessage) for message in removals)
+    assert [message.id for message in removals] == [
+        "old-human",
+        "old-ai",
+    ]
+    assert result["messages"][-1].content == "当前回复"
 
     window_call = next(
         call

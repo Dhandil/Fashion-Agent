@@ -22,6 +22,29 @@ class Settings(BaseSettings):
     # 日志输出级别
     log_level: str = "INFO"
 
+    # OpenTelemetry 默认关闭；启用后才创建 SDK Provider 和 OTLP Exporter
+    telemetry_enabled: bool = False
+
+    # Trace 中使用的稳定服务名，不包含主机名或用户信息
+    telemetry_service_name: str = Field(
+        default="fashion-agent",
+        min_length=1,
+        max_length=100,
+    )
+
+    # OTLP gRPC Collector 地址，例如 http://otel-collector:4317
+    telemetry_otlp_endpoint: str | None = None
+
+    # 本地明文 Collector 可设为 True；生产环境默认要求 TLS
+    telemetry_otlp_insecure: bool = False
+
+    # ParentBased 概率采样，0 表示只传播父采样决定，1 表示记录全部根 Span
+    telemetry_sample_ratio: float = Field(
+        default=0.1,
+        ge=0,
+        le=1,
+    )
+
     # 商品仓库实现类型：当前默认使用内存仓库
     product_repository_backend: Literal[
         "memory",
@@ -49,6 +72,14 @@ class Settings(BaseSettings):
         default=10_080,
         ge=1,
         le=525_600,
+    )
+
+    # 每个会话、每个 Checkpoint 命名空间保留的最近快照数量
+    # 最新快照本身包含完整当前状态，因此旧快照主要用于故障分析而不是恢复必需项
+    redis_checkpoint_keep_last: int = Field(
+        default=50,
+        ge=1,
+        le=1_000,
     )
 
     # OpenAI 兼容接口的基础地址

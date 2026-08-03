@@ -39,6 +39,11 @@ dependencies = [
     # Redis 异步客户端，也用于 readiness 检查
     "redis>=7.4,<8.0",
 
+    # 可选分布式 Trace API、SDK 和 OTLP gRPC 导出器；运行时默认关闭
+    "opentelemetry-api>=1.44,<2.0",
+    "opentelemetry-sdk>=1.44,<2.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.44,<2.0",
+
     # LangChain 与 Chroma 向量数据库适配器
     "langchain-chroma>=1.1,<2.0",
 

@@ -23,7 +23,10 @@ from app.domain.entities.weather import (
     WeatherDataSource,
 )
 from app.memory.short_term.thread import build_conversation_thread_id
-from app.services.conversation import delete_conversation_state
+from app.services.conversation import (
+    delete_conversation_state,
+    prune_conversation_checkpoints,
+)
 
 # 创建聊天接口路由
 router = APIRouter(
@@ -122,11 +125,15 @@ async def chat(
             has_outfit=(outfit_recommendation is not None),
             has_outfit_gap=(outfit_gap_report is not None),
             outfit_issue_count=(
-                len(feasibility_report.issues)
-                if feasibility_report is not None
-                else 0
+                len(feasibility_report.issues) if feasibility_report is not None else 0
             ),
         )
+
+    # 最新状态已经完整写入后再裁剪旧快照；维护失败不会覆盖本次成功回复。
+    await prune_conversation_checkpoints(
+        user_id=current_user.user_id,
+        conversation_id=conversation_id,
+    )
 
     # 读取工作流最终状态中的最后一条消息
     last_message = result["messages"][-1]

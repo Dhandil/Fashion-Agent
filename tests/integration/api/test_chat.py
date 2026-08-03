@@ -94,10 +94,17 @@ def test_chat_returns_agent_response() -> None:
     )
 
     # 替换聊天路由中使用的真实 Agent Graph
-    with patch(
-        ("app.api.dependencies.agent.create_user_shopping_graph"),
-        return_value=fake_graph,
-    ) as mocked_create_graph:
+    prune_checkpoints = AsyncMock(return_value=True)
+    with (
+        patch(
+            ("app.api.dependencies.agent.create_user_shopping_graph"),
+            return_value=fake_graph,
+        ) as mocked_create_graph,
+        patch(
+            "app.api.routers.chat.prune_conversation_checkpoints",
+            prune_checkpoints,
+        ),
+    ):
         response = client.post(
             "/api/v1/chat",
             headers={
@@ -128,6 +135,10 @@ def test_chat_returns_agent_response() -> None:
 
     # 验证工作流只执行了一次
     fake_graph.ainvoke.assert_called_once()
+    prune_checkpoints.assert_awaited_once_with(
+        user_id="user-001",
+        conversation_id="test-conversation-id",
+    )
 
     # 当前用户和请求级衣橱仓库被绑定到本次 Agent Graph
     mocked_create_graph.assert_called_once_with(

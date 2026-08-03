@@ -17,9 +17,15 @@ def test_settings_use_default_values() -> None:
     assert settings.app_port == 8000
     assert settings.debug is False
     assert settings.log_level == "INFO"
+    assert settings.telemetry_enabled is False
+    assert settings.telemetry_service_name == "fashion-agent"
+    assert settings.telemetry_otlp_endpoint is None
+    assert settings.telemetry_otlp_insecure is False
+    assert settings.telemetry_sample_ratio == 0.1
     assert settings.short_term_memory_backend == "memory"
     assert settings.redis_url is None
     assert settings.redis_checkpoint_ttl_minutes == 10_080
+    assert settings.redis_checkpoint_keep_last == 50
     assert settings.weather_provider_backend == "disabled"
     assert settings.weather_timeout_seconds == 10.0
     assert settings.knowledge_repository_path == ("./data/raw/Fashion-Agent-Knowledge")
@@ -91,6 +97,50 @@ def test_settings_read_environment_variables(monkeypatch) -> None:
     assert settings.log_level == "DEBUG"
 
 
+def test_settings_read_telemetry_environment_variables(
+    monkeypatch,
+) -> None:
+    """验证可选 OTLP Trace 配置能够从环境变量读取。"""
+
+    monkeypatch.setenv("TELEMETRY_ENABLED", "true")
+    monkeypatch.setenv("TELEMETRY_SERVICE_NAME", "fashion-agent-test")
+    monkeypatch.setenv(
+        "TELEMETRY_OTLP_ENDPOINT",
+        "http://collector:4317",
+    )
+    monkeypatch.setenv("TELEMETRY_OTLP_INSECURE", "true")
+    monkeypatch.setenv("TELEMETRY_SAMPLE_RATIO", "0.25")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.telemetry_enabled is True
+    assert settings.telemetry_service_name == "fashion-agent-test"
+    assert settings.telemetry_otlp_endpoint == "http://collector:4317"
+    assert settings.telemetry_otlp_insecure is True
+    assert settings.telemetry_sample_ratio == 0.25
+
+
+@pytest.mark.parametrize(
+    ("variable_name", "value"),
+    (
+        ("TELEMETRY_SERVICE_NAME", ""),
+        ("TELEMETRY_SAMPLE_RATIO", "-0.1"),
+        ("TELEMETRY_SAMPLE_RATIO", "1.1"),
+    ),
+)
+def test_settings_reject_invalid_telemetry_config(
+    monkeypatch,
+    variable_name: str,
+    value: str,
+) -> None:
+    """验证服务名和采样率必须处于安全范围。"""
+
+    monkeypatch.setenv(variable_name, value)
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
 def test_llm_api_key_is_masked(monkeypatch) -> None:
     """验证 LLM API Key 使用敏感字符串保存。"""
 
@@ -156,16 +206,16 @@ def test_settings_read_redis_environment_variables(
         "redis://:test-secret@localhost:6379/0",
     )
     monkeypatch.setenv("REDIS_CHECKPOINT_TTL_MINUTES", "60")
+    monkeypatch.setenv("REDIS_CHECKPOINT_KEEP_LAST", "25")
 
     settings = Settings(_env_file=None)
 
     assert settings.short_term_memory_backend == "redis"
     assert settings.redis_url is not None
-    assert settings.redis_url.get_secret_value() == (
-        "redis://:test-secret@localhost:6379/0"
-    )
+    assert settings.redis_url.get_secret_value() == ("redis://:test-secret@localhost:6379/0")
     assert "test-secret" not in str(settings.redis_url)
     assert settings.redis_checkpoint_ttl_minutes == 60
+    assert settings.redis_checkpoint_keep_last == 25
 
 
 @pytest.mark.parametrize(
@@ -173,6 +223,7 @@ def test_settings_read_redis_environment_variables(
     (
         ("SHORT_TERM_MEMORY_BACKEND", "filesystem"),
         ("REDIS_CHECKPOINT_TTL_MINUTES", "0"),
+        ("REDIS_CHECKPOINT_KEEP_LAST", "0"),
     ),
 )
 def test_settings_reject_invalid_short_term_memory_config(

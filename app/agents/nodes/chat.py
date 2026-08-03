@@ -39,6 +39,9 @@ from app.memory.short_term.conversation_window import (
     DEFAULT_HISTORY_MAX_TURNS,
     build_conversation_window,
 )
+from app.memory.short_term.state_compaction import (
+    build_omitted_message_removals,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +330,10 @@ def create_chat_node(
             omitted_message_count=(window_diagnostics.omitted_messages),
             max_chars=summary_max_chars,
         )
+        message_removals = build_omitted_message_removals(
+            state_messages,
+            omitted_message_count=(window_diagnostics.omitted_messages),
+        )
         context_package = _build_chat_context_package(
             state,
             budget_policy=context_budget_policy,
@@ -416,7 +423,9 @@ def create_chat_node(
                     ),
                 )
         return {
-            "messages": [response],
+            # 已写入滚动摘要的旧消息从持久化 State 删除，防止会话快照无限增长。
+            # 当前窗口与本次响应继续由 add_messages Reducer 保留。
+            "messages": [*message_removals, response],
             "conversation_summary": conversation_summary,
         }
 

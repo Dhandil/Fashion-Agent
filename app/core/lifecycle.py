@@ -11,6 +11,10 @@ from app.memory.short_term.checkpointer import (
     close_short_term_checkpointer,
     initialize_short_term_checkpointer,
 )
+from app.observability.telemetry import (
+    initialize_telemetry,
+    shutdown_telemetry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +25,21 @@ async def application_lifespan(
 ) -> AsyncIterator[None]:
     """记录进程生命周期，并在退出时释放基础设施资源。"""
 
-    await initialize_short_term_checkpointer()
+    initialize_telemetry()
+    try:
+        await initialize_short_term_checkpointer()
+    except Exception:
+        shutdown_telemetry()
+        raise
     logger.info("Fashion-Agent application started")
     try:
         yield
     finally:
         try:
-            await close_short_term_checkpointer()
+            try:
+                await close_short_term_checkpointer()
+            finally:
+                await close_database_connections()
         finally:
-            await close_database_connections()
+            shutdown_telemetry()
         logger.info("Fashion-Agent application stopped")

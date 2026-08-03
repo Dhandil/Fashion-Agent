@@ -728,6 +728,13 @@ Redis Checkpointer 在应用 lifespan 启动阶段创建索引，关闭阶段释
 会话默认在 7 天无活动后过期，读取会刷新 TTL；Redis 配置缺失或连接失败时不
 静默回退内存，避免多实例部署在未告警的情况下丢失会话连续性。
 
+短期记忆同时实施两层容量治理：模型输入只保留最近完整轮次，退出窗口的旧
+人机文本先合并到有字符预算的提取式滚动摘要，再通过 `RemoveMessage` 从
+LangGraph State 删除；每次工作流成功写入最新状态后，Redis 按 Checkpoint
+Namespace 保留最近 `REDIS_CHECKPOINT_KEEP_LAST` 个快照，默认 50 个。最新
+Checkpoint 是完整状态快照，裁剪更早历史不影响下一轮恢复。裁剪属于尽力维护，
+失败时记录匿名化告警但不把已经成功的聊天请求改成 500。
+
 聊天、Outfit 确认和会话删除统一使用
 `user:{user_id}:conversation:{conversation_id}` 作为线程键。用户通过
 `DELETE /api/v1/chat/{conversation_id}` 幂等结束会话；服务端只删除包含当前
@@ -741,9 +748,29 @@ LLM 从对话中推断出的临时信息不应未经用户确认自动成为永�
 
 ---
 
-## 12. MCP 与 Multi-Agent
+## 12. 可观测性
 
-### 12.1 MCP
+应用始终提供不依赖外部平台的结构化日志和 `X-Request-ID`。可选的
+OpenTelemetry Trace 由 FastAPI lifespan 管理：默认关闭；只有
+`TELEMETRY_ENABLED=True` 且配置 OTLP gRPC endpoint 时才创建 SDK Provider、
+采样器、批量处理器和网络导出器，应用关闭时显式刷新并释放资源。
+
+HTTP Span 使用稳定路由模板，不记录原始 URL；Graph、LLM、RAG、Tool、数据库
+等现有操作观测通过当前 Span 自动形成父子链路。Span 只保留耗时、状态、数量、
+错误类型、`request_id` 等诊断字段。统一属性过滤器丢弃 Prompt、消息正文、密钥、
+认证、Cookie、数据库与 Redis 连接地址。采样率通过
+`TELEMETRY_SAMPLE_RATIO` 配置，默认 0.1。
+
+当前 Compose 不内置 Collector 和观测后端，避免默认部署增加镜像、端口、存储和
+数据保留成本。生产环境应单独提供受控 Collector，并配置 TLS、访问控制、保留期限
+和用户数据删除策略；本地明文 Collector 只能显式设置
+`TELEMETRY_OTLP_INSECURE=True`。
+
+---
+
+## 13. MCP 与 Multi-Agent
+
+### 13.1 MCP
 
 MCP Client 主要用于接入：
 
@@ -759,7 +786,7 @@ MCP Server 可以对外提供：
 - 服装知识检索
 - 经授权的商品发现能力
 
-### 12.2 Multi-Agent
+### 13.2 Multi-Agent
 
 单 Agent 稳定后，可以演进为：
 

@@ -13,6 +13,7 @@ from app.core.request_context import (
     reset_request_id,
     set_request_id,
 )
+from app.observability.telemetry import trace_operation
 
 logger = logging.getLogger(__name__)
 
@@ -43,40 +44,61 @@ async def request_id_middleware(
         logger,
         "http.request.started",
         method=request.method,
-        path=request.url.path,
     )
 
-    try:
-        response = await call_next(request)
-        response.headers[REQUEST_ID_HEADER] = request_id
-        log_event(
-            logger,
-            "http.request.completed",
-            method=request.method,
-            path=request.url.path,
-            status_code=response.status_code,
-            duration_ms=round(
-                (perf_counter() - started_at) * 1000,
-                2,
-            ),
-        )
-        return response
-    except Exception as exc:
-        log_event(
-            logger,
-            "http.request.failed",
-            level=logging.ERROR,
-            method=request.method,
-            path=request.url.path,
-            error_type=type(exc).__name__,
-            duration_ms=round(
-                (perf_counter() - started_at) * 1000,
-                2,
-            ),
-        )
-        raise
-    finally:
-        reset_request_id(token)
+    with trace_operation(
+        "http.request",
+        method=request.method,
+    ) as span_observation:
+        try:
+            response = await call_next(request)
+            response.headers[REQUEST_ID_HEADER] = request_id
+            route = request.scope.get("route")
+            route_template = getattr(route, "path", None)
+            completion_fields = {
+                "method": request.method,
+                # 只记录路由模板，不记录可能包含会话 ID 的原始 URL。
+                "route": route_template,
+                "status_code": response.status_code,
+                "duration_ms": round(
+                    (perf_counter() - started_at) * 1000,
+                    2,
+                ),
+            }
+            span_observation.add_fields(**completion_fields)
+            log_event(
+                logger,
+                "http.request.completed",
+                method=request.method,
+                route=route_template,
+                status_code=response.status_code,
+                duration_ms=completion_fields["duration_ms"],
+            )
+            return response
+        except Exception as exc:
+            route = request.scope.get("route")
+            failure_fields = {
+                "method": request.method,
+                "route": getattr(route, "path", None),
+                "error_type": type(exc).__name__,
+                "duration_ms": round(
+                    (perf_counter() - started_at) * 1000,
+                    2,
+                ),
+            }
+            span_observation.add_fields(**failure_fields)
+            log_event(
+                logger,
+                "http.request.failed",
+                level=logging.ERROR,
+                method=request.method,
+                route=failure_fields["route"],
+                error_type=type(exc).__name__,
+                duration_ms=failure_fields["duration_ms"],
+            )
+            raise
+        finally:
+            reset_request_id(token)
 
 
 def register_request_id_middleware(

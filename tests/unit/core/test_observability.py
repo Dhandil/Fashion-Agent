@@ -29,13 +29,16 @@ def test_observe_operation_records_completion_fields() -> None:
 
     logger = logging.getLogger("test-observability-success")
 
-    with patch(
-        "app.core.observability.log_event",
-    ) as mocked_log_event, observe_operation(
-        logger,
-        "agent.tool",
-        tool_name="search_wardrobe",
-    ) as observation:
+    with (
+        patch(
+            "app.core.observability.log_event",
+        ) as mocked_log_event,
+        observe_operation(
+            logger,
+            "agent.tool",
+            tool_name="search_wardrobe",
+        ) as observation,
+    ):
         observation.add_fields(result_count=3)
 
     mocked_log_event.assert_called_once()
@@ -54,15 +57,19 @@ def test_observe_operation_records_failure_and_reraises() -> None:
 
     logger = logging.getLogger("test-observability-failure")
 
-    with patch(
-        "app.core.observability.log_event",
-    ) as mocked_log_event, pytest.raises(
-        RuntimeError,
-        match="测试失败",
-    ), observe_operation(
-        logger,
-        "agent.llm",
-        purpose="chat",
+    with (
+        patch(
+            "app.core.observability.log_event",
+        ) as mocked_log_event,
+        pytest.raises(
+            RuntimeError,
+            match="测试失败",
+        ),
+        observe_operation(
+            logger,
+            "agent.llm",
+            purpose="chat",
+        ),
     ):
         raise RuntimeError("测试失败")
 

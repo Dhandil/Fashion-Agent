@@ -117,7 +117,12 @@ def update_conversation_summary(
     omitted_message_count: int,
     max_chars: int = DEFAULT_SUMMARY_MAX_CHARS,
 ) -> ConversationSummary | None:
-    """把新退出对话窗口的消息增量合并进提取式摘要。"""
+    """把本次退出对话窗口的消息增量合并进提取式摘要。
+
+    调用方会在摘要生成后从 LangGraph State 中移除这批旧消息，因此传入的
+    ``messages`` 都视为尚未摘要的当前状态。``covered_message_count`` 记录
+    会话生命周期内累计压缩的消息数，不再作为当前消息列表的切片下标。
+    """
 
     if omitted_message_count < 0:
         raise ValueError("omitted_message_count 不能小于 0")
@@ -126,19 +131,12 @@ def update_conversation_summary(
             "omitted_message_count 不能超过消息总数",
         )
 
-    covered_count = existing.covered_message_count if existing is not None else 0
     existing_content = existing.content if existing is not None else ""
-
-    if covered_count > omitted_message_count:
-        # 消息历史被清理或替换后，旧摘要不能泄漏到新的会话窗口。
-        covered_count = 0
-        existing_content = ""
-
-    if covered_count == omitted_message_count:
+    if omitted_message_count == 0:
         return existing
 
     new_lines = _extract_summary_lines(
-        messages[covered_count:omitted_message_count],
+        messages[:omitted_message_count],
     )
     all_lines = [
         *existing_content.splitlines(),
@@ -150,5 +148,7 @@ def update_conversation_summary(
     )
     return ConversationSummary(
         content=content,
-        covered_message_count=omitted_message_count,
+        covered_message_count=(
+            (existing.covered_message_count if existing is not None else 0) + omitted_message_count
+        ),
     )

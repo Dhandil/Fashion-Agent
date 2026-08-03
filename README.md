@@ -22,8 +22,9 @@ PostgreSQL 和基础可观测性等核心链路，并持续通过确定性测试
 - LangGraph、LangChain
 - DeepSeek / OpenAI 兼容 API
 - RAG、Chroma
-- PostgreSQL、Docker
-- Redis、MCP、Multi-Agent（后续扩展）
+- PostgreSQL、Redis、Docker
+- OpenTelemetry（默认关闭、可选 OTLP 导出）
+- MCP、Multi-Agent（后续扩展）
 
 ## 文档
 
@@ -93,3 +94,13 @@ docker compose -f deployments/docker/compose.yaml up --build -d
 Compose 会等待 PostgreSQL 与 Redis 健康，再运行一次 Alembic migration，成功后
 启动 API。应用使用非 root 用户；原始知识库以只读方式挂载，Chroma、Redis 数据
 和 Hugging Face 缓存独立持久化，不会被复制进镜像。
+
+Redis 会话默认采用 7 天滑动 TTL，并按命名空间保留最近 50 个 LangGraph
+Checkpoint；可通过 `.env.example` 中的 `REDIS_CHECKPOINT_TTL_MINUTES` 和
+`REDIS_CHECKPOINT_KEEP_LAST` 调整。模型输入窗口外的旧消息会先进入滚动摘要，
+再从持久化 State 移除，避免长会话无限增长。
+
+OpenTelemetry Trace 默认关闭，不会创建导出线程或发起网络请求。部署环境提供
+OTLP gRPC Collector 后，可通过 `.env.example` 中的 `TELEMETRY_*` 配置显式启用；
+Trace 仅记录路由模板、耗时、状态、数量和错误类型，不记录完整 Prompt、用户消息、
+密钥、数据库地址或 Redis 地址。
