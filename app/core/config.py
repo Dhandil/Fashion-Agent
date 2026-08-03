@@ -91,6 +91,42 @@ class Settings(BaseSettings):
     # 使用的模型名称，例如 deepseek-chat
     llm_model: str | None = None
 
+    # 衣物照片识别默认关闭；关闭时照片识别接口返回明确的 503
+    wardrobe_vision_backend: Literal[
+        "disabled",
+        "openai_compatible",
+    ] = "disabled"
+
+    # OpenAI 兼容多模态接口地址，例如 https://vendor.example.com/v1
+    wardrobe_vision_base_url: str | None = None
+
+    # 视觉模型密钥，SecretStr 会在打印配置时隐藏真实内容
+    wardrobe_vision_api_key: SecretStr | None = None
+
+    # 支持图片输入的模型名称
+    wardrobe_vision_model: str | None = None
+
+    # 识别请求超时时间，避免用户长时间等待外部模型
+    wardrobe_vision_timeout_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        le=120,
+    )
+
+    # 单张衣物照片允许的最大字节数，默认 5 MB
+    wardrobe_image_max_bytes: int = Field(
+        default=5 * 1024 * 1024,
+        ge=1_024,
+        le=20 * 1024 * 1024,
+    )
+
+    # 低于该置信度时，草稿中已识别的字段全部标记为需要用户确认
+    wardrobe_draft_min_confidence: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+    )
+
     # 天气 Provider 默认关闭；启用后 Agent 才会注册天气查询工具
     weather_provider_backend: Literal[
         "disabled",

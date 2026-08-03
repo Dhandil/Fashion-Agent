@@ -14,9 +14,15 @@ from app.api.dependencies.database import (
 )
 from app.api.dependencies.identity import (
     CurrentUserDependency,
+    SettingsDependency,
+)
+from app.api.dependencies.vision import (
+    WardrobeImageRecognizerDependency,
 )
 from app.api.schemas.wardrobe import (
+    WardrobeImageRecognitionRequest,
     WardrobeItemCreate,
+    WardrobeItemDraftResponse,
     WardrobeItemListResponse,
     WardrobeItemPatch,
     WardrobeItemResponse,
@@ -31,6 +37,9 @@ from app.services.wardrobe import (
     get_wardrobe_item,
     list_wardrobe_items,
     update_wardrobe_item,
+)
+from app.services.wardrobe_draft import (
+    recognize_wardrobe_image,
 )
 
 router = APIRouter(
@@ -126,6 +135,36 @@ async def create_wardrobe_item(
 
     return WardrobeItemResponse.model_validate(
         saved_item,
+    )
+
+
+@router.post(
+    "/recognitions",
+    response_model=WardrobeItemDraftResponse,
+    summary="识别衣物照片并生成待确认草稿",
+)
+async def recognize_wardrobe_item_image(
+    request: WardrobeImageRecognitionRequest,
+    current_user: CurrentUserDependency,
+    recognizer: WardrobeImageRecognizerDependency,
+    settings: SettingsDependency,
+) -> WardrobeItemDraftResponse:
+    """识别照片中的衣物特征，结果需要用户确认后才能写入衣橱。"""
+
+    # 本接口不访问衣橱仓库，识别结果不会成为永久衣橱事实
+    draft = await recognize_wardrobe_image(
+        recognizer=recognizer,
+        user_id=current_user.user_id,
+        image_base64=request.image_base64,
+        content_type=request.content_type,
+        max_image_bytes=(settings.wardrobe_image_max_bytes),
+        min_confidence=(settings.wardrobe_draft_min_confidence),
+        image_url=request.image_url,
+        hint=request.hint,
+    )
+
+    return WardrobeItemDraftResponse.model_validate(
+        draft,
     )
 
 

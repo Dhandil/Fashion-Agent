@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -24,7 +24,7 @@ from app.observability.telemetry import (
 )
 
 # 用唯一标记匹配 Collector 日志，避免读取旧数据
-_RUN_MARKER = f"trace-verify-{datetime.now(timezone.utc).strftime('%H%M%S')}"
+_RUN_MARKER = f"trace-verify-{datetime.now(UTC).strftime('%H%M%S')}"
 
 
 def create_trace_chain() -> None:
@@ -110,6 +110,8 @@ def run_checks() -> None:
             ["docker", "logs", "fashion-agent-collector-1", "--tail", "100"],
             capture_output=True,
             text=True,
+            # 容器不存在或未启动时由脚本自行提示，不抛出异常
+            check=False,
         )
         output = result.stdout
         if _RUN_MARKER in output:

@@ -7,9 +7,16 @@ from pydantic import (
     model_validator,
 )
 
+from app.domain.entities.wardrobe_image import (
+    WardrobeImageContentType,
+)
 from app.domain.entities.wardrobe_item import (
     WardrobeItemStatus,
 )
+
+# Base64 编码后的照片长度上限，约等于 15 MB 原始字节
+# 具体体积限制仍由配置和领域校验决定，这里只拦截明显异常的请求体
+_MAX_IMAGE_BASE64_CHARS = 20_000_000
 
 
 class WardrobeItemBase(BaseModel):
@@ -129,6 +136,78 @@ class WardrobeItemResponse(WardrobeItemBase):
         min_length=1,
         max_length=100,
     )
+
+    # 允许从领域实体的属性读取字段
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+
+class WardrobeImageRecognitionRequest(BaseModel):
+    """提交一张衣物照片请求识别的请求体。"""
+
+    # 照片使用 Base64 传输，服务端不保存原始字节
+    image_base64: str = Field(
+        min_length=1,
+        max_length=_MAX_IMAGE_BASE64_CHARS,
+    )
+
+    # 客户端声明的照片格式，服务端仍会按文件头再次校验
+    content_type: WardrobeImageContentType
+
+    # 客户端已经托管的照片地址，确认后可以随衣物一起保存
+    image_url: str | None = Field(
+        default=None,
+        max_length=1000,
+    )
+
+    # 用户主动提供的补充说明，例如“这是一件羊毛大衣”
+    hint: str | None = Field(
+        default=None,
+        max_length=200,
+    )
+
+
+class WardrobeItemDraftResponse(BaseModel):
+    """返回给客户端的待确认衣橱单品草稿。
+
+    草稿不是衣橱事实。用户确认或修正后，需要再调用新增衣橱单品接口
+    才会写入衣橱。
+    """
+
+    draft_id: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+    name: str | None = Field(
+        default=None,
+        max_length=200,
+    )
+    category: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+    colors: tuple[str, ...] = ()
+    materials: tuple[str, ...] = ()
+    style_tags: tuple[str, ...] = ()
+    seasons: tuple[str, ...] = ()
+    scenarios: tuple[str, ...] = ()
+    notes: str | None = Field(
+        default=None,
+        max_length=1000,
+    )
+    image_url: str | None = Field(
+        default=None,
+        max_length=1000,
+    )
+    confidence: float = Field(
+        ge=0,
+        le=1,
+    )
+    uncertain_fields: tuple[str, ...] = ()
+    missing_fields: tuple[str, ...] = ()
+    unrecognizable_fields: tuple[str, ...] = ()
+    requires_confirmation: bool = True
 
     # 允许从领域实体的属性读取字段
     model_config = ConfigDict(

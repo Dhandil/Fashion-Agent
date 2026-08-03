@@ -390,6 +390,48 @@ POST /api/v1/outfits
 
 商品域用于补全穿搭方案，不负责支付、订单、物流或售后。
 
+### 6.3 衣物照片识别域
+
+照片识别用于降低衣橱录入成本，识别结果只是候选信息：
+
+```text
+客户端上传照片（Base64）
+→ 体积与文件头校验
+→ WardrobeImageRecognizer
+→ WardrobeItemRecognition（模型原始输出）
+→ 确定性净化规则
+→ WardrobeItemDraft（待确认草稿）
+→ 用户确认或修正
+→ POST /api/v1/wardrobe 写入衣橱
+```
+
+边界规则：
+
+- 草稿不写入任何存储，也没有从草稿直接创建衣物的接口。
+- 识别结果不包含用户 ID、衣橱单品 ID 和可用状态；模型多输出的字段直接忽略。
+- 品牌和尺码无法从照片可靠判断，一律丢弃模型猜测并要求用户补充。
+- 名称或品类识别不到时如实标记缺失，不虚构衣物信息。
+- 整体置信度低于阈值时，已识别字段全部标记为需要用户确认。
+- 应用不保存照片字节；`image_url` 只接受客户端已经托管的地址。
+
+`WardrobeImageRecognizer` 是领域层协议，只规定“输入一张照片，输出候选特征”，
+具体适配器由 `integrations/vision` 实现，并由配置工厂装配：
+
+```text
+WARDROBE_VISION_BACKEND=disabled
+→ 返回 None
+→ 识别接口返回结构化 503，不静默降级成空草稿
+
+WARDROBE_VISION_BACKEND=openai_compatible
+→ OpenAICompatibleWardrobeImageRecognizer
+→ 多模态 Chat Completions + JSON Output
+```
+
+启用后每次识别都会调用外部视觉模型并产生费用，因此默认保持关闭，且照片
+识别不作为 Agent 工具暴露给模型；识别只能由用户显式发起。识别日志和 Trace
+只记录匿名用户标识、图片格式、字节数和字段计数，不记录照片内容、识别文本
+和原始模型响应。
+
 ---
 
 ## 7. 数据存储边界
@@ -830,12 +872,14 @@ Fashion-Agent/
 │   ├── domain/
 │   │   ├── entities/          # 领域实体
 │   │   ├── policies/          # 天气等可测试的领域决策规则
+│   │   ├── providers/         # 天气和视觉识别等外部能力协议
 │   │   ├── repositories/      # Repository Protocol
 │   │   └── value_objects/     # 不可变值对象
 │   ├── llm/
 │   │   └── providers/         # LLM 适配器
 │   ├── integrations/
-│   │   └── weather/           # Open-Meteo 等第三方天气 API 适配器
+│   │   ├── weather/           # Open-Meteo 等第三方天气 API 适配器
+│   │   └── vision/            # 衣物照片识别视觉模型适配器
 │   ├── memory/
 │   │   ├── short_term/        # 对话 Checkpointer
 │   │   └── long_term/         # 长期记忆编排

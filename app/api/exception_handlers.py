@@ -158,6 +158,40 @@ async def style_profile_update_conflict_handler(
     )
 
 
+async def wardrobe_image_error_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将无效衣物照片转换成统一的 400 响应。"""
+
+    error_response = ErrorResponse(
+        code="wardrobe_image_invalid",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=error_response.model_dump(),
+    )
+
+
+async def wardrobe_vision_provider_error_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将照片识别未启用或暂时失败转换成统一的 503 响应。"""
+
+    error_response = ErrorResponse(
+        code="wardrobe_vision_unavailable",
+        message=str(exc),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=error_response.model_dump(),
+    )
+
+
 async def wardrobe_item_not_found_handler(
     _request: Request,
     exc: Exception,

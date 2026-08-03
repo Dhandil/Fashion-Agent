@@ -64,6 +64,22 @@ class WardrobeItemNotFoundError(
     """当前用户不存在指定的衣橱单品。"""
 
 
+class WardrobeImageError(
+    FashionAgentError,
+):
+    """用户提交的衣物照片为空、超限或格式无效。"""
+
+
+class WardrobeVisionProviderError(FashionAgentError):
+    """衣物照片识别服务暂时无法提供可信结果。"""
+
+
+class WardrobeVisionUnavailableError(
+    WardrobeVisionProviderError,
+):
+    """当前部署没有启用衣物照片识别能力。"""
+
+
 class WeatherProviderError(FashionAgentError):
     """天气服务暂时无法提供可信结果。"""
 
