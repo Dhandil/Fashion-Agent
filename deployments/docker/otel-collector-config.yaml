@@ -1,0 +1,51 @@
+# Fashion-Agent OpenTelemetry Collector 开发环境配置
+# 接收来自 FastAPI 应用的 OTLP gRPC Trace，以人类可读格式输出到容器日志。
+#
+# 生产环境应替换 exporters 为目标后端（Jaeger、Tempo、Datadog 等）。
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # 按间隔或数量批量发送，降低下游压力
+  batch:
+    timeout: 5s
+    send_batch_size: 128
+
+  # 限制内存使用，防止 OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+exporters:
+  # 开发环境：将 Span 以人类可读格式输出到 Collector 容器日志
+  # sampling_initial 设高以便冒烟测试时能看到全部 Span
+  debug:
+    verbosity: detailed
+    sampling_initial: 50
+    sampling_thereafter: 10
+
+  # 生产环境示例：OTLP 到可观测后端（默认注释，按需启用）
+  # otlp:
+  #   endpoint: https://your-observability-backend:4317
+  #   headers:
+  #     authorization: "Bearer ${OTEL_EXPORTER_OTLP_TOKEN}"
+
+extensions:
+  # Collector 自身健康检查
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

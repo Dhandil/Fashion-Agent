@@ -87,6 +87,33 @@ services:
 
     restart: "no"
 
+  collector:
+    # OpenTelemetry Collector — 接收并处理来自 API 的 Trace
+    # 开发环境使用 debug exporter 输出到容器日志
+    # 生产环境需替换 exporter 为目标后端
+    image: otel/opentelemetry-collector-contrib:0.126.0
+    restart: unless-stopped
+
+    command: ["--config", "/etc/otelcol/config.yaml"]
+
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+
+    ports:
+      # OTLP gRPC — 应用通过此端口发送 Trace
+      - "4317:4317"
+      # OTLP HTTP
+      - "4318:4318"
+      # Collector 自身健康检查
+      - "13133:13133"
+
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "validate", "--config", "/etc/otelcol/config.yaml"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
   app:
     image: fashion-agent-api:local
     build:
@@ -112,6 +139,9 @@ services:
       SHORT_TERM_MEMORY_BACKEND: redis
       REDIS_URL: redis://redis:6379/0
       REDIS_CHECKPOINT_TTL_MINUTES: ${REDIS_CHECKPOINT_TTL_MINUTES:-10080}
+      REDIS_CHECKPOINT_KEEP_LAST: ${REDIS_CHECKPOINT_KEEP_LAST:-50}
+      # 容器内 Collector 地址与本地开发不同
+      TELEMETRY_OTLP_ENDPOINT: ${TELEMETRY_OTLP_ENDPOINT:-http://collector:4317}
       EMBEDDING_DEVICE: cpu
       CHROMA_PERSIST_DIRECTORY: /app/data/chroma
       KNOWLEDGE_REPOSITORY_PATH: /app/data/raw/Fashion-Agent-Knowledge
