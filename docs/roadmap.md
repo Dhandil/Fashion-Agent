@@ -627,7 +627,19 @@ LangGraph 根据分析结果执行确定性分支：
   返回结构化 503，不静默降级成空草稿
 - [已完成] 识别日志只记录匿名用户标识、图片格式、字节数和字段计数，
   不记录照片内容、识别文本和原始模型响应
-- [待人工验证] 经用户同意后使用真实视觉模型端点进行一次冒烟测试
+- [已完成] 按官方文档核对智谱 GLM-4V-Flash 接口差异：视觉模型不支持
+  `response_format`，因此 Provider 不再强制该参数，改为完全依赖系统提示词
+  约束 JSON 输出，并由解析阶段拒绝非法结果；`temperature=0`、Data URI 格式
+  图片输入和 `/chat/completions` 端点路径均与该模型兼容
+- [待人工验证] 经用户同意后使用 GLM-4V-Flash 真实端点进行一次冒烟测试
+
+已确认的 GLM-4V-Flash 接入参数（测试用，完全免费）：
+
+- `WARDROBE_VISION_BACKEND=openai_compatible`
+- `WARDROBE_VISION_BASE_URL=https://open.bigmodel.cn/api/paas/v4`
+- `WARDROBE_VISION_MODEL=glm-4v-flash`
+- 图片格式仅支持 JPEG/PNG，不支持 WebP；单张不超过 5MB 且不超过
+  6000×6000 像素，与 `WARDROBE_IMAGE_MAX_BYTES` 默认值一致
 
 后续计划：
 

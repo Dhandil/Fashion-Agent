@@ -110,9 +110,8 @@ class OpenAICompatibleWardrobeImageRecognizer:
             "model": self._model,
             # 识别属于事实描述任务，使用确定性输出
             "temperature": 0,
-            "response_format": {
-                "type": "json_object",
-            },
+            # 不强制 response_format：部分 OpenAI 兼容视觉模型只支持纯文本模型
+            # 使用该参数，JSON 结构改为完全依赖系统提示词约束，并由解析阶段兜底拒绝非法结果
             "messages": [
                 {
                     "role": "system",

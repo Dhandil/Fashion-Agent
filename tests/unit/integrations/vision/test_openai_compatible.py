@@ -115,9 +115,8 @@ async def test_recognizer_sends_image_and_parses_result() -> None:
         request.content.decode("utf-8"),
     )
     assert payload["model"] == "test-vision-model"
-    assert payload["response_format"] == {
-        "type": "json_object",
-    }
+    # 部分 OpenAI 兼容视觉模型不支持 response_format，JSON 约束完全交给系统提示词
+    assert "response_format" not in payload
 
     user_content = payload["messages"][1]["content"]
     assert "这是一件夏季衬衫" in user_content[0]["text"]
