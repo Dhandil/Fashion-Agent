@@ -2,7 +2,7 @@
 
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
@@ -120,6 +120,22 @@ def _has_explicit_wardrobe_intent(text: str) -> bool:
     return any(term in text for term in _WARDROBE_TERMS)
 
 
+def _history_expresses_wardrobe_intent(
+    recent_conversation: Sequence[dict[str, str]],
+) -> bool:
+    """判断近期对话中用户是否明确表达过使用衣橱/已有衣物的意图。
+
+    用于“用户回答上一轮追问、补全信息”时的意图延续判断：
+    只观察 user 消息，不把助手消息当作意图来源。
+    """
+
+    return any(
+        record["role"] == "user"
+        and _has_explicit_wardrobe_intent(record["content"])
+        for record in recent_conversation
+    )
+
+
 def _has_outfit_scenario_signal(text: str) -> bool:
     """识别足以支持第一版搭配的明确使用情境。"""
 
@@ -188,6 +204,7 @@ def _fallback_analysis(
 def _apply_deterministic_permissions(
     analysis: OutfitRequirementAnalysis,
     current_request: str,
+    history_expresses_wardrobe: bool = False,
 ) -> OutfitRequirementAnalysis:
     """以用户原文的确定性信号收紧购物和衣橱工具权限。"""
 
@@ -201,7 +218,34 @@ def _apply_deterministic_permissions(
         explicit_wardrobe
         or analysis.intent is RequestIntent.OUTFIT_ADJUSTMENT
     )
+
+    # 意图延续：用户此前明确要求使用衣橱，本轮正在补全被追问的信息
+    # （例如回答场景），且本轮没有购物或放弃衣橱的信号时，延续衣橱意图。
+    continuing_wardrobe = (
+        history_expresses_wardrobe
+        and not explicit_shopping
+        and not any(
+            negation in current_request
+            for negation in _SHOPPING_NEGATIONS
+        )
+    )
+    if continuing_wardrobe:
+        wardrobe_required = (
+            wardrobe_required
+            or analysis.intent is RequestIntent.OUTFIT
+        )
+
     resolved_intent = analysis.intent
+    if (
+        continuing_wardrobe
+        and resolved_intent
+        in (
+            RequestIntent.OTHER,
+            RequestIntent.KNOWLEDGE,
+        )
+    ):
+        # 模型把补全场景的消息误判为知识问答时，按历史衣橱意图纠正为穿搭请求。
+        resolved_intent = RequestIntent.OUTFIT
     if (
         resolved_intent is RequestIntent.SHOPPING
         and not explicit_shopping
@@ -382,12 +426,13 @@ def create_requirement_analysis_node(
         conversation_summary = state.get(
             "conversation_summary",
         )
+        recent_conversation = _recent_conversation_text(
+            state,
+        )
         payload = {
             "output_schema": (OutfitRequirementAnalysis.model_json_schema()),
             "current_request": current_request,
-            "recent_conversation": _recent_conversation_text(
-                state,
-            ),
+            "recent_conversation": recent_conversation,
             "conversation_summary": (
                 conversation_summary.content if conversation_summary is not None else ""
             ),
@@ -418,6 +463,9 @@ def create_requirement_analysis_node(
             analysis = _apply_deterministic_permissions(
                 analysis,
                 current_request,
+                history_expresses_wardrobe=_history_expresses_wardrobe_intent(
+                    recent_conversation,
+                ),
             )
             degraded = False
         except Exception as exc:  # noqa: BLE001

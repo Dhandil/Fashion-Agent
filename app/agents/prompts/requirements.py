@@ -6,6 +6,10 @@ REQUIREMENT_ANALYSIS_SYSTEM_PROMPT = """
 规则：
 1. 只输出 JSON，并严格遵守输入中的 output_schema。
 2. 当前用户明确表达高于之前对话；不要把旧需求当作本轮事实。
+   例外：若最近对话中助手刚追问过缺少的信息（例如场景、日期），
+   用户本轮正在补全该信息，且历史中用户已明确表达过使用衣橱或生成穿搭的意图，
+   应视为延续该意图：intent 保持 outfit，needs_wardrobe 设为 true，
+   并把追问到的信息填入本轮对应字段（例如 scenario）。
 3. intent 只能表示当前主要意图：
    knowledge、outfit、outfit_adjustment、wardrobe、shopping 或 other。
 4. 只有用户明确要求搜索、比较、推荐购买或查看价格/商品时，

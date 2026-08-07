@@ -87,8 +87,7 @@ def test_analysis_does_not_infer_wardrobe_from_wearing_words() -> None:
     """验证“想穿黑色”不等于授权读取个人衣橱。"""
 
     _, _, node = _create_node(
-        OutfitRequirementAnalysis(
-            intent=RequestIntent.OUTFIT,
+        OutfitRequirementAnalysis(            intent=RequestIntent.OUTFIT,
             scenario="通勤",
             needs_wardrobe=True,
             wardrobe_preferred=True,
@@ -335,3 +334,98 @@ def test_summary_is_non_authoritative_for_current_avoidances() -> None:
             "content": "这次通勤穿白色",
         },
     ]
+
+
+def test_analysis_continues_wardrobe_intent_after_followup() -> None:
+    """验证用户回答上一轮追问（补全场景）时延续衣橱意图。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            shopping_intent=ShoppingIntent.NONE,
+            needs_wardrobe=False,
+            wardrobe_preferred=False,
+            is_sufficient=True,
+            scenario="聚会",
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="从衣橱帮我搭配",
+            ),
+            AIMessage(
+                content="为了给出更准确且可执行的建议，请补充：使用场景。",
+            ),
+            HumanMessage(
+                content="出门聚会",
+            ),
+        ],
+    }
+
+    result = node(state)
+
+    analysis = result["requirement_analysis"]
+    # 历史用户消息明确表达过衣橱意图，本轮是补全被追问的场景，应延续
+    assert analysis.needs_wardrobe is True
+    assert analysis.intent is RequestIntent.OUTFIT
+    assert analysis.scenario == "聚会"
+
+
+def test_analysis_does_not_continue_wardrobe_without_history_intent() -> None:
+    """验证没有历史衣橱意图时，单纯补充场景不误判为需要衣橱。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            shopping_intent=ShoppingIntent.NONE,
+            needs_wardrobe=False,
+            wardrobe_preferred=False,
+            is_sufficient=True,
+            scenario="聚会",
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="请给我一套出门聚会的穿搭建议",
+            ),
+        ],
+    }
+
+    result = node(state)
+
+    analysis = result["requirement_analysis"]
+    # 历史没有“衣橱/已有衣物”等词，needs_wardrobe 保持模型判定结果
+    assert analysis.needs_wardrobe is False
+
+
+def test_analysis_does_not_continue_wardrobe_on_shopping() -> None:
+    """验证本轮转为购物意图时，不因历史衣橱意图而延续。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.SHOPPING,
+            shopping_intent=ShoppingIntent.EXPLICIT,
+            needs_wardrobe=False,
+            wardrobe_preferred=False,
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [
+            HumanMessage(
+                content="从衣橱帮我搭配一套通勤装",
+            ),
+            HumanMessage(
+                content="帮我买一件深色衬衫",
+            ),
+        ],
+    }
+
+    result = node(state)
+
+    analysis = result["requirement_analysis"]
+    # 本轮明确购物意图被保留
+    assert analysis.shopping_intent is ShoppingIntent.EXPLICIT
+    # 历史衣橱意图不延续到购物请求
+    assert analysis.needs_wardrobe is False
