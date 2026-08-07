@@ -3,51 +3,13 @@
   "release_id": "fashion-knowledge-2.8.0",
   "cases": [
     {
-      "case_id": "material-linen-hot-commute",
-      "category": "material",
-      "query": "夏天通勤穿亚麻有什么优点，又要注意哪些问题？",
-      "expected_knowledge_id": "fk-materials-linen-001",
-      "expected_section_ids": ["S02", "S04", "S06"],
-      "max_rank": 3
-    },
-    {
-      "case_id": "material-wool-care",
-      "category": "material",
-      "query": "羊毛衣服清洗时怎样避免缩水和毡化？",
-      "expected_knowledge_id": "fk-materials-wool-001",
-      "expected_section_ids": ["S04"],
-      "max_rank": 3
-    },
-    {
-      "case_id": "occasion-interview-dress-code",
-      "category": "occasion",
-      "query": "不知道公司着装要求时，第一次面试应该怎么确定正式程度？",
-      "expected_knowledge_id": "fk-occasion-interview-001",
-      "expected_section_ids": ["S02", "S03", "S05"],
-      "max_rank": 3
-    },
-    {
-      "case_id": "occasion-commute-walking",
-      "category": "occasion",
-      "query": "每天步行和坐地铁通勤，怎样兼顾舒适与办公室正式度？",
-      "expected_knowledge_id": "fk-occasion-commute-001",
-      "expected_section_ids": ["S03", "S04"],
-      "max_rank": 3
-    },
-    {
-      "case_id": "weather-rain-protection-terms",
-      "category": "weather",
-      "query": "下雨天选外套时，防泼水、防水和透湿有什么区别？",
-      "expected_knowledge_id": "fk-weather-rain-protection-001",
-      "expected_section_ids": ["S02", "S03", "S04", "S05", "S11"],
-      "max_rank": 3
-    },
-    {
-      "case_id": "weather-wind-outer-layer",
-      "category": "weather",
-      "query": "气温不算低但风很大，穿搭为什么还要考虑防风外层？",
-      "expected_knowledge_id": "fk-weather-wind-001",
-      "expected_section_ids": ["S02", "S04", "S05"],
+      "case_id": "care-storage-wool",
+      "category": "care",
+      "query": "换季收纳羊毛衫时要注意什么？",
+      "expected_knowledge_id": "fk-care-storage-material-001",
+      "expected_section_ids": [
+        "S10"
+      ],
       "max_rank": 3
     },
     {
@@ -55,7 +17,13 @@
       "category": "care",
       "query": "衣服护理标签模糊看不清时，可以直接按面料成分决定怎么洗吗？",
       "expected_knowledge_id": "fk-care-labels-001",
-      "expected_section_ids": ["S02", "S03", "S07", "S08", "S09"],
+      "expected_section_ids": [
+        "S02",
+        "S03",
+        "S07",
+        "S08",
+        "S09"
+      ],
       "max_rank": 3
     },
     {
@@ -63,7 +31,164 @@
       "category": "care",
       "query": "洗衣前信息不完整时，应该怎样决定洗涤、脱水和干燥方式？",
       "expected_knowledge_id": "fk-care-washing-drying-001",
-      "expected_section_ids": ["S01", "S02", "S03", "S07", "S09"],
+      "expected_section_ids": [
+        "S01",
+        "S02",
+        "S03",
+        "S07",
+        "S09"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "fit-proportion-balance",
+      "category": "material",
+      "query": "上下装的轮廓和比例怎么搭配更协调？",
+      "expected_knowledge_id": "fk-fit-proportion-001",
+      "expected_section_ids": [
+        "S02",
+        "S01"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "material-cotton-care",
+      "category": "material",
+      "query": "纯棉衬衫容易缩水起皱，日常应该怎么护理？",
+      "expected_knowledge_id": "fk-materials-cotton-001",
+      "expected_section_ids": [
+        "S03",
+        "S02"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "material-linen-hot-commute",
+      "category": "material",
+      "query": "夏天通勤穿亚麻有什么优点，又要注意哪些问题？",
+      "expected_knowledge_id": "fk-materials-linen-001",
+      "expected_section_ids": [
+        "S02",
+        "S04",
+        "S06"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "material-polyester-sport",
+      "category": "material",
+      "query": "运动服为什么多用聚酯纤维？",
+      "expected_knowledge_id": "fk-materials-polyester-001",
+      "expected_section_ids": [
+        "S02",
+        "S03"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "material-wool-care",
+      "category": "material",
+      "query": "羊毛衣服清洗时怎样避免缩水和毡化？",
+      "expected_knowledge_id": "fk-materials-wool-001",
+      "expected_section_ids": [
+        "S04"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "occasion-commute-walking",
+      "category": "occasion",
+      "query": "每天步行和坐地铁通勤，怎样兼顾舒适与办公室正式度？",
+      "expected_knowledge_id": "fk-occasion-commute-001",
+      "expected_section_ids": [
+        "S03",
+        "S04"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "occasion-interview-dress-code",
+      "category": "occasion",
+      "query": "不知道公司着装要求时，第一次面试应该怎么确定正式程度？",
+      "expected_knowledge_id": "fk-occasion-interview-001",
+      "expected_section_ids": [
+        "S02",
+        "S03",
+        "S05"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "outfit-footwear-formal",
+      "category": "occasion",
+      "query": "搭配整套穿搭时，鞋履的正式度和颜色应该怎么和整体保持一致？",
+      "expected_knowledge_id": "fk-outfit-footwear-001",
+      "expected_section_ids": [
+        "S04",
+        "S02",
+        "S01"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "outfit-layering-transition",
+      "category": "weather",
+      "query": "早晚温差大，怎么用分层穿搭应对？",
+      "expected_knowledge_id": "fk-outfit-layering-001",
+      "expected_section_ids": [
+        "S02",
+        "S03",
+        "S01"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "weather-humidity-sweat",
+      "category": "weather",
+      "query": "夏天闷热出汗多，衣服应该怎么选？",
+      "expected_knowledge_id": "fk-weather-humidity-001",
+      "expected_section_ids": [
+        "S04",
+        "S05",
+        "S06"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "weather-rain-protection-terms",
+      "category": "weather",
+      "query": "下雨天选外套时，防泼水、防水和透湿有什么区别？",
+      "expected_knowledge_id": "fk-weather-rain-protection-001",
+      "expected_section_ids": [
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S11"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "weather-temperature-layering",
+      "category": "weather",
+      "query": "气温十度左右，穿多少才能保证热舒适？",
+      "expected_knowledge_id": "fk-weather-temperature-001",
+      "expected_section_ids": [
+        "S08",
+        "S02"
+      ],
+      "max_rank": 3
+    },
+    {
+      "case_id": "weather-wind-outer-layer",
+      "category": "weather",
+      "query": "气温不算低但风很大，穿搭为什么还要考虑防风外层？",
+      "expected_knowledge_id": "fk-weather-wind-001",
+      "expected_section_ids": [
+        "S02",
+        "S04",
+        "S05"
+      ],
       "max_rank": 3
     }
   ]

@@ -1,0 +1,331 @@
+{
+  "schema_version": "1.0",
+  "release_id": "fashion-knowledge-2.8.0",
+  "generated_at": "2026-08-07T06:42:21.097197+00:00",
+  "total_count": 16,
+  "passed_count": 16,
+  "pass_rate": 1.0,
+  "min_pass_rate": 1.01,
+  "results": [
+    {
+      "case_id": "care-storage-wool",
+      "passed": true,
+      "knowledge_rank": 2,
+      "section_rank": 2,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-materials-wool-001::S06::001",
+          "source": "knowledge/01_materials/fibers/wool.md"
+        },
+        {
+          "fragment_id": "fk-care-storage-material-001::S10::001",
+          "source": "knowledge/05_care/storage/storage_and_material_specific_care.md"
+        },
+        {
+          "fragment_id": "fk-materials-wool-001::S04::001",
+          "source": "knowledge/01_materials/fibers/wool.md"
+        }
+      ]
+    },
+    {
+      "case_id": "care-unclear-label",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-care-labels-001::S02::003",
+          "source": "knowledge/05_care/care_labels/reading_care_labels.md"
+        },
+        {
+          "fragment_id": "fk-care-labels-001::S05::001",
+          "source": "knowledge/05_care/care_labels/reading_care_labels.md"
+        },
+        {
+          "fragment_id": "fk-care-labels-001::S07::001",
+          "source": "knowledge/05_care/care_labels/reading_care_labels.md"
+        }
+      ]
+    },
+    {
+      "case_id": "care-washing-drying",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-care-washing-drying-001::S01::001",
+          "source": "knowledge/05_care/washing/washing_dewatering_and_drying.md"
+        },
+        {
+          "fragment_id": "fk-care-washing-drying-001::S07::001",
+          "source": "knowledge/05_care/washing/washing_dewatering_and_drying.md"
+        },
+        {
+          "fragment_id": "fk-care-washing-drying-001::S10::001",
+          "source": "knowledge/05_care/washing/washing_dewatering_and_drying.md"
+        }
+      ]
+    },
+    {
+      "case_id": "fit-proportion-balance",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 2,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-fit-proportion-001::S04::001",
+          "source": "knowledge/03_fit_and_silhouette/proportion/top_bottom_proportion.md"
+        },
+        {
+          "fragment_id": "fk-fit-proportion-001::S01::001",
+          "source": "knowledge/03_fit_and_silhouette/proportion/top_bottom_proportion.md"
+        },
+        {
+          "fragment_id": "fk-fit-proportion-001::S02::001",
+          "source": "knowledge/03_fit_and_silhouette/proportion/top_bottom_proportion.md"
+        }
+      ]
+    },
+    {
+      "case_id": "material-cotton-care",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-materials-cotton-001::S03::001",
+          "source": "knowledge/01_materials/fibers/cotton.md"
+        },
+        {
+          "fragment_id": "fk-materials-cotton-001::S07::001",
+          "source": "knowledge/01_materials/fibers/cotton.md"
+        },
+        {
+          "fragment_id": "fk-materials-cotton-001::S06::001",
+          "source": "knowledge/01_materials/fibers/cotton.md"
+        }
+      ]
+    },
+    {
+      "case_id": "material-linen-hot-commute",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 3,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-materials-linen-001::S10::002",
+          "source": "knowledge/01_materials/fibers/linen.md"
+        },
+        {
+          "fragment_id": "fk-materials-linen-001::S07::001",
+          "source": "knowledge/01_materials/fibers/linen.md"
+        },
+        {
+          "fragment_id": "fk-materials-linen-001::S04::001",
+          "source": "knowledge/01_materials/fibers/linen.md"
+        }
+      ]
+    },
+    {
+      "case_id": "material-polyester-sport",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 3,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-materials-polyester-001::S01::001",
+          "source": "knowledge/01_materials/fibers/polyester.md"
+        },
+        {
+          "fragment_id": "fk-materials-polyester-001::S07::001",
+          "source": "knowledge/01_materials/fibers/polyester.md"
+        },
+        {
+          "fragment_id": "fk-materials-polyester-001::S03::001",
+          "source": "knowledge/01_materials/fibers/polyester.md"
+        }
+      ]
+    },
+    {
+      "case_id": "material-wool-care",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-materials-wool-001::S04::001",
+          "source": "knowledge/01_materials/fibers/wool.md"
+        },
+        {
+          "fragment_id": "fk-materials-wool-001::S06::001",
+          "source": "knowledge/01_materials/fibers/wool.md"
+        },
+        {
+          "fragment_id": "fk-materials-wool-001::S03::001",
+          "source": "knowledge/01_materials/fibers/wool.md"
+        }
+      ]
+    },
+    {
+      "case_id": "occasion-commute-walking",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 2,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-occasion-commute-001::S07::001",
+          "source": "knowledge/07_occasions_and_formality/office/daily_commute.md"
+        },
+        {
+          "fragment_id": "fk-occasion-commute-001::S04::001",
+          "source": "knowledge/07_occasions_and_formality/office/daily_commute.md"
+        },
+        {
+          "fragment_id": "fk-occasion-commute-001::S01::001",
+          "source": "knowledge/07_occasions_and_formality/office/daily_commute.md"
+        }
+      ]
+    },
+    {
+      "case_id": "occasion-interview-dress-code",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-occasion-interview-001::S03::001",
+          "source": "knowledge/07_occasions_and_formality/interview/interview_outfit.md"
+        },
+        {
+          "fragment_id": "fk-occasion-interview-001::S01::001",
+          "source": "knowledge/07_occasions_and_formality/interview/interview_outfit.md"
+        },
+        {
+          "fragment_id": "fk-occasion-interview-001::S04::001",
+          "source": "knowledge/07_occasions_and_formality/interview/interview_outfit.md"
+        }
+      ]
+    },
+    {
+      "case_id": "outfit-footwear-formal",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-outfit-footwear-001::S04::001",
+          "source": "knowledge/06_outfit_principles/footwear_accessories/footwear_role.md"
+        },
+        {
+          "fragment_id": "fk-outfit-footwear-001::S07::001",
+          "source": "knowledge/06_outfit_principles/footwear_accessories/footwear_role.md"
+        },
+        {
+          "fragment_id": "fk-outfit-footwear-001::S06::001",
+          "source": "knowledge/06_outfit_principles/footwear_accessories/footwear_role.md"
+        }
+      ]
+    },
+    {
+      "case_id": "outfit-layering-transition",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 2,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-outfit-layering-001::S04::001",
+          "source": "knowledge/06_outfit_principles/layering/layering_and_outerwear.md"
+        },
+        {
+          "fragment_id": "fk-outfit-layering-001::S02::001",
+          "source": "knowledge/06_outfit_principles/layering/layering_and_outerwear.md"
+        },
+        {
+          "fragment_id": "fk-outfit-layering-001::S03::001",
+          "source": "knowledge/06_outfit_principles/layering/layering_and_outerwear.md"
+        }
+      ]
+    },
+    {
+      "case_id": "weather-humidity-sweat",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 3,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-weather-humidity-001::S01::001",
+          "source": "knowledge/04_seasons_and_weather_principles/humidity/sweat_and_moisture_management.md"
+        },
+        {
+          "fragment_id": "fk-weather-temperature-001::S10::002",
+          "source": "knowledge/04_seasons_and_weather_principles/temperature/thermal_comfort_and_clothing.md"
+        },
+        {
+          "fragment_id": "fk-weather-humidity-001::S06::001",
+          "source": "knowledge/04_seasons_and_weather_principles/humidity/sweat_and_moisture_management.md"
+        }
+      ]
+    },
+    {
+      "case_id": "weather-rain-protection-terms",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 2,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-weather-rain-protection-001::S01::001",
+          "source": "knowledge/04_seasons_and_weather_principles/rain_and_wind/rain_water_resistance_and_breathability.md"
+        },
+        {
+          "fragment_id": "fk-weather-rain-protection-001::S11::003",
+          "source": "knowledge/04_seasons_and_weather_principles/rain_and_wind/rain_water_resistance_and_breathability.md"
+        },
+        {
+          "fragment_id": "fk-weather-rain-protection-001::S05::002",
+          "source": "knowledge/04_seasons_and_weather_principles/rain_and_wind/rain_water_resistance_and_breathability.md"
+        }
+      ]
+    },
+    {
+      "case_id": "weather-temperature-layering",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 1,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-weather-temperature-001::S08::001",
+          "source": "knowledge/04_seasons_and_weather_principles/temperature/thermal_comfort_and_clothing.md"
+        },
+        {
+          "fragment_id": "fk-weather-temperature-001::S02::001",
+          "source": "knowledge/04_seasons_and_weather_principles/temperature/thermal_comfort_and_clothing.md"
+        },
+        {
+          "fragment_id": "fk-weather-temperature-001::S11::002",
+          "source": "knowledge/04_seasons_and_weather_principles/temperature/thermal_comfort_and_clothing.md"
+        }
+      ]
+    },
+    {
+      "case_id": "weather-wind-outer-layer",
+      "passed": true,
+      "knowledge_rank": 1,
+      "section_rank": 3,
+      "returned_sources": [
+        {
+          "fragment_id": "fk-weather-wind-001::S01::001",
+          "source": "knowledge/04_seasons_and_weather_principles/rain_and_wind/wind_chill_and_outer_protection.md"
+        },
+        {
+          "fragment_id": "fk-weather-wind-001::S06::002",
+          "source": "knowledge/04_seasons_and_weather_principles/rain_and_wind/wind_chill_and_outer_protection.md"
+        },
+        {
+          "fragment_id": "fk-weather-wind-001::S02::002",
+          "source": "knowledge/04_seasons_and_weather_principles/rain_and_wind/wind_chill_and_outer_protection.md"
+        }
+      ]
+    }
+  ]
+}

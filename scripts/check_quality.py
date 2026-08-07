@@ -105,6 +105,7 @@ def build_quality_checks(
     *,
     include_postgres: bool,
     include_redis: bool = False,
+    include_rag_evaluation: bool = False,
 ) -> tuple[QualityCheck, ...]:
     """根据是否启用真实基础设施组合质量检查。"""
 
@@ -186,6 +187,20 @@ def build_quality_checks(
             ),
         )
 
+    if include_rag_evaluation:
+        checks.append(
+            QualityCheck(
+                name="知识检索质量评估",
+                command=(
+                    python,
+                    "-m",
+                    "scripts.evaluate_knowledge_retrieval",
+                ),
+                # 模型已本地缓存时跳过 HuggingFace 网络检查
+                environment={"HF_HUB_OFFLINE": "1"},
+            ),
+        )
+
     return tuple(checks)
 
 
@@ -239,6 +254,14 @@ def detect_infrastructure_services(
     )
 
 
+def rag_evaluation_ready() -> bool:
+    """判断知识检索评估是否可运行：问题集存在且 Chroma 索引非空。"""
+
+    cases_path = Path("evaluation/rag/retrieval_cases.json")
+    chroma_dir = Path("data/chroma")
+    return cases_path.exists() and chroma_dir.exists()
+
+
 def parse_args() -> argparse.Namespace:
     """解析质量门命令行参数。"""
 
@@ -259,6 +282,11 @@ def parse_args() -> argparse.Namespace:
         "--no-auto-detect",
         action="store_true",
         help="关闭基础设施自动探测（默认自动纳入已就绪的 PostgreSQL/Redis 集成测试）。",
+    )
+    parser.add_argument(
+        "--rag-evaluation",
+        action="store_true",
+        help="运行知识检索质量评估（通过率低于 100% 时该检查失败）。",
     )
     return parser.parse_args()
 
@@ -289,6 +317,12 @@ def main() -> int:
     include_postgres = args.postgres or postgres_ready
     include_redis = args.redis or redis_ready
 
+    # 知识检索评估：显式传参或检测到问题集 + Chroma 索引时纳入
+    rag_ready = rag_evaluation_ready()
+    include_rag_evaluation = args.rag_evaluation or (
+        rag_ready and not args.no_auto_detect
+    )
+
     if args.no_auto_detect:
         print("[提示] 已关闭基础设施自动探测。")
     else:
@@ -306,12 +340,20 @@ def main() -> int:
                 "[提示] 未检测到 Redis（127.0.0.1:6379），跳过 3 个 Checkpointer 集成测试；"
                 "可运行 `docker compose up -d redis` 后重试。",
             )
+        if include_rag_evaluation:
+            print("[检测] 检测到知识库索引与问题集，纳入知识检索质量评估。")
+        else:
+            print(
+                "[提示] 未检测到知识库索引或问题集，跳过知识检索质量评估；"
+                "可运行 `python -m scripts.index_knowledge` 与 `python -m scripts.evaluate_knowledge_retrieval` 后重试。",
+            )
 
     failed_checks = tuple(
         check.name
         for check in build_quality_checks(
             include_postgres=include_postgres,
             include_redis=include_redis,
+            include_rag_evaluation=include_rag_evaluation,
         )
         if not run_check(check)
     )

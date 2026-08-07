@@ -1,3 +1,6 @@
+import argparse
+import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.rag.evaluation.retrieval import (
@@ -9,6 +12,9 @@ from app.rag.retrievers.provider import get_knowledge_retriever
 
 DEFAULT_EVALUATION_PATH = Path(
     "evaluation/rag/retrieval_cases.json",
+)
+DEFAULT_REPORT_DIR = Path(
+    "evaluation/reports",
 )
 
 
@@ -40,11 +46,97 @@ def _print_report(report: RetrievalEvaluationReport) -> None:
     )
 
 
-def main() -> None:
-    """使用当前只读 Chroma 集合运行正式知识检索评测。"""
+def _serialize_report(
+    report: RetrievalEvaluationReport,
+    *,
+    min_pass_rate: float,
+) -> dict[str, object]:
+    """把评测报告序列化为可提交的 JSON 结构。"""
 
+    return {
+        "schema_version": "1.0",
+        "release_id": report.release_id,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "total_count": report.total_count,
+        "passed_count": report.passed_count,
+        "pass_rate": report.pass_rate,
+        "min_pass_rate": min_pass_rate,
+        "results": [
+            {
+                "case_id": result.case_id,
+                "passed": result.passed,
+                "knowledge_rank": result.knowledge_rank,
+                "section_rank": result.section_rank,
+                "returned_sources": [
+                    {
+                        "fragment_id": source.fragment_id,
+                        "source": source.source_path_or_url,
+                    }
+                    for source in result.returned_sources
+                ],
+            }
+            for result in report.results
+        ],
+    }
+
+
+def _write_report(
+    report: RetrievalEvaluationReport,
+    *,
+    min_pass_rate: float,
+    report_dir: Path,
+) -> Path:
+    """把评测报告写入 evaluation/reports/，返回报告路径。"""
+
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"retrieval_{report.release_id}.json"
+    report_path.write_text(
+        json.dumps(
+            _serialize_report(
+                report,
+                min_pass_rate=min_pass_rate,
+            ),
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return report_path
+
+
+def parse_args() -> argparse.Namespace:
+    """解析评测参数。"""
+
+    parser = argparse.ArgumentParser(
+        description="运行知识检索评测并保存质量报告。",
+    )
+    parser.add_argument(
+        "--cases",
+        type=Path,
+        default=DEFAULT_EVALUATION_PATH,
+        help="评测问题集路径（默认 evaluation/rag/retrieval_cases.json）。",
+    )
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        default=DEFAULT_REPORT_DIR,
+        help="评测报告输出目录（默认 evaluation/reports）。",
+    )
+    parser.add_argument(
+        "--min-pass-rate",
+        type=float,
+        default=1.0,
+        help="通过率下限，低于该值退出码为 1（默认 1.0）。",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    """使用当前只读 Chroma 集合运行正式知识检索评测并保存报告。"""
+
+    args = parse_args()
     suite = load_retrieval_evaluation_suite(
-        DEFAULT_EVALUATION_PATH,
+        args.cases,
     )
     retriever = get_knowledge_retriever()
     report = evaluate_retrieval_suite(
@@ -52,9 +144,18 @@ def main() -> None:
         retrieve_documents=retriever.invoke,
     )
     _print_report(report)
+    report_path = _write_report(
+        report,
+        min_pass_rate=args.min_pass_rate,
+        report_dir=args.report_dir,
+    )
+    print(f"评测报告已保存：{report_path}")
 
-    # 非零退出码便于未来在 CI 或发布流程中阻止检索质量回退。
-    if report.passed_count != report.total_count:
+    # 非零退出码便于在 CI 或发布流程中阻止检索质量回退。
+    if report.pass_rate < args.min_pass_rate:
+        print(
+            f"评测未达门禁：通过率 {report.pass_rate:.1%} < {args.min_pass_rate:.1%}。",
+        )
         raise SystemExit(1)
 
 
