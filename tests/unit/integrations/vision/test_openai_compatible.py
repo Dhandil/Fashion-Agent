@@ -65,6 +65,25 @@ def create_completion_response(
     )
 
 
+def create_completion_response_content(
+    content: str,
+) -> httpx.Response:
+    """构造带指定原文内容的 Chat Completions 成功响应。"""
+
+    return httpx.Response(
+        200,
+        json={
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                    },
+                },
+            ],
+        },
+    )
+
+
 @pytest.mark.anyio
 async def test_recognizer_sends_image_and_parses_result() -> None:
     """验证请求包含照片与提示，并解析结构化识别结果。"""
@@ -274,3 +293,75 @@ async def test_recognizer_rejects_invalid_confidence() -> None:
         await recognizer.recognize(
             TEST_IMAGE,
         )
+
+
+@pytest.mark.anyio
+async def test_recognizer_parses_markdown_code_block() -> None:
+    """验证模型以 Markdown 代码块包裹 JSON 时仍能解析（GLM-4V-Flash 实测形态）。"""
+
+    recognition = {
+        "name": "浅色衬衫",
+        "category": "上装",
+        "colors": ["白色", "黑色"],
+        "confidence": 0.9,
+    }
+    wrapped = f"```json\n{json.dumps(recognition, ensure_ascii=False)}\n```"
+
+    def handler(
+        _request: httpx.Request,
+    ) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": wrapped,
+                        },
+                    },
+                ],
+            },
+        )
+
+    recognizer = create_recognizer(handler)
+
+    result = await recognizer.recognize(
+        TEST_IMAGE,
+    )
+
+    assert result.name == "浅色衬衫"
+    assert result.category == "上装"
+    assert result.colors == ("白色", "黑色")
+
+
+@pytest.mark.anyio
+async def test_recognizer_parses_json_with_surrounding_text() -> None:
+    """验证 JSON 前后夹带解释性文字时仍能提取并解析。"""
+
+    recognition = {
+        "name": "深灰色直筒西裤",
+        "category": "长裤",
+        "colors": ["深灰色"],
+        "confidence": 0.8,
+    }
+    noisy = (
+        "好的，这是识别结果："
+        f"{json.dumps(recognition, ensure_ascii=False)}"
+        "（仅供参考）"
+    )
+
+    def handler(
+        _request: httpx.Request,
+    ) -> httpx.Response:
+        return create_completion_response_content(
+            noisy,
+        )
+
+    recognizer = create_recognizer(handler)
+
+    result = await recognizer.recognize(
+        TEST_IMAGE,
+    )
+
+    assert result.name == "深灰色直筒西裤"
+    assert result.colors == ("深灰色",)

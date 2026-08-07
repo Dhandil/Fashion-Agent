@@ -26,3 +26,27 @@ class ReadinessResponse(BaseModel):
 
     status: str
     checks: ReadinessChecks
+
+
+class CapabilityChecks(BaseModel):
+    """Agent 核心能力的状态汇总。
+
+    取值约定：
+    - llm / embedding：ok | missing
+    - knowledge_base：ok | empty | unavailable
+    - weather / vision：ok | disabled | missing
+    """
+
+    llm: str = "missing"
+    embedding: str = "missing"
+    knowledge_base: str = "unavailable"
+    knowledge_version: str | None = None
+    weather: str = "disabled"
+    vision: str = "disabled"
+
+
+class CapabilitiesResponse(BaseModel):
+    """Agent 能力检查响应；能力缺失不影响进程存活。"""
+
+    status: str = "degraded"
+    checks: CapabilityChecks

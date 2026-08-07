@@ -24,6 +24,10 @@ tests
 evaluation
 docs
 
+# Node.js 前端依赖与构建产物（构建上下文是仓库根目录）
+frontend/node_modules
+frontend/dist
+
 # 原始知识、Chroma 数据和本地模型必须通过 Volume 提供
 data/raw
 data/chroma

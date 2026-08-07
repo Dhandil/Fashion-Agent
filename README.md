@@ -32,6 +32,9 @@ PostgreSQL 和基础可观测性等核心链路，并持续通过确定性测试
 - [产品定位与边界](docs/product_scope.md)
 - [需求规格](docs/requirements.md)
 - [开发路线图](docs/roadmap.md)
+- [前端界面技术方案](docs/frontend.md)
+- [Web UI 设计方案](docs/ui-design.md)
+- [Web 视觉方向](docs/visual-direction.md)
 
 ## 开发约定
 

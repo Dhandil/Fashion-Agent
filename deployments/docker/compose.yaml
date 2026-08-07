@@ -188,6 +188,30 @@ services:
       retries: 6
       start_period: 30s
 
+  frontend:
+    # 前端静态资源 + nginx 同域反向代理 /api（方案 B）
+    image: fashion-agent-frontend:local
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      # 宿主 ${FRONTEND_PORT:-8080} 映射到容器 nginx 80
+      - "${FRONTEND_PORT:-8080}:80"
+
+    depends_on:
+      app:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
 volumes:
   fashion_agent_postgres_data:
   fashion_agent_huggingface_cache:

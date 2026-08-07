@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import os
+import socket
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# Docker Compose 默认映射的宿主端口（见 deployments/docker/compose.yaml）
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
 # 目录占位文件可以提交，真实运行数据和本地配置不能进入 Git。
 PROTECTED_EXACT_PATHS = frozenset({".env"})
@@ -208,6 +213,32 @@ def run_check(check: QualityCheck) -> bool:
     return False
 
 
+def probe_tcp_port(host: str, port: int, timeout: float = 1.0) -> bool:
+    """TCP 探测一个端口是否可连接，用于判断基础设施服务是否就绪。"""
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def detect_infrastructure_services(
+    *,
+    host: str = "127.0.0.1",
+) -> tuple[bool, bool]:
+    """探测 PostgreSQL 与 Redis 是否已在本机运行。
+
+    返回 (postgres_ready, redis_ready)。仅做 TCP 探测，
+    不验证凭据——服务端口开放即可纳入真实集成测试。
+    """
+
+    return (
+        probe_tcp_port(host, POSTGRES_PORT),
+        probe_tcp_port(host, REDIS_PORT),
+    )
+
+
 def parse_args() -> argparse.Namespace:
     """解析质量门命令行参数。"""
 
@@ -223,6 +254,11 @@ def parse_args() -> argparse.Namespace:
         "--redis",
         action="store_true",
         help="同时运行真实 Redis Checkpointer 持久化测试。",
+    )
+    parser.add_argument(
+        "--no-auto-detect",
+        action="store_true",
+        help="关闭基础设施自动探测（默认自动纳入已就绪的 PostgreSQL/Redis 集成测试）。",
     )
     return parser.parse_args()
 
@@ -243,11 +279,39 @@ def main() -> int:
         return 1
 
     print("[通过] 未发现被 Git 跟踪的受保护本地数据。")
+
+    # 自动探测已就绪的基础设施；显式传参或 --no-auto-detect 时跳过探测
+    postgres_ready, redis_ready = (
+        (False, False)
+        if args.no_auto_detect
+        else detect_infrastructure_services()
+    )
+    include_postgres = args.postgres or postgres_ready
+    include_redis = args.redis or redis_ready
+
+    if args.no_auto_detect:
+        print("[提示] 已关闭基础设施自动探测。")
+    else:
+        if postgres_ready:
+            print("[检测] PostgreSQL 端口就绪，纳入真实集成测试。")
+        else:
+            print(
+                "[提示] 未检测到 PostgreSQL（127.0.0.1:5432），跳过 4 个数据库集成测试；"
+                "可运行 `docker compose up -d postgres` 后重试。",
+            )
+        if redis_ready:
+            print("[检测] Redis 端口就绪，纳入真实集成测试。")
+        else:
+            print(
+                "[提示] 未检测到 Redis（127.0.0.1:6379），跳过 3 个 Checkpointer 集成测试；"
+                "可运行 `docker compose up -d redis` 后重试。",
+            )
+
     failed_checks = tuple(
         check.name
         for check in build_quality_checks(
-            include_postgres=args.postgres,
-            include_redis=args.redis,
+            include_postgres=include_postgres,
+            include_redis=include_redis,
         )
         if not run_check(check)
     )

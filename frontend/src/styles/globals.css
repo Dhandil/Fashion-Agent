@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: theme("colors.border");
+  }
+
+  body {
+    @apply bg-canvas text-body text-text-primary;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 内容区最大宽度 */
+  .content-max {
+    @apply max-w-content;
+  }
+
+  /* 聊天正文可读宽度 */
+  .chat-read-width {
+    @apply max-w-chat;
+  }
+
+  /* 聚焦环 */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand rounded-input;
+  }
+}
+
+@layer components {
+  /* 来源标签 */
+  .source-tag {
+    @apply inline-flex items-center gap-4 px-8 py-2 text-small rounded-tag;
+  }
+  .source-tag-wardrobe {
+    @apply source-tag bg-brand/10 text-brand;
+  }
+  .source-tag-product {
+    @apply source-tag bg-info/10 text-info;
+  }
+  .source-tag-recommendation {
+    @apply source-tag border text-text-secondary;
+  }
+
+  /* 状态标签 */
+  .status-available {
+    @apply text-success;
+  }
+  .status-unavailable {
+    @apply text-text-secondary;
+  }
+}
+
+@layer utilities {
+  /* 触摸目标 */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* 动画降级 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

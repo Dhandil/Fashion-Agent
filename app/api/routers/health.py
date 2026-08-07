@@ -2,12 +2,14 @@ from fastapi import APIRouter
 
 from app.api.dependencies.database import DatabaseSession
 from app.api.schemas.health import (
+    CapabilitiesResponse,
     HealthResponse,
     ReadinessChecks,
     ReadinessResponse,
 )
 from app.core.config import get_settings
 from app.services.health import (
+    assess_capabilities,
     ensure_database_ready,
     ensure_short_term_memory_ready,
 )
@@ -54,3 +56,14 @@ async def readiness_check(
             short_term_memory=memory_status,
         ),
     )
+
+
+@router.get(
+    "/health/capabilities",
+    response_model=CapabilitiesResponse,
+    summary="Agent 能力状态检查",
+)
+async def capabilities_check() -> CapabilitiesResponse:
+    """返回 LLM、Embedding、知识库、天气与视觉能力状态。"""
+
+    return await assess_capabilities()

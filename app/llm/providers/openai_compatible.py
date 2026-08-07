@@ -24,4 +24,7 @@ def create_chat_model(settings: Settings | None = None) -> ChatOpenAI:
         # ChatOpenAI 原生接受 SecretStr，无需在应用层解开密钥
         api_key=current_settings.llm_api_key,
         base_url=current_settings.llm_base_url,
+        # 显式超时与有限重试，避免请求长时间挂起或无限重试
+        timeout=current_settings.llm_timeout_seconds,
+        max_retries=current_settings.llm_max_retries,
     )

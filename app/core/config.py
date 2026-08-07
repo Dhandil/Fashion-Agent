@@ -91,6 +91,20 @@ class Settings(BaseSettings):
     # 使用的模型名称，例如 deepseek-chat
     llm_model: str | None = None
 
+    # LLM 调用超时时间，避免模型响应慢时用户无限等待
+    llm_timeout_seconds: float = Field(
+        default=120.0,
+        gt=0,
+        le=600,
+    )
+
+    # LLM 调用最大重试次数（网络类临时错误）
+    llm_max_retries: int = Field(
+        default=2,
+        ge=0,
+        le=10,
+    )
+
     # 衣物照片识别默认关闭；关闭时照片识别接口返回明确的 503
     wardrobe_vision_backend: Literal[
         "disabled",
@@ -162,6 +176,12 @@ class Settings(BaseSettings):
 
     # Embedding 运行设备，开发环境默认使用 CPU
     embedding_device: str = "cpu"
+
+    # 模型已本地缓存时强制离线加载，跳过 HuggingFace 网络检查（国内网络尤其有用）
+    embedding_hf_offline: bool = False
+
+    # HuggingFace 镜像端点，例如 https://hf-mirror.com；需要下载模型时使用
+    embedding_hf_endpoint: str | None = None
 
     # Chroma 持久化数据保存目录
     chroma_persist_directory: str = "./data/chroma"
