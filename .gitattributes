@@ -1,0 +1,14 @@
+# 统一换行符策略：文本文件自动检测，关键类型显式锁定
+* text=auto
+
+# 前端源码与配置统一 LF（跨平台一致，消除 Windows 上的 CRLF 警告）
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.svg text eol=lf
+
+# Markdown 文档统一 LF
+*.md text eol=lf
