@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routers.chat import router as chat_router
 from app.api.routers.health import router as health_router
 from app.api.routers.outfit import router as outfit_router
+from app.api.routers.products import router as products_router
 from app.api.routers.style_profile import (
     router as style_profile_router,
 )
@@ -25,3 +26,6 @@ api_router.include_router(outfit_router)
 
 # 注册用户长期穿搭档案子路由
 api_router.include_router(style_profile_router)
+
+# 注册商品目录子路由
+api_router.include_router(products_router)
