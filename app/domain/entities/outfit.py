@@ -164,13 +164,23 @@ class OutfitRecommendation(BaseModel):
 
     @model_validator(mode="after")
     def validate_wardrobe_gaps(self) -> Self:
-        """验证每个衣橱缺口都对应搭配中的建议单品。"""
+        """验证每个衣橱缺口都对应搭配中的建议单品。
 
-        recommendation_roles = {
-            item.role for item in self.items if item.source is OutfitItemSource.RECOMMENDATION
+        缺口的“建议单品”可以是推荐单品（recommendation），
+        也可以是购物场景下已搜索到的外部商品（product）。
+        """
+
+        suggested_roles = {
+            item.role
+            for item in self.items
+            if item.source
+            in (
+                OutfitItemSource.RECOMMENDATION,
+                OutfitItemSource.PRODUCT,
+            )
         }
         unmatched_gap_roles = {
-            gap.role for gap in self.wardrobe_gaps if gap.role not in recommendation_roles
+            gap.role for gap in self.wardrobe_gaps if gap.role not in suggested_roles
         }
 
         if unmatched_gap_roles:

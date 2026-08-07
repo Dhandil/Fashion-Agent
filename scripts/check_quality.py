@@ -106,6 +106,7 @@ def build_quality_checks(
     include_postgres: bool,
     include_redis: bool = False,
     include_rag_evaluation: bool = False,
+    include_outfit_evaluation: bool = False,
 ) -> tuple[QualityCheck, ...]:
     """根据是否启用真实基础设施组合质量检查。"""
 
@@ -201,6 +202,18 @@ def build_quality_checks(
             ),
         )
 
+    if include_outfit_evaluation:
+        checks.append(
+            QualityCheck(
+                name="Outfit 生成与修正评测",
+                command=(
+                    python,
+                    "-m",
+                    "scripts.evaluate_outfits",
+                ),
+            ),
+        )
+
     return tuple(checks)
 
 
@@ -288,6 +301,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="运行知识检索质量评估（通过率低于 100% 时该检查失败）。",
     )
+    parser.add_argument(
+        "--outfit-evaluation",
+        action="store_true",
+        help="运行 Outfit 生成与修正评测（调用真实 LLM，较慢；有失败案例时该检查失败）。",
+    )
     return parser.parse_args()
 
 
@@ -354,6 +372,7 @@ def main() -> int:
             include_postgres=include_postgres,
             include_redis=include_redis,
             include_rag_evaluation=include_rag_evaluation,
+            include_outfit_evaluation=args.outfit_evaluation,
         )
         if not run_check(check)
     )

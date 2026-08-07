@@ -135,3 +135,43 @@ def test_wardrobe_gap_must_match_recommended_outfit_item() -> None:
                 ),
             ],
         )
+
+
+def test_wardrobe_gap_matches_product_item() -> None:
+    """验证购物场景下缺口可以由外部商品单品补全。"""
+
+    outfit = OutfitRecommendation(
+        name="通勤穿搭",
+        scenario="通勤",
+        items=[
+            OutfitItem(
+                role="上装",
+                name="白色通勤衬衫",
+                source="wardrobe",
+                source_reference_id="upper-shirt-001",
+            ),
+            OutfitItem(
+                role="下装",
+                name="藏蓝西裤",
+                source="wardrobe",
+                source_reference_id="lower-trouser-001",
+            ),
+            OutfitItem(
+                role="鞋履",
+                name="黑色通勤乐福鞋",
+                source="product",
+                source_reference_id="product-shoes-001",
+            ),
+        ],
+        recommendation_reason="使用已有衣物并补一双通勤鞋完成搭配。",
+        wardrobe_gaps=[
+            WardrobeGap(
+                role="鞋履",
+                suggested_item="黑色通勤乐福鞋",
+                reason="衣橱缺少适合通勤的鞋履",
+            ),
+        ],
+    )
+
+    # 缺口有对应的商品单品，不应触发校验错误
+    assert outfit is not None
