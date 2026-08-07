@@ -143,6 +143,8 @@ services:
       # 容器内 Collector 地址与本地开发不同
       TELEMETRY_OTLP_ENDPOINT: ${TELEMETRY_OTLP_ENDPOINT:-http://collector:4317}
       EMBEDDING_DEVICE: cpu
+      # 模型权重已随镜像缓存，强制离线加载避免每次请求检查 huggingface.co
+      HF_HUB_OFFLINE: "1"
       CHROMA_PERSIST_DIRECTORY: /app/data/chroma
       KNOWLEDGE_REPOSITORY_PATH: /app/data/raw/Fashion-Agent-Knowledge
 

@@ -9,6 +9,11 @@ RUN npm ci
 
 # 复制源码并构建
 COPY frontend/ ./
+
+# 演示/开发部署注入默认用户身份；真实生产由认证系统替代
+ARG VITE_DEV_USER_ID=dev-user-001
+RUN echo "VITE_DEV_USER_ID=${VITE_DEV_USER_ID}" > .env.production
+
 RUN npm run build
 
 # ── 运行阶段：nginx 托管静态文件并反向代理 /api ──
