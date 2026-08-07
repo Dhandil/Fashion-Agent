@@ -80,6 +80,48 @@ python -m scripts.smoke_agent --allow-model-call
 首次运行会把模型写入 Docker 的 Hugging Face 缓存卷，可能需要数分钟。请求发出后
 应等待脚本明确成功或失败；中断客户端不保证已经到达服务端的模型调用会同步取消。
 
+## 前端开发
+
+前端位于 `frontend/`（React 19 + Vite + TypeScript + Tailwind CSS），通过
+`/api` 代理访问后端，开发期无需处理跨域。
+
+开发模式需要两个终端，均在仓库根目录：
+
+```powershell
+# 终端 1：后端 FastAPI（PostgreSQL/Redis 容器需已启动）
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# 终端 2：前端 Vite 开发服务器
+cd frontend
+npm install   # 首次
+npm run dev
+```
+
+访问 http://127.0.0.1:5173 。前端测试：
+
+```powershell
+cd frontend
+npx vitest run        # 单元测试
+npx tsc --noEmit      # 类型检查
+npx vite build        # 生产构建
+```
+
+开发期前端默认以 `dev-user-001` 作为 `X-User-ID` 演示身份；生产构建不注入身份，
+待接入真实认证后使用。
+
+## 质量评测
+
+知识检索命中率与 Outfit 质量评估（需要 RAG 与 LLM 可用，非默认质量门）：
+
+```powershell
+$env:HF_HUB_OFFLINE = "1"   # 使用本地模型缓存
+python -m scripts.evaluate_knowledge_retrieval   # 知识检索用例命中率
+python -m scripts.evaluate_outfits               # Outfit 质量评分
+```
+
+问题集位于 `evaluation/`，`evaluate_knowledge_retrieval` 会报告每个用例的
+knowledge/section 命中排名与整体通过率。
+
 ## Docker Compose
 
 只验证 Compose 结构，不构建或下载镜像：
@@ -97,6 +139,21 @@ docker compose -f deployments/docker/compose.yaml up --build -d
 Compose 会等待 PostgreSQL 与 Redis 健康，再运行一次 Alembic migration，成功后
 启动 API。应用使用非 root 用户；原始知识库以只读方式挂载，Chroma、Redis 数据
 和 Hugging Face 缓存独立持久化，不会被复制进镜像。
+
+完整部署（含前端）后访问：
+
+- 前端 Web UI：http://127.0.0.1:8080 （nginx 同域反向代理 `/api` 到应用）
+- API 文档：http://127.0.0.1:8000/docs （直接访问应用端口）
+
+更新部署时重新构建镜像并用新镜像重建容器（数据保存在 volume，不会丢失）：
+
+```powershell
+docker compose -f deployments/docker/compose.yaml build
+docker compose -f deployments/docker/compose.yaml up -d --force-recreate app frontend
+```
+
+前端镜像构建时通过 `VITE_DEV_USER_ID` 注入演示身份，使 Docker 部署与本地开发
+行为一致；生产接入认证后移除该注入即可。
 
 Redis 会话默认采用 7 天滑动 TTL，并按命名空间保留最近 50 个 LangGraph
 Checkpoint；可通过 `.env.example` 中的 `REDIS_CHECKPOINT_TTL_MINUTES` 和
