@@ -534,6 +534,7 @@ export interface components {
              */
             message: string;
             weather?: components["schemas"]["WeatherContextInput"] | null;
+            weather_query?: components["schemas"]["WeatherQueryInput"] | null;
         };
         /**
          * ChatResponse
@@ -1436,6 +1437,19 @@ export interface components {
             wind_speed_kph?: number | null;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /**
+         * WeatherQueryInput
+         * @description 前端请求实时天气时提供的地点和日期。
+         */
+        WeatherQueryInput: {
+            /** Location */
+            location: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
         };
         /**
          * WeatherDataSource

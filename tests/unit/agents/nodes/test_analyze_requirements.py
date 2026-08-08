@@ -140,6 +140,38 @@ def test_complete_weather_query_does_not_ask_for_weather() -> None:
     assert analysis.needs_weather is True
 
 
+def test_structured_weather_query_supplies_location_and_date() -> None:
+    """验证结构化天气查询会补齐天气工具所需的地点和日期。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            scenario="通勤",
+            needs_weather=False,
+            is_sufficient=True,
+        ),
+    )
+
+    result = node(
+        {
+            "messages": [
+                HumanMessage(content="请帮我安排明天的通勤穿搭"),
+            ],
+            "weather_query": {
+                "location": "上海",
+                "target_date": "2026-08-09",
+            },
+        },
+    )
+    analysis = result["requirement_analysis"]
+
+    assert analysis.needs_weather is True
+    assert analysis.location == "上海"
+    assert analysis.target_date == "2026-08-09"
+    assert analysis.is_sufficient is True
+    assert analysis.missing_fields == ()
+
+
 def test_analysis_recognises_explicit_product_search() -> None:
     """验证用户原文明示找商品时开放商品查询权限。"""
 

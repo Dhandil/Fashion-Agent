@@ -13,12 +13,14 @@ import {
 } from "@/api/client";
 import type { components } from "@/api/generated/schema";
 import { useChatStore, type WeatherSnapshot } from "@/stores/chat";
+import type { WeatherQuery } from "@/features/conversation/PromptComposer";
 
 type ChatRequest = components["schemas"]["ChatRequest"];
 type ChatResponse = components["schemas"]["ChatResponse"];
 type ChatResponseWithWeather = ChatResponse & {
   weather?: WeatherSnapshot | null;
 };
+type WeatherInput = components["schemas"]["WeatherContextInput"];
 
 /** sessionStorage key 按用户隔离，避免不同用户串会话 */
 export function conversationStorageKey(userId: string): string {
@@ -38,7 +40,11 @@ export function useSendMessage() {
   const [error, setError] = useState<AppError | null>(null);
 
   const send = useCallback(
-    async (message: string) => {
+    async (
+      message: string,
+      weather?: WeatherInput,
+      weatherQuery?: WeatherQuery,
+    ) => {
       if (status === "submitting" || !message.trim()) return;
 
       setStatus("submitting");
@@ -46,9 +52,14 @@ export function useSendMessage() {
       addUserMessage(message.trim());
 
       try {
+        const requestMessage = weatherQuery
+          ? message.trim()
+          : message.trim();
         const body: ChatRequest = {
-          message: message.trim(),
+          message: requestMessage,
           conversation_id: conversationId,
+          weather: weather ?? null,
+          weather_query: weatherQuery ?? null,
         };
 
         const streamResult: { value: ChatResponseWithWeather | null } = {

@@ -78,6 +78,11 @@ def _build_graph_input(
         "messages": [HumanMessage(content=request.message)],
         # 每轮都明确写入天气；None 会清除 Checkpointer 中的过期天气。
         "weather_context": weather_context,
+        "weather_query": (
+            request.weather_query.model_dump(mode="json")
+            if request.weather_query is not None
+            else None
+        ),
     }
 
 

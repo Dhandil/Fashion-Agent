@@ -429,6 +429,7 @@ def create_requirement_analysis_node(
         recent_conversation = _recent_conversation_text(
             state,
         )
+        weather_query = state.get("weather_query")
         payload = {
             "output_schema": (OutfitRequirementAnalysis.model_json_schema()),
             "current_request": current_request,
@@ -436,6 +437,7 @@ def create_requirement_analysis_node(
             "conversation_summary": (
                 conversation_summary.content if conversation_summary is not None else ""
             ),
+            "weather_query": weather_query,
         }
 
         try:
@@ -467,6 +469,34 @@ def create_requirement_analysis_node(
                     recent_conversation,
                 ),
             )
+            if weather_query:
+                # 结构化天气查询优先于模型是否成功从自然语言提取地点和日期。
+                # 仍保留其他缺失字段，避免天气输入绕过场景等必要澄清。
+                location = weather_query.get("location")
+                target_date = weather_query.get("target_date")
+                remaining_missing_fields = tuple(
+                    field
+                    for field in analysis.missing_fields
+                    if field
+                    not in (
+                        RequirementField.LOCATION,
+                        RequirementField.TARGET_DATE,
+                        RequirementField.WEATHER,
+                    )
+                )
+                analysis = analysis.model_copy(
+                    update={
+                        "location": location or analysis.location,
+                        "target_date": target_date or analysis.target_date,
+                        "needs_weather": True,
+                        "is_sufficient": (
+                            not remaining_missing_fields
+                            if not analysis.is_sufficient
+                            else analysis.is_sufficient
+                        ),
+                        "missing_fields": remaining_missing_fields,
+                    },
+                )
             degraded = False
         except Exception as exc:  # noqa: BLE001
             logger.warning(

@@ -688,3 +688,35 @@ def test_chat_stream_returns_progress_and_complete_events() -> None:
     assert '"type": "status"' in response.text
     assert '"type": "complete"' in response.text
     assert '"message": "流式回复"' in response.text
+def test_chat_passes_structured_weather_query_to_graph() -> None:
+    """验证前端只提供地点和日期时，查询参数会原样进入 Agent 状态。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [AIMessage(content="已收到天气查询")],
+        },
+    )
+
+    with patch(
+        "app.api.dependencies.agent.create_user_shopping_graph",
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={"X-User-ID": "user-001"},
+            json={
+                "message": "明天上海通勤怎么穿？",
+                "weather_query": {
+                    "location": "上海",
+                    "target_date": "2026-08-09",
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    input_state = fake_graph.ainvoke.call_args.args[0]
+    assert input_state["weather_query"] == {
+        "location": "上海",
+        "target_date": "2026-08-09",
+    }

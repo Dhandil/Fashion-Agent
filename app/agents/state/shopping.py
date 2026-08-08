@@ -45,6 +45,9 @@ class ShoppingAgentState(TypedDict):
     # 当前请求明确提供的天气，只对本轮穿搭决策有效
     weather_context: NotRequired[WeatherContext | None]
 
+    # 前端明确要求查询实时天气时使用，避免依赖自然语言猜测地点和日期。
+    weather_query: NotRequired[dict[str, str] | None]
+
     # 用户已确认的历史 Outfit 反馈形成的个性化参考
     outfit_feedback_context: NotRequired[str]
 

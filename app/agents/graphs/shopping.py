@@ -45,6 +45,9 @@ from app.agents.nodes.prepare_turn import (
 from app.agents.nodes.reject_tools import (
     reject_disallowed_tool_calls,
 )
+from app.agents.nodes.resolve_weather import (
+    create_weather_query_node,
+)
 from app.agents.nodes.retrieve_knowledge import (
     create_retrieve_knowledge_node,
 )
@@ -169,8 +172,21 @@ def create_shopping_graph(
         START,
         "prepare_turn",
     )
+
+    weather_tool = next(
+        (tool for tool in tools or () if tool.name == "get_weather"),
+        None,
+    )
+    graph_builder.add_node(
+        "resolve_weather_query",
+        cast(Any, create_weather_query_node(weather_tool)),
+    )
     graph_builder.add_edge(
         "prepare_turn",
+        "resolve_weather_query",
+    )
+    graph_builder.add_edge(
+        "resolve_weather_query",
         "analyze_requirements",
     )
 

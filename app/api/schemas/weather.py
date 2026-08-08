@@ -10,6 +10,13 @@ from pydantic import (
 )
 
 
+class WeatherQueryInput(BaseModel):
+    """前端请求实时天气时提供的地点和日期。"""
+
+    location: str = Field(min_length=1, max_length=200)
+    target_date: date
+
+
 class WeatherContextInput(BaseModel):
     """由用户或客户端明确提供的当前天气上下文。"""
 

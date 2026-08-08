@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.api.schemas.weather import WeatherContextInput
+from app.api.schemas.weather import WeatherContextInput, WeatherQueryInput
 from app.domain.entities.outfit import (
     OutfitRecommendation,
 )
@@ -30,6 +30,9 @@ class ChatRequest(BaseModel):
 
     # 可由前端定位和天气服务明确提供；不提供时 Agent 不虚构实时天气
     weather: WeatherContextInput | None = None
+
+    # 只提供地点和日期时，由 Agent 的天气工具查询实时天气。
+    weather_query: WeatherQueryInput | None = None
 
 
 class ChatResponse(BaseModel):
