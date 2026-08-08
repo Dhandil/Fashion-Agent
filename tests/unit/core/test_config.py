@@ -167,10 +167,6 @@ def test_settings_read_database_environment_variables(
 
     # 模拟生产环境提供的数据库配置
     monkeypatch.setenv(
-        "PRODUCT_REPOSITORY_BACKEND",
-        "postgres",
-    )
-    monkeypatch.setenv(
         "DATABASE_URL",
         ("postgresql+asyncpg://fashion_agent:secret@localhost:5432/fashion_agent"),
     )
@@ -181,9 +177,6 @@ def test_settings_read_database_environment_variables(
 
     # 不读取项目的 .env，只验证测试设置的环境变量
     settings = Settings(_env_file=None)
-
-    # 仓库后端应该切换为 PostgreSQL
-    assert settings.product_repository_backend == "postgres"
 
     # SecretStr 需要显式调用方法才能取得真实内容
     assert settings.database_url is not None
@@ -235,22 +228,6 @@ def test_settings_reject_invalid_short_term_memory_config(
 
     monkeypatch.setenv(variable_name, value)
 
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None)
-
-
-def test_settings_reject_invalid_repository_backend(
-    monkeypatch,
-) -> None:
-    """验证不支持的商品仓库类型会触发配置校验错误。"""
-
-    # 设置一个不在 Literal 允许范围内的仓库类型
-    monkeypatch.setenv(
-        "PRODUCT_REPOSITORY_BACKEND",
-        "mongodb",
-    )
-
-    # Settings 初始化时应该立即拒绝无效配置
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
 

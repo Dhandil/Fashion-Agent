@@ -1,4 +1,8 @@
-"""商品仓库依赖提供模块。"""
+"""商品仓库依赖提供模块。
+
+当前商品目录仍是开发阶段的内存样例数据；正式外部商品源接入后，
+再通过请求级依赖装配 PostgreSQL 缓存或 Provider 适配器。
+"""
 
 from functools import lru_cache
 from pathlib import Path

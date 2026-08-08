@@ -1,7 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import AgentMessage from "./AgentMessage";
 import type { ChatMessage } from "@/stores/chat";
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
 
 function makeAgentMessage(partial: Partial<ChatMessage>): ChatMessage {
   return {
@@ -34,7 +45,7 @@ describe("AgentMessage", () => {
       notes: null,
     };
 
-    render(
+    renderWithQueryClient(
       <AgentMessage
         message={makeAgentMessage({ outfit })}
         onSaveOutfit={vi.fn()}
@@ -60,7 +71,7 @@ describe("AgentMessage", () => {
       next_actions: ["search_products", "add_wardrobe_items"],
     } as unknown as Parameters<typeof AgentMessage>[0]["message"]["outfitGap"];
 
-    render(
+    renderWithQueryClient(
       <AgentMessage
         message={makeAgentMessage({ outfitGap: gap })}
         onSaveOutfit={vi.fn()}
@@ -88,7 +99,7 @@ describe("AgentMessage", () => {
       },
     ] as Parameters<typeof AgentMessage>[0]["message"]["outfitIssues"];
 
-    render(
+    renderWithQueryClient(
       <AgentMessage
         message={makeAgentMessage({ outfitIssues: issues })}
         onSaveOutfit={vi.fn()}
@@ -103,7 +114,7 @@ describe("AgentMessage", () => {
   });
 
   it("有来源时渲染知识依据折叠区", () => {
-    render(
+    renderWithQueryClient(
       <AgentMessage
         message={makeAgentMessage({ sources: ["knowledge/01_materials/fibers/linen.md"] })}
         onSaveOutfit={vi.fn()}

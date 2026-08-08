@@ -168,12 +168,6 @@ def _capability_patches(settings: Settings, vector_store: Mock) -> ExitStack:
     )
     stack.enter_context(
         patch(
-            "app.services.health.create_huggingface_embeddings",
-            return_value=Mock(),
-        ),
-    )
-    stack.enter_context(
-        patch(
             "app.services.health.get_knowledge_vector_store",
             return_value=vector_store,
         ),

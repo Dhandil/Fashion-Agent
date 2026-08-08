@@ -196,9 +196,14 @@ def build_quality_checks(
                     python,
                     "-m",
                     "scripts.evaluate_knowledge_retrieval",
+                    "--no-write",
                 ),
-                # 模型已本地缓存时跳过 HuggingFace 网络检查
-                environment={"HF_HUB_OFFLINE": "1"},
+                # 测试和评测都不能被本地 .env 中的非法 DEBUG 值污染。
+                # 模型已本地缓存时跳过 HuggingFace 网络检查。
+                environment={
+                    "DEBUG": "false",
+                    "HF_HUB_OFFLINE": "1",
+                },
             ),
         )
 
@@ -211,6 +216,7 @@ def build_quality_checks(
                     "-m",
                     "scripts.evaluate_outfits",
                 ),
+                environment={"DEBUG": "false"},
             ),
         )
 

@@ -18,8 +18,6 @@ export default function ProductSearchDrawer({ open, gapRole, onClose }: Props) {
     null,
   );
 
-  if (!open) return null;
-
   const { data, isLoading, isError } = useProductSearch(
     {
       query: submitted?.query ?? (gapRole ?? undefined),
@@ -27,14 +25,20 @@ export default function ProductSearchDrawer({ open, gapRole, onClose }: Props) {
       maxPrice: submitted?.maxPrice,
       limit: 10,
     },
-    true,
+    open,
   );
 
+  if (!open) return null;
+
   const handleSearch = () => {
+    const normalizedMaxPrice = maxPrice.trim() ? Number(maxPrice.trim()) : undefined;
+    if (normalizedMaxPrice !== undefined && (!Number.isFinite(normalizedMaxPrice) || normalizedMaxPrice < 0)) {
+      return;
+    }
     setSubmitted({
       query: query.trim(),
       category: category.trim(),
-      maxPrice: maxPrice.trim() ? Number(maxPrice.trim()) : undefined,
+      maxPrice: normalizedMaxPrice,
     });
   };
 

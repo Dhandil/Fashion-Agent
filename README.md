@@ -120,7 +120,8 @@ python -m scripts.evaluate_outfits               # Outfit 质量评分
 ```
 
 问题集位于 `evaluation/`，`evaluate_knowledge_retrieval` 会报告每个用例的
-knowledge/section 命中排名与整体通过率。
+knowledge/section 命中排名与整体通过率。默认会写入评测报告；质量门使用
+`--no-write` 只读模式，避免普通检查改写已提交基线。
 
 ## Docker Compose
 
@@ -152,8 +153,12 @@ docker compose -f deployments/docker/compose.yaml build
 docker compose -f deployments/docker/compose.yaml up -d --force-recreate app frontend
 ```
 
-前端镜像构建时通过 `VITE_DEV_USER_ID` 注入演示身份，使 Docker 部署与本地开发
-行为一致；生产接入认证后移除该注入即可。
+前端 Docker 构建默认不注入用户身份。仅本地演示时才通过 `VITE_DEV_USER_ID`
+显式注入临时身份；生产环境必须接入真实认证，不能让多个用户共享演示身份。
+
+Embedding 模型默认允许首次启动时下载，并通过 Docker Volume 缓存。模型已经完整
+缓存后，可以在 `.env` 中设置 `EMBEDDING_HF_OFFLINE=true`，让后续启动不再访问
+Hugging Face。
 
 Redis 会话默认采用 7 天滑动 TTL，并按命名空间保留最近 50 个 LangGraph
 Checkpoint；可通过 `.env.example` 中的 `REDIS_CHECKPOINT_TTL_MINUTES` 和

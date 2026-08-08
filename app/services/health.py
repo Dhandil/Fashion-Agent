@@ -1,5 +1,6 @@
 """应用健康与基础设施就绪检查服务。"""
 
+import asyncio
 from typing import Literal
 
 from redis.asyncio import Redis
@@ -14,9 +15,6 @@ from app.api.schemas.health import (
 )
 from app.core.config import get_settings
 from app.core.exceptions import ServiceNotReadyError
-from app.rag.embeddings.huggingface import (
-    create_huggingface_embeddings,
-)
 from app.rag.vectorstores.provider import (
     get_knowledge_vector_store,
 )
@@ -99,29 +97,34 @@ async def assess_capabilities() -> CapabilitiesResponse:
     if settings.llm_api_key is not None and settings.llm_model is not None:
         checks.llm = "ok"
 
-    # ── Embedding：配置存在且模型对象可构造（不触发权重加载）──
+    # ── Embedding 与知识库：共享一次本地 Vector Store 初始化 ──
+    # HuggingFace 模型和 Chroma 初始化是同步且可能较重的操作，放入线程，
+    # 避免公开能力检查阻塞 FastAPI 事件循环；同一对象同时验证两项能力。
     try:
-        create_huggingface_embeddings(settings)
+        vector_store = await asyncio.to_thread(get_knowledge_vector_store)
         checks.embedding = "ok"
     except Exception:  # noqa: BLE001 - 能力检查必须吞掉所有异常并降级上报
+        vector_store = None
         checks.embedding = "missing"
 
     # ── 知识库：Chroma 集合非空并读取已导入发布版本 ──
-    try:
-        vector_store = get_knowledge_vector_store()
-        stored = vector_store.get(
-            include=["metadatas"],
-            limit=1,
-        )
-        stored_metadatas = stored.get("metadatas") or []
-        if stored_metadatas and stored_metadatas[0]:
-            checks.knowledge_base = "ok"
-            checks.knowledge_version = stored_metadatas[0].get("release_id")
-        else:
-            checks.knowledge_base = "empty"
-    except Exception:  # noqa: BLE001 - Chroma 未初始化或不可访问时降级为 unavailable
-        # Chroma 尚未初始化或无法访问时保持默认 unavailable
+    if vector_store is None:
         checks.knowledge_base = "unavailable"
+    else:
+        try:
+            stored = await asyncio.to_thread(
+                vector_store.get,
+                include=["metadatas"],
+                limit=1,
+            )
+            stored_metadatas = stored.get("metadatas") or []
+            if stored_metadatas and stored_metadatas[0]:
+                checks.knowledge_base = "ok"
+                checks.knowledge_version = stored_metadatas[0].get("release_id")
+            else:
+                checks.knowledge_base = "empty"
+        except Exception:  # noqa: BLE001 - Chroma 异常只降级上报能力状态
+            checks.knowledge_base = "unavailable"
 
     # ── 天气：仅检查后端是否启用（Open-Meteo 无需密钥）──
     if settings.weather_provider_backend != "disabled":

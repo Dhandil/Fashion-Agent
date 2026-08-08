@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -28,6 +28,15 @@ export default function OutfitsPage() {
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / OUTFIT_PAGE_SIZE));
+
+  // 列表刷新后同步详情抽屉，避免收藏状态继续使用旧对象。
+  useEffect(() => {
+    if (!selected) return;
+    const refreshed = items.find((item) => item.outfit_id === selected.outfit_id);
+    if (refreshed && refreshed !== selected) {
+      setSelected(refreshed);
+    }
+  }, [items, selected]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">

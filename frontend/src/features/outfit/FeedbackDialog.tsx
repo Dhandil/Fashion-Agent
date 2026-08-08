@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, ThumbsUp, ThumbsDown } from "lucide-react";
 import type { components } from "@/api/generated/schema";
 
@@ -23,6 +23,15 @@ export default function FeedbackDialog({
   const [sentiment, setSentiment] = useState<Sentiment | null>(initialSentiment);
   const [comment, setComment] = useState(initialComment);
   const [submitting, setSubmitting] = useState(false);
+
+  // 每次打开或服务端反馈刷新时，都以最新已保存反馈初始化草稿。
+  useEffect(() => {
+    if (open) {
+      setSentiment(initialSentiment);
+      setComment(initialComment);
+      setSubmitting(false);
+    }
+  }, [open, initialSentiment, initialComment]);
 
   if (!open) return null;
 

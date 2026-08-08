@@ -91,6 +91,41 @@ def test_redis_checks_are_explicitly_opt_in() -> None:
     assert "Redis Checkpointer 持久化测试" in redis_names
 
 
+def test_rag_evaluation_is_read_only_and_isolated_from_local_env() -> None:
+    """验证 RAG 质量评估不会覆盖基线，也不会读取非法本地 DEBUG。"""
+
+    checks = build_quality_checks(
+        include_postgres=False,
+        include_redis=False,
+        include_rag_evaluation=True,
+    )
+    rag_check = next(
+        check
+        for check in checks
+        if check.name == "知识检索质量评估"
+    )
+
+    assert "--no-write" in rag_check.command
+    assert rag_check.environment["DEBUG"] == "false"
+
+
+def test_outfit_evaluation_isolated_from_local_env() -> None:
+    """验证 Outfit 评测同样不受本地 .env 的 DEBUG 值污染。"""
+
+    checks = build_quality_checks(
+        include_postgres=False,
+        include_redis=False,
+        include_outfit_evaluation=True,
+    )
+    outfit_check = next(
+        check
+        for check in checks
+        if check.name == "Outfit 生成与修正评测"
+    )
+
+    assert outfit_check.environment["DEBUG"] == "false"
+
+
 def test_configure_utf8_output_is_safe_under_pytest() -> None:
     """验证捕获输出流不支持 reconfigure 时也不会失败。"""
 

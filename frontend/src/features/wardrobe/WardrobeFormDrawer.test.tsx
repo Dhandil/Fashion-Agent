@@ -51,6 +51,23 @@ describe("WardrobeFormDrawer", () => {
     expect(values.status).toBe("available");
   });
 
+  it("可以输入并提交自定义颜色标签", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <WardrobeFormDrawer
+        open
+        mode="create"
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await userEvent.type(screen.getByPlaceholderText("输入颜色后回车"), "雾霾蓝");
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.getByRole("button", { name: "移除 雾霾蓝" })).toBeInTheDocument();
+  });
+
   it("编辑模式预填已有衣物信息", () => {
     render(
       <WardrobeFormDrawer

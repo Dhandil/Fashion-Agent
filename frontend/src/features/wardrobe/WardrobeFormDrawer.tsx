@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -53,9 +53,14 @@ function StringListInput({
   suggestions: string[];
   placeholder: string;
 }) {
+  const [draftValue, setDraftValue] = useState("");
   const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
   const addSuggestion = (s: string) => {
-    if (!value.includes(s)) onChange([...value, s]);
+    const normalized = s.trim();
+    if (normalized && !value.includes(normalized)) {
+      onChange([...value, normalized]);
+    }
+    setDraftValue("");
   };
 
   return (
@@ -80,19 +85,18 @@ function StringListInput({
       )}
       <input
         type="text"
-        value={value.length ? "" : ""}
+        value={draftValue}
+        onChange={(event) => setDraftValue(event.target.value)}
         placeholder={placeholder}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && e.currentTarget.value.trim()) {
+          if (e.key === "Enter" && draftValue.trim()) {
             e.preventDefault();
-            addSuggestion(e.currentTarget.value.trim());
-            e.currentTarget.value = "";
+            addSuggestion(draftValue);
           }
         }}
-        onBlur={(e) => {
-          if (e.target.value.trim()) {
-            addSuggestion(e.target.value.trim());
-            e.target.value = "";
+        onBlur={() => {
+          if (draftValue.trim()) {
+            addSuggestion(draftValue);
           }
         }}
         className="w-full rounded-input border border-border bg-surface px-12 py-8 text-body

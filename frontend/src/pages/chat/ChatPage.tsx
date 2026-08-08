@@ -57,9 +57,6 @@ export default function ChatPage() {
         <div className="flex items-center justify-between px-16 md:px-32 py-12 border-b border-border bg-surface">
           <span className="text-small text-text-secondary">智能搭配</span>
           <div className="flex items-center gap-8">
-            {endError && (
-              <span className="text-caption text-danger" role="alert">{endError}</span>
-            )}
             <button
               onClick={handleEndSession}
               disabled={ending}
@@ -70,6 +67,12 @@ export default function ChatPage() {
               {ending ? "结束中…" : "结束会话"}
             </button>
           </div>
+        </div>
+      )}
+
+      {endError && (
+        <div className="mx-16 md:mx-32 mt-12 rounded-card border border-danger/30 bg-danger/[0.06] px-16 py-12" role="alert">
+          <p className="text-small text-danger">{endError}</p>
         </div>
       )}
 

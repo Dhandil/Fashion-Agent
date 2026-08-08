@@ -45,12 +45,6 @@ class Settings(BaseSettings):
         le=1,
     )
 
-    # 商品仓库实现类型：当前默认使用内存仓库
-    product_repository_backend: Literal[
-        "memory",
-        "postgres",
-    ] = "memory"
-
     # PostgreSQL 异步连接地址
     # SecretStr 可以避免连接地址中的密码被日志直接打印
     database_url: SecretStr | None = None

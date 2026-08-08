@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { onUserChange } from "@/api/client";
+import { useChatStore } from "@/stores/chat";
 import AppRoutes from "@/routes";
 
 // 服务端状态缓存 · frontend §9
@@ -19,6 +20,8 @@ export default function App() {
   useEffect(() => {
     return onUserChange(() => {
       queryClient.clear();
+      // 同时清理进程内聊天状态，避免身份切换后继续显示上一位用户的消息。
+      useChatStore.getState().endSession();
     });
   }, []);
 

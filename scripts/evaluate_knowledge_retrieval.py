@@ -128,6 +128,19 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="通过率下限，低于该值退出码为 1（默认 1.0）。",
     )
+    report_group = parser.add_mutually_exclusive_group()
+    report_group.add_argument(
+        "--write-report",
+        action="store_true",
+        help="显式覆盖 evaluation/reports 中对应的评测基线文件。",
+    )
+    report_group.add_argument(
+        "--no-write",
+        dest="write_report",
+        action="store_false",
+        help="只运行评测并输出结果（默认行为）。",
+    )
+    parser.set_defaults(write_report=False)
     return parser.parse_args()
 
 
@@ -144,12 +157,15 @@ def main() -> None:
         retrieve_documents=retriever.invoke,
     )
     _print_report(report)
-    report_path = _write_report(
-        report,
-        min_pass_rate=args.min_pass_rate,
-        report_dir=args.report_dir,
-    )
-    print(f"评测报告已保存：{report_path}")
+    if args.write_report:
+        report_path = _write_report(
+            report,
+            min_pass_rate=args.min_pass_rate,
+            report_dir=args.report_dir,
+        )
+        print(f"评测报告已保存：{report_path}")
+    else:
+        print("已使用只读模式，不覆盖评测基线文件。")
 
     # 非零退出码便于在 CI 或发布流程中阻止检索质量回退。
     if report.pass_rate < args.min_pass_rate:

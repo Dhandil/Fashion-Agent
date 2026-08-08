@@ -10,8 +10,8 @@ RUN npm ci
 # 复制源码并构建
 COPY frontend/ ./
 
-# 演示/开发部署注入默认用户身份；真实生产由认证系统替代
-ARG VITE_DEV_USER_ID=dev-user-001
+# 只有开发 Compose 显式传入时才注入演示身份；生产构建默认不注入用户。
+ARG VITE_DEV_USER_ID=
 RUN echo "VITE_DEV_USER_ID=${VITE_DEV_USER_ID}" > .env.production
 
 RUN npm run build
