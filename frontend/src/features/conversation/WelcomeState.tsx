@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { Sparkles } from "lucide-react";
 import PromptComposer from "@/features/conversation/PromptComposer";
 
@@ -13,6 +13,8 @@ const QUICK_PROMPTS = [
 ];
 
 export default function WelcomeState({ onSend }: Props) {
+  const [prefillMessage, setPrefillMessage] = useState<string>();
+
   return (
     <div className="flex-1 flex min-h-0 flex-col px-16 md:px-32">
       <div className="flex flex-1 items-center justify-center py-32 md:py-48">
@@ -34,7 +36,7 @@ export default function WelcomeState({ onSend }: Props) {
               <button
                 key={prompt}
                 type="button"
-                onClick={() => onSend(prompt)}
+                onClick={() => setPrefillMessage(prompt)}
                 className="rounded-tag border border-border px-16 py-8 text-small text-text-secondary hover:bg-surface-subtle hover:text-text-primary transition-colors"
               >
                 {prompt}
@@ -45,7 +47,7 @@ export default function WelcomeState({ onSend }: Props) {
       </div>
 
       <div className="w-full max-w-chat mx-auto">
-        <PromptComposer onSubmit={onSend} />
+        <PromptComposer onSubmit={onSend} prefillMessage={prefillMessage} />
       </div>
     </div>
   );

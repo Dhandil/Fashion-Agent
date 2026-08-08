@@ -37,4 +37,27 @@ describe("streamPost", () => {
       "text/event-stream",
     );
   });
+
+  it("把服务端 error 事件转换成可重试的 AppError", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          'data: {"type":"error","code":"agent_timeout","message":"处理超时"}\n\n',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          },
+        ),
+      ),
+    );
+
+    await expect(
+      streamPost("/chat/stream", { message: "hi" }, () => undefined),
+    ).rejects.toMatchObject({
+      code: "agent_timeout",
+      message: "处理超时",
+      retryable: true,
+    });
+  });
 });

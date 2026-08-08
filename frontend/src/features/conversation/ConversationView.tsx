@@ -1,22 +1,21 @@
+import { Loader2 } from "lucide-react";
 import { useChatStore } from "@/stores/chat";
-import { useSendMessage, useSaveOutfit } from "@/features/conversation/api";
+import { useSaveOutfit, useSendMessage } from "@/features/conversation/api";
 import MessageList from "@/features/conversation/MessageList";
 import PromptComposer from "@/features/conversation/PromptComposer";
-import { Loader2 } from "lucide-react";
 
 export default function ConversationView() {
   const { messages, status, thinkingStage, conversationId } = useChatStore();
-  const { send } = useSendMessage();
-  const { save, saving } = useSaveOutfit();
+  const { send, retry, error: sendError } = useSendMessage();
+  const { save, saving, error: saveError } = useSaveOutfit();
 
   const handleSaveOutfit = () => {
     if (!conversationId) return;
-    save(conversationId);
+    void save(conversationId);
   };
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* 提交中状态 */}
       {status === "submitting" && (
         <div className="flex items-center gap-8 px-16 md:px-32 py-8 bg-surface-subtle border-b border-border">
           <Loader2 size={16} className="text-brand animate-spin" />
@@ -28,18 +27,40 @@ export default function ConversationView() {
         </div>
       )}
 
-      {/* 消息列表 */}
+      {sendError && (
+        <div
+          className="mx-16 md:mx-32 mt-12 flex items-center justify-between gap-12 rounded-card border border-danger/30 bg-danger/[0.06] px-16 py-12"
+          role="alert"
+        >
+          <p className="text-small text-danger">{sendError.message}</p>
+          {sendError.retryable && status !== "submitting" && (
+            <button
+              type="button"
+              className="shrink-0 rounded-button border border-danger/40 px-12 py-6 text-small text-danger hover:bg-danger/[0.08]"
+              onClick={retry}
+            >
+              重试
+            </button>
+          )}
+        </div>
+      )}
+
+      {saveError && (
+        <div
+          className="mx-16 md:mx-32 mt-12 rounded-card border border-danger/30 bg-danger/[0.06] px-16 py-12"
+          role="alert"
+        >
+          <p className="text-small text-danger">保存穿搭失败：{saveError.message}</p>
+        </div>
+      )}
+
       <MessageList
         messages={messages}
         onSaveOutfit={handleSaveOutfit}
         savingOutfit={saving}
       />
 
-      {/* 输入区 */}
-      <PromptComposer
-        onSubmit={send}
-        disabled={status === "submitting"}
-      />
+      <PromptComposer onSubmit={send} disabled={status === "submitting"} />
     </div>
   );
 }

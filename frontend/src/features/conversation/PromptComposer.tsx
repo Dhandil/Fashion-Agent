@@ -15,6 +15,7 @@ type Props = {
     weatherQuery?: WeatherQuery,
   ) => void;
   disabled?: boolean;
+  prefillMessage?: string;
 };
 
 type WeatherDraft = {
@@ -35,12 +36,23 @@ const EMPTY_WEATHER_DRAFT: WeatherDraft = {
   precipitationProbability: "",
 };
 
-export default function PromptComposer({ onSubmit, disabled = false }: Props) {
+export default function PromptComposer({
+  onSubmit,
+  disabled = false,
+  prefillMessage,
+}: Props) {
   const [value, setValue] = useState("");
   const [showWeather, setShowWeather] = useState(false);
   const [weatherDraft, setWeatherDraft] = useState(EMPTY_WEATHER_DRAFT);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (prefillMessage !== undefined) {
+      setValue(prefillMessage);
+      textareaRef.current?.focus();
+    }
+  }, [prefillMessage]);
 
   // 自动调整高度
   useEffect(() => {

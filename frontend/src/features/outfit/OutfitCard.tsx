@@ -11,6 +11,11 @@ type Props = {
 };
 
 export default function OutfitCard({ outfit, onSave, saving }: Props) {
+  const wardrobeItemCount = outfit.items.filter(
+    (item) => item.source === "wardrobe",
+  ).length;
+  const referenceItemCount = outfit.items.length - wardrobeItemCount;
+
   return (
     <div className="rounded-card-lg border border-border bg-surface p-20 md:p-24 space-y-16">
       {/* 头部：名称 + 场景/风格 */}
@@ -39,6 +44,13 @@ export default function OutfitCard({ outfit, onSave, saving }: Props) {
       </div>
 
       {/* 单品列表 */}
+      <div className="rounded-card border border-info/20 bg-info/[0.05] px-12 py-8 text-small text-text-secondary">
+        {wardrobeItemCount > 0
+          ? `本方案使用了 ${wardrobeItemCount} 件衣橱单品`
+          : "本方案暂未使用衣橱单品，属于通用参考建议"}
+        {referenceItemCount > 0 && `，另有 ${referenceItemCount} 件参考单品`}
+      </div>
+
       <ul className="space-y-10" role="list">
         {outfit.items.map((item, i) => (
           <li key={i} className="flex items-start gap-12">
@@ -91,6 +103,15 @@ export default function OutfitCard({ outfit, onSave, saving }: Props) {
       )}
 
       {/* 保存按钮 */}
+      {outfit.wardrobe_gaps.length > 0 && (
+        <div className="rounded-card border border-warning/30 bg-warning/[0.05] px-12 py-8 text-small text-warning">
+          衣橱缺口：
+          {outfit.wardrobe_gaps
+            .map((gap) => gap.role ?? gap.suggested_item ?? "待补充单品")
+            .join("、")}
+        </div>
+      )}
+
       <div className="pt-8">
         <button
           onClick={onSave}
