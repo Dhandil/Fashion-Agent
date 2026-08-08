@@ -1,8 +1,9 @@
+import json
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 from app.api.dependencies.database import (
     get_fashion_repositories,
@@ -34,6 +35,7 @@ from app.domain.entities.outfit_validation import (
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
+from app.integrations.weather.provider import get_weather_provider
 from app.main import create_app
 
 # 创建测试使用的请求级仓库集合
@@ -65,13 +67,21 @@ def override_settings() -> Settings:
         _env_file=None,
         app_env="test",
         debug=False,
+        weather_provider_backend="disabled",
     )
+
+
+def override_weather_provider() -> None:
+    """测试聊天 API 时显式关闭外部天气服务。"""
+
+    return
 
 
 # 创建测试应用，替换数据库仓库和环境配置
 application = create_app()
 application.dependency_overrides[get_fashion_repositories] = override_repositories
 application.dependency_overrides[get_settings] = override_settings
+application.dependency_overrides[get_weather_provider] = override_weather_provider
 client = TestClient(application)
 
 
@@ -125,6 +135,7 @@ def test_chat_returns_agent_response() -> None:
     assert response.json() == {
         "conversation_id": "test-conversation-id",
         "message": "请告诉我你的预算",
+        "weather": None,
         "outfit": None,
         "outfit_gap": None,
         "sources": [
@@ -586,3 +597,94 @@ def test_chat_rejects_invalid_weather_before_graph() -> None:
 
     assert response.status_code == 422
     fake_graph.ainvoke.assert_not_awaited()
+
+
+def test_chat_returns_weather_snapshot_from_weather_tool() -> None:
+    """验证天气工具结果会以结构化快照返回给前端。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={
+            "messages": [
+                ToolMessage(
+                    name="get_weather",
+                    tool_call_id="weather-call-1",
+                    content=json.dumps(
+                        [
+                            {
+                                "location": "上海",
+                                "target_date": "2026-08-09",
+                                "condition": "晴",
+                                "temperature_min_c": 27,
+                                "temperature_max_c": 34,
+                                "feels_like_c": 36,
+                                "precipitation_probability": 10,
+                                "humidity_percent": 70,
+                                "wind_speed_kph": 12,
+                                "source": "api",
+                            },
+                        ],
+                        ensure_ascii=False,
+                    ),
+                ),
+                AIMessage(content="今天适合穿透气的浅色衣物。"),
+            ],
+        },
+    )
+
+    with patch(
+        "app.api.dependencies.agent.create_user_shopping_graph",
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={"X-User-ID": "user-001"},
+            json={"message": "查询上海天气"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["weather"] == {
+        "location": "上海",
+        "target_date": "2026-08-09",
+        "condition": "晴",
+        "temperature_min_c": 27.0,
+        "temperature_max_c": 34.0,
+        "feels_like_c": 36.0,
+        "precipitation_probability": 10,
+        "humidity_percent": 70,
+        "wind_speed_kph": 12.0,
+        "source": "api",
+        "updated_at": None,
+    }
+
+
+def test_chat_stream_returns_progress_and_complete_events() -> None:
+    """验证流式聊天接口会先推送进度，最后推送完整响应。"""
+
+    fake_graph = Mock()
+
+    async def fake_stream(*args: object, **kwargs: object):
+        del args, kwargs
+        yield {
+            "messages": [
+                AIMessage(content="流式回复"),
+            ],
+        }
+
+    fake_graph.astream = fake_stream
+
+    with patch(
+        "app.api.dependencies.agent.create_user_shopping_graph",
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat/stream",
+            headers={"X-User-ID": "user-001"},
+            json={"message": "给我一套通勤穿搭"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "status"' in response.text
+    assert '"type": "complete"' in response.text
+    assert '"message": "流式回复"' in response.text

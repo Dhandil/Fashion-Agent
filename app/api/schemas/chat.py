@@ -8,6 +8,7 @@ from app.domain.entities.outfit_gap import OutfitGapReport
 from app.domain.entities.outfit_validation import (
     OutfitFeasibilityIssue,
 )
+from app.domain.entities.weather import WeatherContext
 
 
 class ChatRequest(BaseModel):
@@ -39,6 +40,11 @@ class ChatResponse(BaseModel):
 
     # Agent 返回给用户的文本回复
     message: str
+
+    weather: WeatherContext | None = Field(
+        default=None,
+        description="本轮穿搭使用的天气事实快照",
+    )
 
     # 只有生成完整穿搭时才返回结构化 Outfit
     outfit: OutfitRecommendation | None = Field(

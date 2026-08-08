@@ -3,6 +3,7 @@ import OutfitCard from "@/features/outfit/OutfitCard";
 import OutfitGapCard from "@/features/outfit/OutfitGapCard";
 import OutfitIssueList from "@/features/outfit/OutfitIssueList";
 import KnowledgeSources from "@/features/outfit/KnowledgeSources";
+import WeatherCard from "@/features/conversation/WeatherCard";
 
 type Props = {
   message: ChatMessage;
@@ -22,6 +23,8 @@ export default function AgentMessage({ message, onSaveOutfit, savingOutfit }: Pr
           {message.text}
         </div>
       )}
+
+      {message.weather && <WeatherCard weather={message.weather} />}
 
       {/* 结构化 Outfit */}
       {message.outfit && (

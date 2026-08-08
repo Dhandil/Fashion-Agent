@@ -19,6 +19,14 @@ export type AppError = {
   retryable: boolean;
 };
 
+export type StreamEvent = {
+  type: "status" | "complete" | "error";
+  stage?: string;
+  response?: unknown;
+  code?: string;
+  message?: string;
+};
+
 // ── 配置 ──
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
@@ -218,3 +226,97 @@ export const api = {
     return request<T>(path, { ...options, method: "DELETE" });
   },
 };
+
+/**
+ * 发送 JSON 请求并消费 Server-Sent Events。
+ * 普通 api.post 会等待完整 JSON；聊天场景使用此函数即可先收到处理阶段。
+ */
+export async function streamPost(
+  path: string,
+  body: unknown,
+  onEvent: (event: StreamEvent) => void,
+  options: Omit<RequestOptions, "body" | "method"> = {},
+): Promise<void> {
+  const { xUserId, timeoutMs, signal, anonymous, headers: extraHeaders, ...init } = options;
+  const effectiveUserId = anonymous ? null : (xUserId ?? userId);
+  if (!effectiveUserId && !anonymous) {
+    throw buildError(401, "unauthorized", "用户身份未设置，请先配置 X-User-ID。", false);
+  }
+
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    "Content-Type": "application/json",
+    ...(extraHeaders as Record<string, string> | undefined),
+  };
+  if (effectiveUserId) headers["X-User-ID"] = effectiveUserId;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener("abort", onExternalAbort);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) throw buildError(null, "aborted", "请求已取消。", false);
+    if (controller.signal.aborted) {
+      throw buildError(null, "timeout", "请求超时，请稍后重试。", true);
+    }
+    throw buildError(null, "network_error", "网络连接失败，请稍后重试。", true);
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", onExternalAbort);
+  }
+
+  if (!response.ok) {
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      // 服务器可能返回空错误体。
+    }
+    throw normalizeError(response, payload);
+  }
+
+  if (!response.body) {
+    throw buildError(null, "empty_stream", "服务器没有返回流式内容。", true);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const consumeBlock = (block: string) => {
+    const data = block
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!data) return;
+    const event = JSON.parse(data) as StreamEvent;
+    onEvent(event);
+    if (event.type === "error") {
+      throw buildError(null, event.code ?? "agent_error", event.message ?? "助手暂时无法回答。", true);
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) consumeBlock(block);
+    if (done) break;
+  }
+  if (buffer.trim()) consumeBlock(buffer);
+}

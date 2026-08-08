@@ -5,7 +5,7 @@ import PromptComposer from "@/features/conversation/PromptComposer";
 import { Loader2 } from "lucide-react";
 
 export default function ConversationView() {
-  const { messages, status, conversationId } = useChatStore();
+  const { messages, status, thinkingStage, conversationId } = useChatStore();
   const { send } = useSendMessage();
   const { save, saving } = useSaveOutfit();
 
@@ -20,7 +20,11 @@ export default function ConversationView() {
       {status === "submitting" && (
         <div className="flex items-center gap-8 px-16 md:px-32 py-8 bg-surface-subtle border-b border-border">
           <Loader2 size={16} className="text-brand animate-spin" />
-          <span className="text-small text-text-secondary">正在分析衣橱、天气和知识…</span>
+          <span className="text-small text-text-secondary">
+            {thinkingStage === "working"
+              ? "正在整理穿搭方案…"
+              : "正在分析衣橱、天气和知识…"}
+          </span>
         </div>
       )}
 

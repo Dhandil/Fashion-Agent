@@ -20,8 +20,12 @@ export type ChatMessage = {
   outfitGap?: components["schemas"]["OutfitGapReport"] | null;
   outfitIssues?: components["schemas"]["OutfitFeasibilityIssue"][] | null;
   sources?: string[];
+  /** 本轮回答使用的结构化天气快照 */
+  weather?: WeatherSnapshot | null;
   createdAt: number;
 };
+
+export type WeatherSnapshot = components["schemas"]["WeatherContext"];
 
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -34,12 +38,15 @@ type ChatState = {
   status: SubmitStatus;
   /** 最近一次错误 */
   error: string | null;
+  /** 当前 Agent 处理阶段 */
+  thinkingStage: string | null;
 
   // 操作
   setConversationId: (id: string) => void;
   addUserMessage: (text: string) => void;
   addAgentMessage: (msg: Omit<ChatMessage, "id" | "role" | "createdAt">) => void;
   setStatus: (status: SubmitStatus, error?: string | null) => void;
+  setThinkingStage: (stage: string | null) => void;
   endSession: () => void;
 };
 
@@ -48,6 +55,7 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   status: "idle",
   error: null,
+  thinkingStage: null,
 
   setConversationId: (id) => set({ conversationId: id }),
 
@@ -77,7 +85,10 @@ export const useChatStore = create<ChatState>((set) => ({
       ],
     })),
 
-  setStatus: (status, error = null) => set({ status, error }),
+  setStatus: (status, error = null) =>
+    set({ status, error, thinkingStage: status === "submitting" ? "analyzing" : null }),
+
+  setThinkingStage: (thinkingStage) => set({ thinkingStage }),
 
   endSession: () =>
     set({
@@ -85,5 +96,6 @@ export const useChatStore = create<ChatState>((set) => ({
       messages: [],
       status: "idle",
       error: null,
+      thinkingStage: null,
     }),
 }));

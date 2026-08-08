@@ -4,12 +4,21 @@
 
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, getUserId, isAppError, type AppError } from "@/api/client";
+import {
+  api,
+  getUserId,
+  isAppError,
+  streamPost,
+  type AppError,
+} from "@/api/client";
 import type { components } from "@/api/generated/schema";
-import { useChatStore } from "@/stores/chat";
+import { useChatStore, type WeatherSnapshot } from "@/stores/chat";
 
 type ChatRequest = components["schemas"]["ChatRequest"];
 type ChatResponse = components["schemas"]["ChatResponse"];
+type ChatResponseWithWeather = ChatResponse & {
+  weather?: WeatherSnapshot | null;
+};
 
 /** sessionStorage key 按用户隔离，避免不同用户串会话 */
 export function conversationStorageKey(userId: string): string {
@@ -23,6 +32,7 @@ export function useSendMessage() {
     addUserMessage,
     addAgentMessage,
     setStatus,
+    setThinkingStage,
     status,
   } = useChatStore();
   const [error, setError] = useState<AppError | null>(null);
@@ -41,7 +51,20 @@ export function useSendMessage() {
           conversation_id: conversationId,
         };
 
-        const res = await api.post<ChatResponse>("/chat", body);
+        const streamResult: { value: ChatResponseWithWeather | null } = {
+          value: null,
+        };
+        await streamPost("/chat/stream", body, (event) => {
+          if (event.type === "status") {
+            setThinkingStage(event.stage ?? "working");
+          } else if (event.type === "complete") {
+            streamResult.value = event.response as ChatResponseWithWeather;
+          }
+        });
+        if (!streamResult.value) {
+          throw new Error("流式响应缺少完整结果");
+        }
+        const res = streamResult.value;
 
         // 首次成功后保存会话 ID（按用户隔离）
         if (!conversationId && res.conversation_id) {
@@ -62,6 +85,7 @@ export function useSendMessage() {
           outfitGap: res.outfit_gap ?? null,
           outfitIssues: res.outfit_issues ?? null,
           sources: res.sources ?? undefined,
+          weather: res.weather ?? null,
         });
 
         setStatus("success");
@@ -78,7 +102,15 @@ export function useSendMessage() {
         setStatus("error", appErr?.message ?? "发送失败");
       }
     },
-    [conversationId, setConversationId, addUserMessage, addAgentMessage, setStatus, status],
+    [
+      conversationId,
+      setConversationId,
+      addUserMessage,
+      addAgentMessage,
+      setStatus,
+      setThinkingStage,
+      status,
+    ],
   );
 
   return { send, error, status };

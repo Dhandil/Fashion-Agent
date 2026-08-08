@@ -12,8 +12,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * å¥åº·æ£æ¥
-         * @description è¿ååºç¨å½åçè¿è¡ç¶æã
+         * 健康检查
+         * @description 返回应用当前的运行状态。
          */
         get: operations["health_check_api_v1_health_get"];
         put?: never;
@@ -32,8 +32,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ°æ®åºå°±ç»ªæ£æ¥
-         * @description ç¡®è®¤ PostgreSQL åç­æè®°å¿åå¯å¤çä¸å¡è¯·æ±ã
+         * 数据库就绪检查
+         * @description 确认 PostgreSQL 和短期记忆均可处理业务请求。
          */
         get: operations["readiness_check_api_v1_health_ready_get"];
         put?: never;
@@ -52,8 +52,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Agent è½åç¶ææ£æ¥
-         * @description è¿å LLMãEmbeddingãç¥è¯åºãå¤©æ°ä¸è§è§è½åç¶æã
+         * Agent 能力状态检查
+         * @description 返回 LLM、Embedding、知识库、天气与视觉能力状态。
          */
         get: operations["capabilities_check_api_v1_health_capabilities_get"];
         put?: never;
@@ -74,10 +74,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * ä¸ä¸ªäººç©¿æ­å©æèå¤©
-         * @description å°ç¨æ·æ¶æ¯åç»å½åç¨æ·ç Fashion Agent å¹¶è¿ååå¤ã
+         * 与个人穿搭助手聊天
+         * @description 将用户消息发给当前用户的 Fashion Agent 并返回回复。
          */
         post: operations["chat_api_v1_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 以事件流方式与个人穿搭助手聊天
+         * @description 逐步推送 Agent 工作阶段，最后发送完整聊天响应。
+         */
+        post: operations["chat_stream_api_v1_chat_stream_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -95,8 +115,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * ç»æå¹¶å é¤å½åç¨æ·çç­æä¼è¯
-         * @description å¹ç­å é¤å½åç¨æ·å¨ Checkpointer ä¸­çå®æ´ä¼è¯ç¶æã
+         * 结束并删除当前用户的短期会话
+         * @description 幂等删除当前用户在 Checkpointer 中的完整会话状态。
          */
         delete: operations["delete_conversation_api_v1_chat__conversation_id__delete"];
         options?: never;
@@ -112,14 +132,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢å½åç¨æ·è¡£æ©±
-         * @description æ ¹æ®åç±»ãç¶æååé¡µæ¡ä»¶æ¥è¯¢å½åç¨æ·è¡£æ©±ã
+         * 查询当前用户衣橱
+         * @description 根据品类、状态和分页条件查询当前用户衣橱。
          */
         get: operations["list_current_user_wardrobe_api_v1_wardrobe_get"];
         put?: never;
         /**
-         * æ°å¢è¡£æ©±åå
-         * @description ä¸ºå½åç¨æ·æ°å¢ä¸ä»¶è¡£æ©±ååã
+         * 新增衣橱单品
+         * @description 为当前用户新增一件衣橱单品。
          */
         post: operations["create_wardrobe_item_api_v1_wardrobe_post"];
         delete?: never;
@@ -138,8 +158,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * è¯å«è¡£ç©ç§çå¹¶çæå¾ç¡®è®¤èç¨¿
-         * @description è¯å«ç§çä¸­çè¡£ç©ç¹å¾ï¼ç»æéè¦ç¨æ·ç¡®è®¤åæè½åå¥è¡£æ©±ã
+         * 识别衣物照片并生成待确认草稿
+         * @description 识别照片中的衣物特征，结果需要用户确认后才能写入衣橱。
          */
         post: operations["recognize_wardrobe_item_image_api_v1_wardrobe_recognitions_post"];
         delete?: never;
@@ -156,22 +176,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢è¡£æ©±ååè¯¦æ
-         * @description è¯»åå½åç¨æ·æå® ID çè¡£æ©±ååã
+         * 查询衣橱单品详情
+         * @description 读取当前用户指定 ID 的衣橱单品。
          */
         get: operations["read_wardrobe_item_api_v1_wardrobe__wardrobe_item_id__get"];
         put?: never;
         post?: never;
         /**
-         * å é¤è¡£æ©±åå
-         * @description å é¤å½åç¨æ·æå® ID çè¡£æ©±ååã
+         * 删除衣橱单品
+         * @description 删除当前用户指定 ID 的衣橱单品。
          */
         delete: operations["remove_wardrobe_item_api_v1_wardrobe__wardrobe_item_id__delete"];
         options?: never;
         head?: never;
         /**
-         * å±é¨ä¿®æ¹è¡£æ©±åå
-         * @description åªä¿®æ¹è¯·æ±ä¸­æç¡®æä¾çè¡£æ©±å­æ®µã
+         * 局部修改衣橱单品
+         * @description 只修改请求中明确提供的衣橱字段。
          */
         patch: operations["patch_wardrobe_item_api_v1_wardrobe__wardrobe_item_id__patch"];
         trace?: never;
@@ -190,8 +210,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * åæ¢è¡£æ©±ååå¯ç¨ç¶æ
-         * @description æç¡®åæ¢è¡£ç©æ¯å¦å¯ä»¥åä¸ç©¿æ­æ¨èã
+         * 切换衣橱单品可用状态
+         * @description 明确切换衣物是否可以参与穿搭推荐。
          */
         patch: operations["set_wardrobe_item_status_api_v1_wardrobe__wardrobe_item_id__status_patch"];
         trace?: never;
@@ -204,14 +224,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢å½åç¨æ·ä¿å­çç©¿æ­
-         * @description æ ¹æ®å½åç¨æ·åå¯éæ¡ä»¶æ¥è¯¢å·²ä¿å­ç©¿æ­ã
+         * 查询当前用户保存的穿搭
+         * @description 根据当前用户和可选条件查询已保存穿搭。
          */
         get: operations["list_outfits_api_v1_outfits_get"];
         put?: never;
         /**
-         * ç¡®è®¤å¹¶ä¿å­å½åç©¿æ­æ¨è
-         * @description ä¿å­å½åç¨æ·æå®ä¼è¯ä¸­çæåä¸å¥ç»æåæ¨èã
+         * 确认并保存当前穿搭推荐
+         * @description 保存当前用户指定会话中的最后一套结构化推荐。
          */
         post: operations["confirm_outfit_api_v1_outfits_post"];
         delete?: never;
@@ -228,8 +248,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢æè¿ç©¿æ­åé¦
-         * @description æ¥è¯¢å½åç¨æ·æè¿ç¡®è®¤çåé¦åå¯¹åº Outfit æè¦ã
+         * 查询最近穿搭反馈
+         * @description 查询当前用户最近确认的反馈及对应 Outfit 摘要。
          */
         get: operations["list_outfit_feedback_api_v1_outfits_feedback_recent_get"];
         put?: never;
@@ -248,8 +268,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢å·²ä¿å­ç©¿æ­è¯¦æ
-         * @description è¯»åå½åç¨æ·æå® ID çç©¿æ­æ¹æ¡ã
+         * 查询已保存穿搭详情
+         * @description 读取当前用户指定 ID 的穿搭方案。
          */
         get: operations["get_outfit_api_v1_outfits__outfit_id__get"];
         put?: never;
@@ -274,8 +294,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * ä¿®æ¹ç©¿æ­æ¶èç¶æ
-         * @description æ¶èæåæ¶æ¶èå½åç¨æ·çä¸å¥ç©¿æ­ã
+         * 修改穿搭收藏状态
+         * @description 收藏或取消收藏当前用户的一套穿搭。
          */
         patch: operations["set_outfit_favorite_api_v1_outfits__outfit_id__favorite_patch"];
         trace?: never;
@@ -288,19 +308,19 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢ç©¿æ­åé¦
-         * @description è¯»åå½åç¨æ·å¯¹ä¸å¥å·²ä¿å­ç©¿æ­çåé¦ã
+         * 查询穿搭反馈
+         * @description 读取当前用户对一套已保存穿搭的反馈。
          */
         get: operations["get_outfit_feedback_api_v1_outfits__outfit_id__feedback_get"];
         /**
-         * æ°å¢ææ´æ°ç©¿æ­åé¦
-         * @description ä¿å­å½åç¨æ·å¯¹ä¸å¥å·²ä¿å­ç©¿æ­çææ°åé¦ã
+         * 新增或更新穿搭反馈
+         * @description 保存当前用户对一套已保存穿搭的最新反馈。
          */
         put: operations["upsert_outfit_feedback_api_v1_outfits__outfit_id__feedback_put"];
         post?: never;
         /**
-         * å é¤ç©¿æ­åé¦
-         * @description æ¤åå½åç¨æ·å¯¹ä¸å¥å·²ä¿å­ç©¿æ­çåé¦ã
+         * 删除穿搭反馈
+         * @description 撤回当前用户对一套已保存穿搭的反馈。
          */
         delete: operations["delete_outfit_feedback_api_v1_outfits__outfit_id__feedback_delete"];
         options?: never;
@@ -316,8 +336,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * åæé¿æåå¥½åé
-         * @description æ ¹æ®å½ååé¦å¨æåæé£æ ¼åå¥½åéï¼ä¸ä¿®æ¹æ¡£æ¡ã
+         * 分析长期偏好候选
+         * @description 根据当前反馈动态分析风格偏好候选，不修改档案。
          */
         get: operations["list_preference_candidates_api_v1_style_profile_candidates_get"];
         put?: never;
@@ -338,8 +358,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * ç¡®è®¤é¿æåå¥½åé
-         * @description éæ°æ ¡éªè¯æ®ï¼å¹¶æç¨æ·ç¡®è®¤çåéåå¹¶è¿é¿ææ¡£æ¡ã
+         * 确认长期偏好候选
+         * @description 重新校验证据，并把用户确认的候选合并进长期档案。
          */
         post: operations["confirm_preference_candidate_api_v1_style_profile_candidates_confirm_post"];
         delete?: never;
@@ -356,8 +376,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢é¿æåå¥½æ¥æº
-         * @description è¯»åå½åç¨æ·å·²ç¡®è®¤åå¥½çæ¥æºãè¯æ®åç¡®è®¤æ¶é´ã
+         * 查询长期偏好来源
+         * @description 读取当前用户已确认偏好的来源、证据和确认时间。
          */
         get: operations["read_preference_memories_api_v1_style_profile_memories_get"];
         put?: never;
@@ -379,15 +399,15 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * å é¤ä¸æ¡é¿æåå¥½
-         * @description å é¤åå¥½å®¡è®¡åå¶å¯¹æ¡£æ¡çååå½±åï¼å¹¶ä¿æå¹ç­ã
+         * 删除一条长期偏好
+         * @description 删除偏好审计及其对档案的同向影响，并保持幂等。
          */
         delete: operations["remove_preference_memory_api_v1_style_profile_memories__preference_memory_id__delete"];
         options?: never;
         head?: never;
         /**
-         * è®¾ç½®é¿æåå¥½è¿ææ¶é´
-         * @description è®¾ç½®è¿ææ¶é´ï¼æ¾å¼ä¼  null å¯ä»¥æ¢å¤ä¸ºé¿æææã
+         * 设置长期偏好过期时间
+         * @description 设置过期时间；显式传 null 可以恢复为长期有效。
          */
         patch: operations["update_preference_memory_expiry_api_v1_style_profile_memories__preference_memory_id__patch"];
         trace?: never;
@@ -400,26 +420,26 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æ¥è¯¢é¿æç©¿æ­æ¡£æ¡
-         * @description è¯»åå½åç¨æ·æç¡®ç»´æ¤çé¿æç©¿æ­åå¥½ã
+         * 查询长期穿搭档案
+         * @description 读取当前用户明确维护的长期穿搭偏好。
          */
         get: operations["read_style_profile_api_v1_style_profile_get"];
         /**
-         * æ°å¢ææ¿æ¢é¿æç©¿æ­æ¡£æ¡
-         * @description ä½¿ç¨å½åç¨æ·æç¡®ç¡®è®¤çåå®¹å®æ´æ¿æ¢é¿ææ¡£æ¡ã
+         * 新增或替换长期穿搭档案
+         * @description 使用当前用户明确确认的内容完整替换长期档案。
          */
         put: operations["upsert_style_profile_api_v1_style_profile_put"];
         post?: never;
         /**
-         * å é¤é¿æç©¿æ­æ¡£æ¡
-         * @description å é¤å½åç¨æ·çé¿ææ¡£æ¡ï¼æ¡£æ¡ä¸å­å¨æ¶ä¹è¿åæåã
+         * 删除长期穿搭档案
+         * @description 删除当前用户的长期档案；档案不存在时也返回成功。
          */
         delete: operations["remove_style_profile_api_v1_style_profile_delete"];
         options?: never;
         head?: never;
         /**
-         * é¨åæ´æ°é¿æç©¿æ­æ¡£æ¡
-         * @description åªæ´æ°è¯·æ±ä¸­æç¡®æä¾çé¿æåå¥½å­æ®µã
+         * 部分更新长期穿搭档案
+         * @description 只更新请求中明确提供的长期偏好字段。
          */
         patch: operations["update_style_profile_api_v1_style_profile_patch"];
         trace?: never;
@@ -432,8 +452,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * æç´¢ååç®å½
-         * @description æå³é®è¯ãåç±»åé¢ç®æç´¢æåºå­çååç®å½ã
+         * 搜索商品目录
+         * @description 按关键词、品类和预算搜索有库存的商品目录。
          */
         get: operations["search_product_catalog_api_v1_products_get"];
         put?: never;
@@ -450,7 +470,7 @@ export interface components {
     schemas: {
         /**
          * CapabilitiesResponse
-         * @description Agent è½åæ£æ¥ååºï¼è½åç¼ºå¤±ä¸å½±åè¿ç¨å­æ´»ã
+         * @description Agent 能力检查响应；能力缺失不影响进程存活。
          */
         CapabilitiesResponse: {
             /**
@@ -462,12 +482,12 @@ export interface components {
         };
         /**
          * CapabilityChecks
-         * @description Agent æ ¸å¿è½åçç¶ææ±æ»ã
+         * @description Agent 核心能力的状态汇总。
          *
-         *     åå¼çº¦å®ï¼
-         *     - llm / embeddingï¼ok | missing
-         *     - knowledge_baseï¼ok | empty | unavailable
-         *     - weather / visionï¼ok | disabled | missing
+         *     取值约定：
+         *     - llm / embedding：ok | missing
+         *     - knowledge_base：ok | empty | unavailable
+         *     - weather / vision：ok | disabled | missing
          */
         CapabilityChecks: {
             /**
@@ -500,51 +520,53 @@ export interface components {
         };
         /**
          * ChatRequest
-         * @description èå¤©æ¥å£çè¯·æ±æ¨¡åã
+         * @description 聊天接口的请求模型。
          */
         ChatRequest: {
             /**
              * Conversation Id
-             * @description ç¨äºä¿å­å¤è½®å¯¹è¯ç¶æçä¼è¯ ID
+             * @description 用于保存多轮对话状态的会话 ID
              */
             conversation_id?: string | null;
             /**
              * Message
-             * @description ç¨æ·åéç»ä¸ªäººç©¿æ­å©æçæ¶æ¯
+             * @description 用户发送给个人穿搭助手的消息
              */
             message: string;
             weather?: components["schemas"]["WeatherContextInput"] | null;
         };
         /**
          * ChatResponse
-         * @description èå¤©æ¥å£çååºæ¨¡åã
+         * @description 聊天接口的响应模型。
          */
         ChatResponse: {
             /** Conversation Id */
             conversation_id: string;
             /** Message */
             message: string;
-            /** @description æ¬æ¬¡çæçç»æåç©¿æ­æ¨è */
+            /** @description 本轮穿搭使用的天气事实快照 */
+            weather?: components["schemas"]["WeatherContext"] | null;
+            /** @description 本次生成的结构化穿搭推荐 */
             outfit?: components["schemas"]["OutfitRecommendation"] | null;
-            /** @description æ æ³å½¢æå®æ´ç©¿æ­æ¶çç»æåç¼ºå£ */
+            /** @description 无法形成完整穿搭时的结构化缺口 */
             outfit_gap?: components["schemas"]["OutfitGapReport"] | null;
             /**
              * Sources
-             * @description æ¬æ¬¡åç­ä½¿ç¨çç¥è¯ææ¡£æ¥æº
+             * @description 本次回答使用的知识文档来源
              */
             sources?: string[];
             /**
              * Outfit Issues
-             * @description æ¬æ¬¡ç©¿æ­å¯æ§è¡æ§æ£æ¥åç°çé®é¢
+             * @description 本次穿搭可执行性检查发现的问题
              */
             outfit_issues?: components["schemas"]["OutfitFeasibilityIssue"][];
         };
         /**
          * CoreOutfitRole
-         * @description å®æ´ç©¿æ­éè¦è¦ççç¨³å®æ ¸å¿è§è²ã
+         * @description 完整穿搭需要覆盖的稳定核心角色。
          * @enum {string}
          */
-        CoreOutfitRole: "ä¸è£" | "ä¸è£" | "éå±¥";
+        CoreOutfitRole: "上装" | "下装" | "鞋履";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -552,7 +574,7 @@ export interface components {
         };
         /**
          * HealthResponse
-         * @description å¥åº·æ£æ¥æ¥å£çååºæ¨¡åã
+         * @description 健康检查接口的响应模型。
          */
         HealthResponse: {
             /** Status */
@@ -564,29 +586,29 @@ export interface components {
         };
         /**
          * OutfitConfirmRequest
-         * @description ç¡®è®¤ä¿å­å½åä¼è¯ä¸­æåä¸å¥ç»æåæ¨èã
+         * @description 确认保存当前会话中最后一套结构化推荐。
          */
         OutfitConfirmRequest: {
             /**
              * Conversation Id
-             * @description äº§çå¾ä¿å­ç©¿æ­æ¨èçä¼è¯ ID
+             * @description 产生待保存穿搭推荐的会话 ID
              */
             conversation_id: string;
         };
         /**
          * OutfitFavoriteUpdate
-         * @description ä¿®æ¹ä¸å¥å·²ä¿å­ç©¿æ­çæ¶èç¶æã
+         * @description 修改一套已保存穿搭的收藏状态。
          */
         OutfitFavoriteUpdate: {
             /**
              * Is Favorite
-             * @description æ¯å¦æ¶èè¯¥ç©¿æ­
+             * @description 是否收藏该穿搭
              */
             is_favorite: boolean;
         };
         /**
          * OutfitFeasibilityIssue
-         * @description ä¸æ¡å¯å®ä½ä¸ä¸åå«éç§æ­£æçæ£æ¥ç»æã
+         * @description 一条可定位且不包含隐私正文的检查结果。
          */
         OutfitFeasibilityIssue: {
             code: components["schemas"]["OutfitIssueCode"];
@@ -598,7 +620,7 @@ export interface components {
         };
         /**
          * OutfitFeedbackListItem
-         * @description æè¿åé¦åè¡¨ä¸­çä¸é¡¹ï¼å¹¶éå¸¦åç©¿æ­æè¦ã
+         * @description 最近反馈列表中的一项，并附带原穿搭摘要。
          */
         OutfitFeedbackListItem: {
             /** Outfit Id */
@@ -613,7 +635,7 @@ export interface components {
         };
         /**
          * OutfitFeedbackListResponse
-         * @description å½åç¨æ·æè¿ Outfit åé¦åè¡¨ã
+         * @description 当前用户最近 Outfit 反馈列表。
          */
         OutfitFeedbackListResponse: {
             /**
@@ -628,7 +650,7 @@ export interface components {
         };
         /**
          * OutfitFeedbackResponse
-         * @description å½åç¨æ·å¯¹ä¸å¥ Outfit çåé¦ååºã
+         * @description 当前用户对一套 Outfit 的反馈响应。
          */
         OutfitFeedbackResponse: {
             /** Outfit Id */
@@ -639,13 +661,13 @@ export interface components {
         };
         /**
          * OutfitFeedbackSentiment
-         * @description ç¨æ·å¯¹ä¸å¥ Outfit çæç¡®æåº¦ã
+         * @description 用户对一套 Outfit 的明确态度。
          * @enum {string}
          */
         OutfitFeedbackSentiment: "like" | "dislike";
         /**
          * OutfitFeedbackUpsertRequest
-         * @description æ°å¢æè¦çä¸å¥å·²ä¿å­ç©¿æ­çå½ååé¦ã
+         * @description 新增或覆盖一套已保存穿搭的当前反馈。
          */
         OutfitFeedbackUpsertRequest: {
             sentiment?: components["schemas"]["OutfitFeedbackSentiment"] | null;
@@ -654,13 +676,13 @@ export interface components {
         };
         /**
          * OutfitGapNextAction
-         * @description ç¼ºå£åºç°ååè®¸æä¾ç»ç¨æ·çä¸ä¸æ­¥ã
+         * @description 缺口出现后允许提供给用户的下一步。
          * @enum {string}
          */
         OutfitGapNextAction: "add_wardrobe_items" | "adjust_requirements" | "search_products";
         /**
          * OutfitGapReport
-         * @description å½åçå®æ°æ®ä¸è¶³ä»¥å½¢æå®æ´ç©¿æ­çæ¥åã
+         * @description 当前真实数据不足以形成完整穿搭的报告。
          */
         OutfitGapReport: {
             /** Missing Roles */
@@ -679,19 +701,19 @@ export interface components {
         };
         /**
          * OutfitIssueCode
-         * @description ç¨³å®çé®é¢ä»£ç ï¼ä¾ APIãæµè¯ååç»­ä¿®æ­£èç¹ä½¿ç¨ã
+         * @description 稳定的问题代码，供 API、测试和后续修正节点使用。
          * @enum {string}
          */
         OutfitIssueCode: "unknown_source_id" | "unavailable_wardrobe_item" | "out_of_stock_product" | "duplicate_source_item" | "missing_core_role" | "scenario_mismatch" | "hot_weather_conflict" | "cold_weather_risk" | "precipitation_risk" | "avoided_style" | "avoided_color" | "avoided_material";
         /**
          * OutfitIssueSeverity
-         * @description å¯æ§è¡æ§é®é¢çä¸¥éç¨åº¦ã
+         * @description 可执行性问题的严重程度。
          * @enum {string}
          */
         OutfitIssueSeverity: "error" | "warning";
         /**
          * OutfitItem
-         * @description ä¸å¥ç©¿æ­ä¸­çä¸ä¸ªç»æååã
+         * @description 一套穿搭中的一个组成单品。
          */
         OutfitItem: {
             /** Role */
@@ -706,13 +728,13 @@ export interface components {
         };
         /**
          * OutfitItemSource
-         * @description ç©¿æ­ååçæ°æ®æ¥æºã
+         * @description 穿搭单品的数据来源。
          * @enum {string}
          */
         OutfitItemSource: "wardrobe" | "product" | "recommendation";
         /**
          * OutfitListResponse
-         * @description å·²ä¿å­ç©¿æ­åè¡¨ååºã
+         * @description 已保存穿搭列表响应。
          */
         OutfitListResponse: {
             /**
@@ -731,7 +753,7 @@ export interface components {
         };
         /**
          * OutfitRecommendation
-         * @description Agent çæä½å°æªæä¹åçä¸å¥ç©¿æ­æ¨èã
+         * @description Agent 生成但尚未持久化的一套穿搭推荐。
          */
         OutfitRecommendation: {
             /** Name */
@@ -764,7 +786,7 @@ export interface components {
         };
         /**
          * OutfitResponse
-         * @description å·²æä¹åç©¿æ­ç API ååºã
+         * @description 已持久化穿搭的 API 响应。
          */
         OutfitResponse: {
             /** Outfit Id */
@@ -794,13 +816,13 @@ export interface components {
         };
         /**
          * PreferenceCandidateCategory
-         * @description åéåå¥½çæ°æ®ç±»å«ã
+         * @description 候选偏好的数据类别。
          * @enum {string}
          */
         PreferenceCandidateCategory: "style";
         /**
          * PreferenceCandidateConfirmRequest
-         * @description ç¡®è®¤ä¸æ¡å½åä»ç¶ææçé¿æåå¥½åéã
+         * @description 确认一条当前仍然有效的长期偏好候选。
          */
         PreferenceCandidateConfirmRequest: {
             /** Candidate Id */
@@ -817,7 +839,7 @@ export interface components {
         };
         /**
          * PreferenceCandidateListResponse
-         * @description å½åç¨æ·çå¨æé¿æåå¥½åéåè¡¨ã
+         * @description 当前用户的动态长期偏好候选列表。
          */
         PreferenceCandidateListResponse: {
             /**
@@ -832,7 +854,7 @@ export interface components {
         };
         /**
          * PreferenceCandidateResponse
-         * @description ä¸æ¡ç±åé¦æ¨å¯¼çé¿æåå¥½åéã
+         * @description 一条由反馈推导的长期偏好候选。
          */
         PreferenceCandidateResponse: {
             /** Candidate Id */
@@ -851,19 +873,19 @@ export interface components {
         };
         /**
          * PreferenceCandidateSource
-         * @description åéåå¥½çè¯æ®æ¥æºã
+         * @description 候选偏好的证据来源。
          * @enum {string}
          */
         PreferenceCandidateSource: "outfit_feedback";
         /**
          * PreferenceDirection
-         * @description åéåå¥½çå»ºè®®æ²æ·æ¹åã
+         * @description 候选偏好的建议沉淀方向。
          * @enum {string}
          */
         PreferenceDirection: "prefer" | "avoid";
         /**
          * PreferenceMemoryExpiryRequest
-         * @description è®¾ç½®ææ¸é¤ä¸æ¡é¿æåå¥½çè¿ææ¶é´ã
+         * @description 设置或清除一条长期偏好的过期时间。
          */
         PreferenceMemoryExpiryRequest: {
             /** Expires At */
@@ -871,7 +893,7 @@ export interface components {
         };
         /**
          * PreferenceMemoryListResponse
-         * @description å½åç¨æ·å¯è§çé¿æåå¥½å®¡è®¡åè¡¨ã
+         * @description 当前用户可见的长期偏好审计列表。
          */
         PreferenceMemoryListResponse: {
             /**
@@ -889,7 +911,7 @@ export interface components {
         };
         /**
          * PreferenceMemoryResponse
-         * @description ä¸æ¡ä¸æ´é²ç¨æ· ID çé¿æåå¥½å®¡è®¡ååºã
+         * @description 一条不暴露用户 ID 的长期偏好审计响应。
          */
         PreferenceMemoryResponse: {
             /** Preference Memory Id */
@@ -916,13 +938,13 @@ export interface components {
         };
         /**
          * PreferenceMemorySource
-         * @description é¿æåå¥½è¿å¥æ¡£æ¡æ¶ç»è¿ç¡®è®¤çæ¥æºã
+         * @description 长期偏好进入档案时经过确认的来源。
          * @enum {string}
          */
         PreferenceMemorySource: "outfit_feedback_confirmation";
         /**
          * ProductListResponse
-         * @description ååæç´¢ç»æã
+         * @description 商品搜索结果。
          */
         ProductListResponse: {
             /** Items */
@@ -934,7 +956,7 @@ export interface components {
         };
         /**
          * ProductResponse
-         * @description ååæç´¢ç»ææ¡ç®ã
+         * @description 商品搜索结果条目。
          */
         ProductResponse: {
             /** Product Id */
@@ -956,7 +978,7 @@ export interface components {
         };
         /**
          * ReadinessChecks
-         * @description å½å readiness ç«¯ç¹è¦ççåºç¡è®¾æ½ç¶æã
+         * @description 当前 readiness 端点覆盖的基础设施状态。
          */
         ReadinessChecks: {
             /** Database */
@@ -966,7 +988,7 @@ export interface components {
         };
         /**
          * ReadinessResponse
-         * @description åºç¨è½å¤å¤çæä¹åä¸å¡è¯·æ±æ¶çååºã
+         * @description 应用能够处理持久化业务请求时的响应。
          */
         ReadinessResponse: {
             /** Status */
@@ -975,7 +997,7 @@ export interface components {
         };
         /**
          * StyleProfilePatchRequest
-         * @description é¨åæ´æ°å½åç¨æ·çé¿æç©¿æ­æ¡£æ¡ã
+         * @description 部分更新当前用户的长期穿搭档案。
          */
         StyleProfilePatchRequest: {
             /** Preferred Styles */
@@ -1001,7 +1023,7 @@ export interface components {
         };
         /**
          * StyleProfileResponse
-         * @description å½åç¨æ·é¿æç©¿æ­æ¡£æ¡ååºã
+         * @description 当前用户长期穿搭档案响应。
          */
         StyleProfileResponse: {
             /**
@@ -1048,7 +1070,7 @@ export interface components {
         };
         /**
          * StyleProfileUpsertRequest
-         * @description å®æ´æ°å¢ææ¿æ¢å½åç¨æ·çé¿æç©¿æ­åå¥½ã
+         * @description 完整新增或替换当前用户的长期穿搭偏好。
          */
         StyleProfileUpsertRequest: {
             /**
@@ -1108,7 +1130,7 @@ export interface components {
         };
         /**
          * WardrobeGap
-         * @description ä¸å¥æ¨èä¸­ææ¶ç¼ºå°çè¡£æ©±ååã
+         * @description 一套推荐中暂时缺少的衣橱单品。
          */
         WardrobeGap: {
             /** Role */
@@ -1120,13 +1142,13 @@ export interface components {
         };
         /**
          * WardrobeImageContentType
-         * @description å½ååè®¸ä¸ä¼ çè¡£ç©ç§çæ ¼å¼ã
+         * @description 当前允许上传的衣物照片格式。
          * @enum {string}
          */
         WardrobeImageContentType: "image/jpeg" | "image/png" | "image/webp";
         /**
          * WardrobeImageRecognitionRequest
-         * @description æäº¤ä¸å¼ è¡£ç©ç§çè¯·æ±è¯å«çè¯·æ±ä½ã
+         * @description 提交一张衣物照片请求识别的请求体。
          */
         WardrobeImageRecognitionRequest: {
             /** Image Base64 */
@@ -1139,7 +1161,7 @@ export interface components {
         };
         /**
          * WardrobeItemCreate
-         * @description åå»ºè¡£æ©±ååçè¯·æ±ä½ã
+         * @description 创建衣橱单品的请求体。
          */
         WardrobeItemCreate: {
             /** Name */
@@ -1184,10 +1206,10 @@ export interface components {
         };
         /**
          * WardrobeItemDraftResponse
-         * @description è¿åç»å®¢æ·ç«¯çå¾ç¡®è®¤è¡£æ©±ååèç¨¿ã
+         * @description 返回给客户端的待确认衣橱单品草稿。
          *
-         *     èç¨¿ä¸æ¯è¡£æ©±äºå®ãç¨æ·ç¡®è®¤æä¿®æ­£åï¼éè¦åè°ç¨æ°å¢è¡£æ©±ååæ¥å£
-         *     æä¼åå¥è¡£æ©±ã
+         *     草稿不是衣橱事实。用户确认或修正后，需要再调用新增衣橱单品接口
+         *     才会写入衣橱。
          */
         WardrobeItemDraftResponse: {
             /** Draft Id */
@@ -1250,7 +1272,7 @@ export interface components {
         };
         /**
          * WardrobeItemListResponse
-         * @description å½åç¨æ·è¡£æ©±åé¡µåè¡¨ååºã
+         * @description 当前用户衣橱分页列表响应。
          */
         WardrobeItemListResponse: {
             /**
@@ -1269,7 +1291,7 @@ export interface components {
         };
         /**
          * WardrobeItemPatch
-         * @description å±é¨ä¿®æ¹è¡£æ©±ååçè¯·æ±ä½ã
+         * @description 局部修改衣橱单品的请求体。
          */
         WardrobeItemPatch: {
             /** Name */
@@ -1298,7 +1320,7 @@ export interface components {
         };
         /**
          * WardrobeItemResponse
-         * @description è¿åç»å®¢æ·ç«¯çè¡£æ©±ååã
+         * @description 返回给客户端的衣橱单品。
          */
         WardrobeItemResponse: {
             /** Name */
@@ -1345,20 +1367,50 @@ export interface components {
         };
         /**
          * WardrobeItemStatus
-         * @description è¡£æ©±ååå½åå¯ç¨ç¶æã
+         * @description 衣橱单品当前可用状态。
          * @enum {string}
          */
         WardrobeItemStatus: "available" | "unavailable";
         /**
          * WardrobeItemStatusUpdate
-         * @description åç¬ä¿®æ¹è¡£æ©±ååå¯ç¨ç¶æçè¯·æ±ä½ã
+         * @description 单独修改衣橱单品可用状态的请求体。
          */
         WardrobeItemStatusUpdate: {
             status: components["schemas"]["WardrobeItemStatus"];
         };
         /**
+         * WeatherContext
+         * @description 一次穿搭请求对应的天气事实。
+         */
+        WeatherContext: {
+            /** Location */
+            location: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Condition */
+            condition?: string | null;
+            /** Temperature Min C */
+            temperature_min_c?: number | null;
+            /** Temperature Max C */
+            temperature_max_c?: number | null;
+            /** Feels Like C */
+            feels_like_c?: number | null;
+            /** Precipitation Probability */
+            precipitation_probability?: number | null;
+            /** Humidity Percent */
+            humidity_percent?: number | null;
+            /** Wind Speed Kph */
+            wind_speed_kph?: number | null;
+            source: components["schemas"]["WeatherDataSource"];
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
          * WeatherContextInput
-         * @description ç±ç¨æ·æå®¢æ·ç«¯æç¡®æä¾çå½åå¤©æ°ä¸ä¸æã
+         * @description 由用户或客户端明确提供的当前天气上下文。
          */
         WeatherContextInput: {
             /** Location */
@@ -1385,6 +1437,12 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /**
+         * WeatherDataSource
+         * @description 天气数据的来源类型。
+         * @enum {string}
+         */
+        WeatherDataSource: "user_provided" | "api" | "mcp";
     };
     responses: never;
     parameters: never;
@@ -1477,6 +1535,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ChatResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_stream_api_v1_chat_stream_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-User-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2342,13 +2433,13 @@ export interface operations {
     search_product_catalog_api_v1_products_get: {
         parameters: {
             query?: {
-                /** @description å³é®è¯ï¼å¹éåååç§°æåç±» */
+                /** @description 关键词，匹配商品名称或品类 */
                 query?: string | null;
-                /** @description ç²¾ç¡®åç±»è¿æ»¤ */
+                /** @description 精确品类过滤 */
                 category?: string | null;
-                /** @description æé«ä»·æ ¼ï¼å«ï¼ï¼ç¨äºé¢ç®è¿æ»¤ */
+                /** @description 最高价格（含），用于预算过滤 */
                 max_price?: number | string | null;
-                /** @description è¿åæ°éä¸é */
+                /** @description 返回数量上限 */
                 limit?: number;
             };
             header?: never;
