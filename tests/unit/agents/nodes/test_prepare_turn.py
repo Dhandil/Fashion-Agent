@@ -10,6 +10,7 @@ from app.domain.entities.outfit import (
     OutfitItem,
     OutfitRecommendation,
 )
+from app.memory.short_term.conversation_summary import ConversationSummary
 
 
 def create_previous_recommendation() -> OutfitRecommendation:
@@ -92,6 +93,39 @@ def test_prepare_turn_keeps_existing_baseline_when_no_new_outfit() -> None:
         "outfit_feedback_context": "",
         "recent_outfits_context": "",
     }
+
+
+def test_prepare_turn_restores_dictionary_outfit_from_checkpointer() -> None:
+    """验证 Redis 恢复的字典 Outfit 会转换为领域模型。"""
+
+    recommendation = create_previous_recommendation()
+    node = create_prepare_turn_node()
+    result = node(
+        {
+            "messages": [],
+            "outfit_recommendation": recommendation.model_dump(mode="json"),
+        },
+    )
+
+    assert result["previous_outfit_recommendation"] == recommendation
+
+
+def test_prepare_turn_restores_dictionary_summary_from_checkpointer() -> None:
+    """验证 Redis 恢复的对话摘要会转换为领域模型。"""
+
+    summary = ConversationSummary(
+        content="用户：喜欢简约风格",
+        covered_message_count=1,
+    )
+    node = create_prepare_turn_node()
+    result = node(
+        {
+            "messages": [],
+            "conversation_summary": summary.model_dump(mode="json"),
+        },
+    )
+
+    assert result["conversation_summary"] == summary
 
 
 def test_prepare_turn_clears_previous_derived_context() -> None:

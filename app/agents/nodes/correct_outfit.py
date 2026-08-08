@@ -28,6 +28,7 @@ from app.agents.prompts.outfit_correction import (
     OUTFIT_CORRECTION_SYSTEM_PROMPT,
 )
 from app.agents.schemas.outfit import OutfitGenerationResult
+from app.agents.state.serialization import model_to_json
 from app.agents.state.shopping import ShoppingAgentState
 from app.agents.style_constraints import (
     get_effective_style_constraints,
@@ -97,7 +98,7 @@ def _build_correction_context(
                 key="requirement_analysis",
                 source=(ContextSource.REQUIREMENT_ANALYSIS),
                 priority=ContextPriority.CURRENT_FACT,
-                content=(requirement_analysis.model_dump_json()),
+                content=model_to_json(requirement_analysis),
                 truncatable=False,
             ),
         )
@@ -166,7 +167,7 @@ def _build_correction_context(
                 key="provided_weather",
                 source=ContextSource.WEATHER,
                 priority=ContextPriority.CURRENT_FACT,
-                content=weather.model_dump_json(),
+                content=model_to_json(weather),
                 truncatable=False,
             ),
         )

@@ -31,6 +31,7 @@ from app.agents.prompts.outfit import (
 from app.agents.schemas.outfit import (
     OutfitGenerationResult,
 )
+from app.agents.state.serialization import model_to_json
 from app.agents.state.shopping import ShoppingAgentState
 from app.agents.style_constraints import (
     get_effective_style_constraints,
@@ -107,7 +108,7 @@ def _create_generation_context_package(
                 key="requirement_analysis",
                 source=(ContextSource.REQUIREMENT_ANALYSIS),
                 priority=ContextPriority.CURRENT_FACT,
-                content=(requirement_analysis.model_dump_json()),
+                content=model_to_json(requirement_analysis),
                 truncatable=False,
             ),
         )
@@ -155,7 +156,7 @@ def _create_generation_context_package(
                 key="provided_weather",
                 source=ContextSource.WEATHER,
                 priority=ContextPriority.CURRENT_FACT,
-                content=provided_weather.model_dump_json(),
+                content=model_to_json(provided_weather),
                 truncatable=False,
             ),
         )
@@ -201,7 +202,7 @@ def _create_generation_context_package(
                 key="previous_outfit",
                 source=ContextSource.PREVIOUS_OUTFIT,
                 priority=ContextPriority.EXPLICIT_MEMORY,
-                content=previous_outfit.model_dump_json(),
+                content=model_to_json(previous_outfit),
                 truncatable=False,
             ),
         )

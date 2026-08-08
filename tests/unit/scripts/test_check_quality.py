@@ -91,6 +91,22 @@ def test_redis_checks_are_explicitly_opt_in() -> None:
     assert "Redis Checkpointer 持久化测试" in redis_names
 
 
+def test_default_automated_tests_disable_external_weather_provider() -> None:
+    """验证默认质量门测试不受本地天气服务配置影响。"""
+
+    checks = build_quality_checks(
+        include_postgres=False,
+        include_redis=False,
+    )
+    automated_tests = next(
+        check for check in checks if check.name == "默认自动化测试"
+    )
+
+    assert automated_tests.environment["WEATHER_PROVIDER_BACKEND"] == (
+        "disabled"
+    )
+
+
 def test_rag_evaluation_is_read_only_and_isolated_from_local_env() -> None:
     """验证 RAG 质量评估不会覆盖基线，也不会读取非法本地 DEBUG。"""
 

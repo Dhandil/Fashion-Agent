@@ -1,4 +1,5 @@
 import { Sparkles } from "lucide-react";
+import PromptComposer from "@/features/conversation/PromptComposer";
 
 type Props = {
   onSend: (message: string) => void;
@@ -35,6 +36,8 @@ export default function WelcomeState({ onSend }: Props) {
             </button>
           ))}
         </div>
+
+        <PromptComposer onSubmit={onSend} />
       </div>
     </div>
   );

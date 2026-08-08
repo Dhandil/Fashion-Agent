@@ -137,7 +137,11 @@ def build_quality_checks(
             name="默认自动化测试",
             command=(python, "-m", "pytest", "tests", "-q"),
             # 本地受保护 .env 不参与质量门的测试配置。
-            environment={"DEBUG": "false"},
+            # 默认测试使用禁用天气的确定性配置；真实天气联调单独执行。
+            environment={
+                "DEBUG": "false",
+                "WEATHER_PROVIDER_BACKEND": "disabled",
+            },
         ),
     ]
 

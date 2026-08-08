@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -17,6 +18,7 @@ from app.agents.context_package import (
     build_context_package,
 )
 from app.agents.prompts.shopping import SHOPPING_ASSISTANT_SYSTEM_PROMPT
+from app.agents.state.serialization import model_to_json
 from app.agents.state.shopping import ShoppingAgentState
 from app.agents.style_constraints import (
     get_effective_style_constraints,
@@ -63,7 +65,7 @@ def _build_chat_context_package(
                 key="requirement_analysis",
                 source=(ContextSource.REQUIREMENT_ANALYSIS),
                 priority=ContextPriority.CURRENT_FACT,
-                content=(requirement_analysis.model_dump_json()),
+                content=model_to_json(requirement_analysis),
                 truncatable=False,
             ),
         )
@@ -89,7 +91,7 @@ def _build_chat_context_package(
                 key="weather",
                 source=ContextSource.WEATHER,
                 priority=ContextPriority.CURRENT_FACT,
-                content=weather_context.model_dump_json(),
+                content=model_to_json(weather_context),
                 # JSON 必须保持完整，不能按字符切断。
                 truncatable=False,
             ),
@@ -130,7 +132,7 @@ def _build_chat_context_package(
                 key="previous_outfit",
                 source=ContextSource.PREVIOUS_OUTFIT,
                 priority=ContextPriority.EXPLICIT_MEMORY,
-                content=previous_outfit.model_dump_json(),
+                content=model_to_json(previous_outfit),
                 truncatable=False,
             ),
         )
@@ -197,6 +199,16 @@ def _render_chat_context(package: ContextPackage) -> str:
     """把已选中的上下文渲染为受边界标记保护的系统提示词。"""
 
     rendered_sections: list[str] = []
+    if any(
+        selection.source is ContextSource.REQUIREMENT_ANALYSIS
+        for selection in package.selections
+    ):
+        rendered_sections.append(
+            "当前系统日期："
+            f"{datetime.now(UTC).date().isoformat()}。"
+            "仅可用于将‘今天、明天、后天’等相对日期转换为天气工具需要的具体日期，"
+            "不能据此推断天气内容。"
+        )
 
     for selection in package.selections:
         content = selection.content

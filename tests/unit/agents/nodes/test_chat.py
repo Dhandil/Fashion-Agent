@@ -405,6 +405,37 @@ def test_chat_node_includes_previous_outfit_for_adjustment() -> None:
     assert "仍需重新查询当前可用衣橱" in (system_message.content)
 
 
+def test_chat_node_accepts_restored_dictionary_previous_outfit() -> None:
+    """验证 Redis 恢复的字典 Outfit 不会导致上下文渲染失败。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(content="我会调整上衣。")
+    chat_node = create_chat_node(model)
+    previous_outfit = OutfitRecommendation(
+        name="清爽通勤",
+        scenario="通勤",
+        items=(
+            OutfitItem(
+                role="上装",
+                name="浅蓝色衬衫",
+                source="wardrobe",
+                source_reference_id="shirt-001",
+            ),
+        ),
+        recommendation_reason="适合通勤。",
+    )
+
+    chat_node(
+        {
+            "messages": [HumanMessage(content="换一件上衣")],
+            "previous_outfit_recommendation": previous_outfit.model_dump(mode="json"),
+        },
+    )
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "清爽通勤" in system_message.content
+
+
 def test_chat_node_includes_current_weather_context() -> None:
     """验证当前轮天气作为事实而不是系统指令加入提示词。"""
 
@@ -437,3 +468,28 @@ def test_chat_node_includes_current_weather_context() -> None:
     assert "不要补造缺失的实时天气" in (system_message.content)
     assert "高温或体感炎热" in (system_message.content)
     assert "明显降水风险" in (system_message.content)
+
+
+def test_chat_node_includes_current_date_for_weather_tool() -> None:
+    """验证天气工具可以把相对日期转换为具体日期。"""
+
+    model = Mock(spec=BaseChatModel)
+    model.invoke.return_value = AIMessage(content="请先查询天气。")
+    chat_node = create_chat_node(model)
+
+    chat_node(
+        {
+            "messages": [HumanMessage(content="明天上海通勤怎么穿？")],
+            "requirement_analysis": OutfitRequirementAnalysis(
+                intent=RequestIntent.OUTFIT,
+                scenario="通勤",
+                location="上海",
+                target_date="明天",
+                needs_weather=True,
+            ),
+        },
+    )
+
+    system_message = model.invoke.call_args.args[0][0]
+    assert "当前系统日期：" in system_message.content
+    assert "相对日期转换为天气工具需要的具体日期" in system_message.content

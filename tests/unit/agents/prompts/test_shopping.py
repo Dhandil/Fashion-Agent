@@ -45,5 +45,8 @@ def test_prompt_defines_tool_and_data_boundaries() -> None:
     # 没有天气工具时不能虚构实时天气
     assert "不得虚构当前天气" in (SHOPPING_ASSISTANT_SYSTEM_PROMPT)
 
+    # 已有完整天气查询条件时必须先调用天气工具
+    assert "必须先调用 get_weather" in (SHOPPING_ASSISTANT_SYSTEM_PROMPT)
+
     # Agent 当前不允许执行真实交易
     assert "不执行购买、支付、下单、物流、售后或修改库存" in (SHOPPING_ASSISTANT_SYSTEM_PROMPT)
