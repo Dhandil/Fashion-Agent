@@ -70,6 +70,14 @@ class WardrobeImageError(
     """用户提交的衣物照片为空、超限或格式无效。"""
 
 
+class WardrobeImageStorageError(FashionAgentError):
+    """衣物图片本地文件卷读写失败。"""
+
+
+class WardrobeImageAssetNotFoundError(FashionAgentError):
+    """当前用户不存在指定的图片资产。"""
+
+
 class WardrobeVisionProviderError(FashionAgentError):
     """衣物照片识别服务暂时无法提供可信结果。"""
 

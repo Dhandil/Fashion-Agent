@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from unittest.mock import (
     AsyncMock,
     Mock,
@@ -17,12 +18,20 @@ from app.api.dependencies.database import (
 from app.db.repositories.fashion_provider import (
     FashionRepositories,
 )
+from app.domain.entities.wardrobe_image import WardrobeImageContentType
+from app.domain.entities.wardrobe_image_asset import (
+    WardrobeImageAsset,
+    WardrobeImageAssetStatus,
+)
 from app.domain.entities.wardrobe_item import (
     WardrobeItem,
     WardrobeItemStatus,
 )
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
+)
+from app.domain.repositories.wardrobe_image_asset import (
+    WardrobeImageAssetRepository,
 )
 from app.main import create_app
 
@@ -53,6 +62,7 @@ def create_test_item(
 @contextmanager
 def wardrobe_test_client(
     repository: WardrobeRepository,
+    image_asset_repository: WardrobeImageAssetRepository | None = None,
 ) -> Iterator[TestClient]:
     """创建注入假衣橱仓库的 API 测试客户端。"""
 
@@ -60,6 +70,7 @@ def wardrobe_test_client(
         style_profiles=Mock(),
         preference_memories=Mock(),
         wardrobe=repository,
+        wardrobe_image_assets=image_asset_repository,
         outfits=Mock(),
         outfit_feedback=Mock(),
     )
@@ -361,6 +372,7 @@ def test_delete_wardrobe_item_returns_no_content() -> None:
     repository = AsyncMock(
         spec=WardrobeRepository,
     )
+    repository.get_by_id.return_value = create_test_item()
     repository.delete.return_value = True
 
     with wardrobe_test_client(repository) as client:
@@ -385,6 +397,7 @@ def test_delete_missing_wardrobe_item_returns_not_found() -> None:
     repository = AsyncMock(
         spec=WardrobeRepository,
     )
+    repository.get_by_id.return_value = None
     repository.delete.return_value = False
 
     with wardrobe_test_client(repository) as client:
@@ -399,3 +412,42 @@ def test_delete_missing_wardrobe_item_returns_not_found() -> None:
     assert response.json()["code"] == (
         "wardrobe_item_not_found"
     )
+
+
+def test_delete_wardrobe_item_marks_image_asset_for_cleanup() -> None:
+    """验证删除衣橱单品时会保留图片资产并标记待清理。"""
+
+    repository = AsyncMock(spec=WardrobeRepository)
+    repository.get_by_id.return_value = create_test_item().model_copy(
+        update={"image_asset_id": "asset-001"},
+    )
+    repository.delete.return_value = True
+
+    image_asset_repository = AsyncMock(
+        spec=WardrobeImageAssetRepository,
+    )
+    image_asset_repository.get_by_id.return_value = WardrobeImageAsset(
+        image_asset_id="asset-001",
+        user_id="user-001",
+        object_key="asset-001.jpg",
+        content_type=WardrobeImageContentType.JPEG,
+        byte_size=10,
+        sha256="a" * 64,
+        status=WardrobeImageAssetStatus.ATTACHED,
+        created_at=datetime.now(UTC) - timedelta(days=1),
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+    )
+
+    with wardrobe_test_client(
+        repository,
+        image_asset_repository,
+    ) as client:
+        response = client.delete(
+            "/api/v1/wardrobe/wardrobe-001",
+            headers={"X-User-ID": "user-001"},
+        )
+
+    assert response.status_code == 204
+    saved_asset = image_asset_repository.save.await_args.args[0]
+    assert saved_asset.status is WardrobeImageAssetStatus.DELETION_PENDING
+    assert saved_asset.deleted_at is not None

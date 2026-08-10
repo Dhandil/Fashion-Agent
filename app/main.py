@@ -10,7 +10,9 @@ from app.api.exception_handlers import (
     preference_memory_update_conflict_handler,
     service_not_ready_handler,
     style_profile_update_conflict_handler,
+    wardrobe_image_asset_not_found_handler,
     wardrobe_image_error_handler,
+    wardrobe_image_storage_error_handler,
     wardrobe_item_not_found_handler,
     wardrobe_vision_provider_error_handler,
 )
@@ -29,7 +31,9 @@ from app.core.exceptions import (
     PreferenceMemoryUpdateConflictError,
     ServiceNotReadyError,
     StyleProfileUpdateConflictError,
+    WardrobeImageAssetNotFoundError,
     WardrobeImageError,
+    WardrobeImageStorageError,
     WardrobeItemNotFoundError,
     WardrobeVisionProviderError,
 )
@@ -106,6 +110,14 @@ def create_app() -> FastAPI:
     application.add_exception_handler(
         WardrobeImageError,
         wardrobe_image_error_handler,
+    )
+    application.add_exception_handler(
+        WardrobeImageStorageError,
+        wardrobe_image_storage_error_handler,
+    )
+    application.add_exception_handler(
+        WardrobeImageAssetNotFoundError,
+        wardrobe_image_asset_not_found_handler,
     )
     application.add_exception_handler(
         WardrobeVisionProviderError,

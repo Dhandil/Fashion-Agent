@@ -1153,12 +1153,35 @@ export interface components {
          */
         WardrobeImageRecognitionRequest: {
             /** Image Base64 */
-            image_base64: string;
-            content_type: components["schemas"]["WardrobeImageContentType"];
+            image_base64?: string | null;
+            /** Image Asset Id */
+            image_asset_id?: string | null;
+            content_type?: components["schemas"]["WardrobeImageContentType"];
             /** Image Url */
             image_url?: string | null;
             /** Hint */
             hint?: string | null;
+        };
+        /** WardrobeImageUploadRequest */
+        WardrobeImageUploadRequest: {
+            content_type: components["schemas"]["WardrobeImageContentType"];
+            byte_size: number;
+        };
+        /** WardrobeImageUploadResponse */
+        WardrobeImageUploadResponse: {
+            image_asset_id: string;
+            upload_url: string;
+            content_url: string;
+            expires_at: string;
+        };
+        /** WardrobeImageAssetResponse */
+        WardrobeImageAssetResponse: {
+            image_asset_id: string;
+            content_type: components["schemas"]["WardrobeImageContentType"];
+            byte_size: number;
+            sha256: string;
+            status: string;
+            content_url: string;
         };
         /**
          * WardrobeItemCreate
@@ -1200,6 +1223,8 @@ export interface components {
             scenarios: string[];
             /** Image Url */
             image_url?: string | null;
+            /** Image Asset Id */
+            image_asset_id?: string | null;
             /** @default available */
             status: components["schemas"]["WardrobeItemStatus"];
             /** Notes */
@@ -1248,6 +1273,8 @@ export interface components {
             notes?: string | null;
             /** Image Url */
             image_url?: string | null;
+            /** Image Asset Id */
+            image_asset_id?: string | null;
             /** Confidence */
             confidence: number;
             /**
@@ -1315,6 +1342,8 @@ export interface components {
             scenarios?: string[] | null;
             /** Image Url */
             image_url?: string | null;
+            /** Image Asset Id */
+            image_asset_id?: string | null;
             status?: components["schemas"]["WardrobeItemStatus"] | null;
             /** Notes */
             notes?: string | null;
@@ -1359,6 +1388,8 @@ export interface components {
             scenarios: string[];
             /** Image Url */
             image_url?: string | null;
+            /** Image Asset Id */
+            image_asset_id?: string | null;
             /** @default available */
             status: components["schemas"]["WardrobeItemStatus"];
             /** Notes */

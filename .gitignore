@@ -94,6 +94,12 @@ temp/
 # Chroma 向量、索引和本地数据库不提交
 /data/chroma/**
 
+# 本地视觉模型冒烟测试图片，可能包含个人衣物，不提交到仓库
+/test-assets/vision/**
+
+# 本地衣物图片上传文件卷
+/data/uploads/**
+
 # 处理过程中生成的数据不提交
 /data/processed/**
 

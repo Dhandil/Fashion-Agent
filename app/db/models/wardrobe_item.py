@@ -108,6 +108,11 @@ class WardrobeItemModel(Base):
         nullable=True,
     )
 
+    image_asset_id: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
     # 保存枚举的字符串值：available 或 unavailable
     status: Mapped[str] = mapped_column(
         String(20),

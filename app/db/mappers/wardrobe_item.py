@@ -27,6 +27,7 @@ def wardrobe_item_entity_to_model(
         seasons=list(item.seasons),
         scenarios=list(item.scenarios),
         image_url=item.image_url,
+        image_asset_id=item.image_asset_id,
         # 数据库保存枚举对应的字符串值
         status=item.status.value,
         notes=item.notes,
@@ -52,6 +53,7 @@ def wardrobe_item_model_to_entity(
         seasons=tuple(item_model.seasons),
         scenarios=tuple(item_model.scenarios),
         image_url=item_model.image_url,
+        image_asset_id=item_model.image_asset_id,
         # 显式把数据库字符串恢复成领域枚举
         status=WardrobeItemStatus(
             item_model.status,

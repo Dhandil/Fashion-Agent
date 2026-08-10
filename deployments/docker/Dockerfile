@@ -35,7 +35,7 @@ COPY data/samples ./data/samples
 # 运行进程不使用 root；挂载目录提前创建并交给应用用户。
 RUN groupadd --system fashion_agent \
     && useradd --system --gid fashion_agent --create-home fashion_agent \
-    && mkdir -p /app/data/chroma /app/data/raw /home/fashion_agent/.cache/huggingface \
+    && mkdir -p /app/data/chroma /app/data/raw /app/data/uploads/wardrobe /home/fashion_agent/.cache/huggingface \
     && chown -R fashion_agent:fashion_agent /app /home/fashion_agent
 
 USER fashion_agent

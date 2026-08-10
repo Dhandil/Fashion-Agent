@@ -175,6 +175,38 @@ async def wardrobe_image_error_handler(
     )
 
 
+async def wardrobe_image_storage_error_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将本地图片文件卷异常转换成统一的 503 响应。"""
+
+    error_response = ErrorResponse(
+        code="wardrobe_image_storage_unavailable",
+        message=str(exc),
+    )
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=error_response.model_dump(),
+    )
+
+
+async def wardrobe_image_asset_not_found_handler(
+    _request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """将图片资产越权或不存在转换成统一的 404 响应。"""
+
+    error_response = ErrorResponse(
+        code="wardrobe_image_asset_not_found",
+        message=str(exc),
+    )
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content=error_response.model_dump(),
+    )
+
+
 async def wardrobe_vision_provider_error_handler(
     _request: Request,
     exc: Exception,

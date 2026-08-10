@@ -413,6 +413,9 @@ POST /api/v1/outfits
 - 名称或品类识别不到时如实标记缺失，不虚构衣物信息。
 - 整体置信度低于阈值时，已识别字段全部标记为需要用户确认。
 - 应用不保存照片字节；`image_url` 只接受客户端已经托管的地址。
+- 后续对象存储方案见 [`docs/image-storage.md`](image-storage.md)：图片使用私有
+  S3-compatible Bucket，衣橱记录保存 `image_asset_id`，`image_url` 只作为短时
+  签名访问地址的响应字段，不保存永久公开 URL。
 
 `WardrobeImageRecognizer` 是领域层协议，只规定“输入一张照片，输出候选特征”，
 具体适配器由 `integrations/vision` 实现，并由配置工厂装配：
@@ -441,6 +444,7 @@ WARDROBE_VISION_BACKEND=openai_compatible
 | PostgreSQL | 用户档案、衣橱、搭配、反馈、商品缓存 | Embedding、短期消息检查点 |
 | Redis | 短期会话、临时状态、缓存、限流 | 需要永久保留的用户业务数据 |
 | Chroma | 服装知识文本、向量、来源元数据 | 实时价格、库存、支付信息 |
+| 私有对象存储 | 用户确认后的衣物图片对象 | 公开图片 URL、Base64、识别草稿事实 |
 | 外部 API/MCP | 实时商品、库存、价格、天气 | Fashion-Agent 内部会话状态 |
 
 ### 7.1 PostgreSQL 会话生命周期

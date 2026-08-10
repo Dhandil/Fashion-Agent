@@ -108,14 +108,46 @@ export const WARDROBE_PAGE_SIZE = PAGE_SIZE;
 
 type DraftResponse = components["schemas"]["WardrobeItemDraftResponse"];
 
+type ImageUploadResponse = components["schemas"]["WardrobeImageUploadResponse"];
+
+/** 创建本地图片上传凭证。 */
+export function createWardrobeImageUpload(input: {
+  contentType: components["schemas"]["WardrobeImageContentType"];
+  byteSize: number;
+}): Promise<ImageUploadResponse> {
+  return api.post<ImageUploadResponse>("/wardrobe/images/uploads", {
+    content_type: input.contentType,
+    byte_size: input.byteSize,
+  });
+}
+
+/** 将图片原始字节直传到本地文件卷。 */
+export async function uploadWardrobeImage(
+  uploadUrl: string,
+  file: File,
+): Promise<void> {
+  await api.putBinary<void>(uploadUrl, file, file.type);
+}
+
+/** 确认图片上传完成并取得资产摘要。 */
+export function completeWardrobeImageUpload(
+  imageAssetId: string,
+): Promise<components["schemas"]["WardrobeImageAssetResponse"]> {
+  return api.post<components["schemas"]["WardrobeImageAssetResponse"]>(
+    `/wardrobe/images/${encodeURIComponent(imageAssetId)}/complete`,
+  );
+}
+
 /** 识别一张衣物照片，返回待确认草稿 */
 export async function recognizeWardrobeImage(input: {
-  imageBase64: string;
-  contentType: components["schemas"]["WardrobeImageContentType"];
+  imageBase64?: string;
+  imageAssetId?: string;
+  contentType?: components["schemas"]["WardrobeImageContentType"];
   hint?: string | null;
 }): Promise<DraftResponse> {
   return api.post<DraftResponse>("/wardrobe/recognitions", {
     image_base64: input.imageBase64,
+    image_asset_id: input.imageAssetId,
     content_type: input.contentType,
     hint: input.hint ?? null,
   });

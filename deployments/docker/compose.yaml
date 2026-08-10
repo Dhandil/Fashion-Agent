@@ -168,6 +168,8 @@ services:
       - ../../data/chroma:/app/data/chroma
       # 首次下载的 Embedding 模型在容器重建后继续复用
       - fashion_agent_huggingface_cache:/home/fashion_agent/.cache/huggingface
+      # 本地衣物图片文件卷，图片不进入 Git
+      - fashion_agent_wardrobe_uploads:/app/data/uploads
 
     depends_on:
       postgres:
@@ -221,3 +223,4 @@ volumes:
   fashion_agent_postgres_data:
   fashion_agent_huggingface_cache:
   fashion_agent_redis_data:
+  fashion_agent_wardrobe_uploads:

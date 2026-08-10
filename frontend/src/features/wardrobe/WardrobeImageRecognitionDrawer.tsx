@@ -2,10 +2,12 @@ import { useRef, useState } from "react";
 import { X, Upload, Scan, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  recognizeWardrobeImage,
+  completeWardrobeImageUpload,
+  createWardrobeImageUpload,
+    recognizeWardrobeImage,
+  uploadWardrobeImage,
   validateWardrobeImageFile,
   readFileAsDataUrl,
-  stripDataUrlPrefix,
   useCreateWardrobeItem,
 } from "@/features/wardrobe/api";
 import ChipInput from "@/components/ui/ChipInput";
@@ -38,6 +40,7 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
   // 阶段 1：选图与预览
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [imageAssetId, setImageAssetId] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
 
   // 阶段 2：识别结果草稿（可编辑）
@@ -50,6 +53,7 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
   const reset = () => {
     setPreviewUrl(null);
     setFileName(null);
+    setImageAssetId(null);
     setFileError(null);
     setDraft(null);
     setRecognizing(false);
@@ -80,12 +84,18 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
     setFileName(file.name);
     setDraft(null);
 
-    // 调用识别
+    // 先直传到本地文件卷，再用资产 ID 发起识别，避免 Base64 放大请求体。
     setRecognizing(true);
     try {
-      const result = await recognizeWardrobeImage({
-        imageBase64: stripDataUrlPrefix(dataUrl),
+      const upload = await createWardrobeImageUpload({
         contentType: file.type as components["schemas"]["WardrobeImageContentType"],
+        byteSize: file.size,
+      });
+      await uploadWardrobeImage(upload.upload_url, file);
+      const completed = await completeWardrobeImageUpload(upload.image_asset_id);
+      setImageAssetId(completed.image_asset_id);
+      const result = await recognizeWardrobeImage({
+        imageAssetId: completed.image_asset_id,
       });
       setDraft(result);
     } catch (err) {
@@ -122,6 +132,7 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
         seasons: draft.seasons,
         scenarios: draft.scenarios,
         image_url: draft.image_url ?? null,
+        image_asset_id: draft.image_asset_id ?? imageAssetId,
         status: "available",
         notes: draft.notes ?? null,
       });

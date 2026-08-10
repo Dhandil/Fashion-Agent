@@ -79,6 +79,9 @@ class WardrobeItem(BaseModel):
         max_length=1000,
     )
 
+    # 私有图片资产的稳定 ID；image_url 由 API 按需生成
+    image_asset_id: str | None = Field(default=None, max_length=100)
+
     # 单品当前是否可以参与穿搭
     status: WardrobeItemStatus = WardrobeItemStatus.AVAILABLE
 

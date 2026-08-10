@@ -14,6 +14,7 @@ from app.domain.entities.wardrobe_draft import (
     WardrobeItemDraft,
 )
 from app.domain.entities.wardrobe_image import (
+    WardrobeImage,
     WardrobeImageContentType,
 )
 from app.domain.policies.wardrobe_draft import (
@@ -40,6 +41,7 @@ async def recognize_wardrobe_image(
     min_confidence: float,
     image_url: str | None = None,
     hint: str | None = None,
+    image_asset_id: str | None = None,
 ) -> WardrobeItemDraft:
     """识别一张衣物照片，返回等待用户确认的草稿。
 
@@ -84,6 +86,7 @@ async def recognize_wardrobe_image(
             draft_id=str(uuid4()),
             recognition=recognition,
             image_url=image_url,
+            image_asset_id=image_asset_id,
             min_confidence=min_confidence,
         )
         observation.add_fields(
@@ -96,4 +99,52 @@ async def recognize_wardrobe_image(
             ),
         )
 
+    return draft
+
+
+async def recognize_wardrobe_image_content(
+    *,
+    recognizer: WardrobeImageRecognizer | None,
+    user_id: str,
+    image: WardrobeImage,
+    max_image_bytes: int,
+    min_confidence: float,
+    image_url: str | None = None,
+    image_asset_id: str | None = None,
+    hint: str | None = None,
+) -> WardrobeItemDraft:
+    """识别已经由本地文件卷读取的图片字节。"""
+
+    if recognizer is None:
+        raise WardrobeVisionUnavailableError(
+            "当前部署未启用衣物照片识别，请手动录入衣橱单品。",
+        )
+
+    validate_wardrobe_image(image=image, max_bytes=max_image_bytes)
+    with observe_operation(
+        logger,
+        "service.wardrobe_image_recognition",
+        user=anonymize_identifier(user_id),
+        content_type=image.content_type.value,
+        image_bytes=len(image.content),
+    ) as observation:
+        with observe_operation(
+            logger,
+            "provider.wardrobe_vision",
+            provider_type=type(recognizer).__name__,
+        ):
+            recognition = await recognizer.recognize(image, hint)
+
+        draft = build_wardrobe_item_draft(
+            draft_id=str(uuid4()),
+            recognition=recognition,
+            image_url=image_url,
+            image_asset_id=image_asset_id,
+            min_confidence=min_confidence,
+        )
+        observation.add_fields(
+            confidence=draft.confidence,
+            uncertain_field_count=len(draft.uncertain_fields),
+            missing_field_count=len(draft.missing_fields),
+        )
     return draft

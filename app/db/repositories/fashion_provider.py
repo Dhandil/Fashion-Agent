@@ -19,6 +19,9 @@ from app.db.repositories.postgres_style_profile import (
 from app.db.repositories.postgres_wardrobe import (
     PostgresWardrobeRepository,
 )
+from app.db.repositories.postgres_wardrobe_image_asset import (
+    PostgresWardrobeImageAssetRepository,
+)
 from app.domain.repositories.outfit import (
     OutfitRepository,
 )
@@ -34,6 +37,9 @@ from app.domain.repositories.style_profile import (
 from app.domain.repositories.wardrobe import (
     WardrobeRepository,
 )
+from app.domain.repositories.wardrobe_image_asset import (
+    WardrobeImageAssetRepository,
+)
 
 
 @dataclass(
@@ -48,6 +54,8 @@ class FashionRepositories:
     wardrobe: WardrobeRepository
     outfits: OutfitRepository
     outfit_feedback: OutfitFeedbackRepository
+    # 旧测试和内存装配可以暂不提供图片资产仓库；PostgreSQL 装配会注入实现
+    wardrobe_image_assets: WardrobeImageAssetRepository | None = None
 
 
 def create_postgres_fashion_repositories(
@@ -65,6 +73,9 @@ def create_postgres_fashion_repositories(
             )
         ),
         wardrobe=PostgresWardrobeRepository(
+            session,
+        ),
+        wardrobe_image_assets=PostgresWardrobeImageAssetRepository(
             session,
         ),
         outfits=PostgresOutfitRepository(

@@ -1,5 +1,7 @@
 """用户衣橱 API 数据结构。"""
 
+from datetime import datetime
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -47,6 +49,7 @@ class WardrobeItemBase(BaseModel):
         default=None,
         max_length=1000,
     )
+    image_asset_id: str | None = Field(default=None, max_length=100)
     status: WardrobeItemStatus = WardrobeItemStatus.AVAILABLE
     notes: str | None = Field(
         default=None,
@@ -112,10 +115,7 @@ class WardrobeItemPatch(BaseModel):
         )
 
         for field_name in non_nullable_fields:
-            if (
-                field_name in self.model_fields_set
-                and getattr(self, field_name) is None
-            ):
+            if field_name in self.model_fields_set and getattr(self, field_name) is None:
                 raise ValueError(
                     f"{field_name} 不能为 null",
                 )
@@ -147,13 +147,17 @@ class WardrobeImageRecognitionRequest(BaseModel):
     """提交一张衣物照片请求识别的请求体。"""
 
     # 照片使用 Base64 传输，服务端不保存原始字节
-    image_base64: str = Field(
+    image_base64: str | None = Field(
+        default=None,
         min_length=1,
         max_length=_MAX_IMAGE_BASE64_CHARS,
     )
 
+    # 本地文件卷流程使用已经上传完成的图片资产 ID
+    image_asset_id: str | None = Field(default=None, max_length=100)
+
     # 客户端声明的照片格式，服务端仍会按文件头再次校验
-    content_type: WardrobeImageContentType
+    content_type: WardrobeImageContentType | None = None
 
     # 客户端已经托管的照片地址，确认后可以随衣物一起保存
     image_url: str | None = Field(
@@ -166,6 +170,43 @@ class WardrobeImageRecognitionRequest(BaseModel):
         default=None,
         max_length=200,
     )
+
+    @model_validator(mode="after")
+    def validate_image_input(self) -> "WardrobeImageRecognitionRequest":
+        """Base64 和图片资产二选一，避免空请求或重复上传。"""
+
+        if (self.image_base64 is None) == (self.image_asset_id is None):
+            raise ValueError("image_base64 和 image_asset_id 必须二选一")
+        if self.image_base64 is not None and self.content_type is None:
+            raise ValueError("使用 image_base64 时必须提供 content_type")
+        return self
+
+
+class WardrobeImageUploadRequest(BaseModel):
+    """创建本地文件卷上传凭证。"""
+
+    content_type: WardrobeImageContentType
+    byte_size: int = Field(ge=1, le=20 * 1024 * 1024)
+
+
+class WardrobeImageUploadResponse(BaseModel):
+    """返回给前端的本地上传地址和资产信息。"""
+
+    image_asset_id: str
+    upload_url: str
+    content_url: str
+    expires_at: datetime
+
+
+class WardrobeImageAssetResponse(BaseModel):
+    """上传完成后的图片资产元数据。"""
+
+    image_asset_id: str
+    content_type: WardrobeImageContentType
+    byte_size: int
+    sha256: str
+    status: str
+    content_url: str
 
 
 class WardrobeItemDraftResponse(BaseModel):
@@ -200,6 +241,7 @@ class WardrobeItemDraftResponse(BaseModel):
         default=None,
         max_length=1000,
     )
+    image_asset_id: str | None = Field(default=None, max_length=100)
     confidence: float = Field(
         ge=0,
         le=1,

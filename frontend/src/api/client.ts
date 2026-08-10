@@ -51,6 +51,7 @@ export function getUserId(): string {
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
+  rawBody?: BodyInit;
   xUserId?: string;
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -120,7 +121,7 @@ export function isAppError(err: unknown): err is AppError {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, xUserId, timeoutMs, signal, anonymous, ...init } = options;
+  const { body, rawBody, xUserId, timeoutMs, signal, anonymous, ...init } = options;
   const effectiveUserId = anonymous ? null : (xUserId ?? userId);
   if (!effectiveUserId && !anonymous) {
     throw buildError(401, "unauthorized", "用户身份未配置。", false);
@@ -148,7 +149,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       ...init,
       method: init.method,
       headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: rawBody ?? (body !== undefined ? JSON.stringify(body) : undefined),
       signal: controller.signal,
     });
   } catch (err) {
@@ -189,6 +190,17 @@ export const api = {
   },
   put<T>(path: string, body?: unknown, options?: RequestOptions) {
     return request<T>(path, { ...options, method: "PUT", body });
+  },
+  putBinary<T>(path: string, body: BodyInit, contentType: string, options?: RequestOptions) {
+    return request<T>(path, {
+      ...options,
+      method: "PUT",
+      rawBody: body,
+      headers: {
+        ...(options?.headers as Record<string, string> | undefined),
+        "Content-Type": contentType,
+      },
+    });
   },
   delete<T>(path: string, options?: RequestOptions) {
     return request<T>(path, { ...options, method: "DELETE" });

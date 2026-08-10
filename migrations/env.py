@@ -28,6 +28,9 @@ from app.db.models.style_profile import (
 from app.db.models.wardrobe_item import (
     WardrobeItemModel,
 )
+from app.db.models.wardrobe_image_asset import (
+    WardrobeImageAssetModel,
+)
 
 # Alembic 当前使用的配置对象
 config = context.config
@@ -73,6 +76,7 @@ _registered_models = (
     OutfitItemModel,
     OutfitFeedbackModel,
     PreferenceMemoryModel,
+    WardrobeImageAssetModel,
 )
 
 # 所有 SQLAlchemy 模型共享同一个 Base.metadata

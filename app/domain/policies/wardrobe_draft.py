@@ -45,6 +45,7 @@ def build_wardrobe_item_draft(
     draft_id: str,
     recognition: WardrobeItemRecognition,
     image_url: str | None = None,
+    image_asset_id: str | None = None,
     min_confidence: float,
 ) -> WardrobeItemDraft:
     """净化识别结果，并明确标记需要用户确认和补充的字段。"""
@@ -99,6 +100,7 @@ def build_wardrobe_item_draft(
             max_chars=_MAX_NOTES_CHARS,
         ),
         image_url=image_url,
+        image_asset_id=image_asset_id,
         confidence=recognition.confidence,
         uncertain_fields=uncertain_fields,
         missing_fields=missing_fields,

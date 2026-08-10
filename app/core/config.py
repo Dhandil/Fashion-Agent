@@ -135,6 +135,16 @@ class Settings(BaseSettings):
         le=1,
     )
 
+    # 本地开发使用的衣物图片目录，生产环境应替换为对象存储适配器
+    wardrobe_image_storage_directory: str = "data/uploads/wardrobe"
+
+    # 上传凭证有效期，过期的 pending 资产不能继续上传
+    wardrobe_image_upload_ttl_seconds: int = Field(
+        default=600,
+        ge=60,
+        le=3600,
+    )
+
     # 天气 Provider 默认关闭；启用后 Agent 才会注册天气查询工具
     weather_provider_backend: Literal[
         "disabled",

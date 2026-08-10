@@ -101,6 +101,12 @@ class WardrobeItemDraft(BaseModel):
         max_length=1000,
     )
 
+    # 新上传流程使用资产 ID 关联私有图片；旧 image_url 保持兼容
+    image_asset_id: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
     # 本次识别的整体置信度
     confidence: float = Field(
         default=0.0,
