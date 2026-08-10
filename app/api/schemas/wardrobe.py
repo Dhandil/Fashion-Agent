@@ -19,6 +19,7 @@ from app.domain.entities.wardrobe_item import (
 # Base64 编码后的照片长度上限，约等于 15 MB 原始字节
 # 具体体积限制仍由配置和领域校验决定，这里只拦截明显异常的请求体
 _MAX_IMAGE_BASE64_CHARS = 20_000_000
+_MAX_BATCH_IMAGE_COUNT = 5
 
 
 class WardrobeItemBase(BaseModel):
@@ -182,6 +183,24 @@ class WardrobeImageRecognitionRequest(BaseModel):
         return self
 
 
+class WardrobeImageBatchRecognitionRequest(BaseModel):
+    """提交多张已上传图片，分别生成待确认草稿。"""
+
+    image_asset_ids: tuple[str, ...] = Field(
+        min_length=1,
+        max_length=_MAX_BATCH_IMAGE_COUNT,
+    )
+    hint: str | None = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_unique_assets(self) -> "WardrobeImageBatchRecognitionRequest":
+        """拒绝重复图片，避免同一资产被重复识别。"""
+
+        if len(set(self.image_asset_ids)) != len(self.image_asset_ids):
+            raise ValueError("image_asset_ids 不能包含重复值")
+        return self
+
+
 class WardrobeImageUploadRequest(BaseModel):
     """创建本地文件卷上传凭证。"""
 
@@ -255,6 +274,21 @@ class WardrobeItemDraftResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class WardrobeImageBatchRecognitionFailure(BaseModel):
+    """批量识别中单张图片的失败摘要。"""
+
+    image_asset_id: str
+    code: str
+    message: str
+
+
+class WardrobeImageBatchRecognitionResponse(BaseModel):
+    """批量识别结果；单张失败不会影响其他图片。"""
+
+    items: tuple[WardrobeItemDraftResponse, ...] = ()
+    failures: tuple[WardrobeImageBatchRecognitionFailure, ...] = ()
 
 
 class WardrobeItemListResponse(BaseModel):

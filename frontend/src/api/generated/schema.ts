@@ -168,6 +168,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/wardrobe/recognitions/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recognize_wardrobe_item_images_api_v1_wardrobe_recognitions_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/wardrobe/{wardrobe_item_id}": {
         parameters: {
             query?: never;
@@ -1162,6 +1178,11 @@ export interface components {
             /** Hint */
             hint?: string | null;
         };
+        /** WardrobeImageBatchRecognitionRequest */
+        WardrobeImageBatchRecognitionRequest: {
+            image_asset_ids: string[];
+            hint?: string | null;
+        };
         /** WardrobeImageUploadRequest */
         WardrobeImageUploadRequest: {
             content_type: components["schemas"]["WardrobeImageContentType"];
@@ -1182,6 +1203,17 @@ export interface components {
             sha256: string;
             status: string;
             content_url: string;
+        };
+        /** WardrobeImageBatchRecognitionFailure */
+        WardrobeImageBatchRecognitionFailure: {
+            image_asset_id: string;
+            code: string;
+            message: string;
+        };
+        /** WardrobeImageBatchRecognitionResponse */
+        WardrobeImageBatchRecognitionResponse: {
+            items: components["schemas"]["WardrobeItemDraftResponse"][];
+            failures: components["schemas"]["WardrobeImageBatchRecognitionFailure"][];
         };
         /**
          * WardrobeItemCreate
@@ -1752,6 +1784,39 @@ export interface operations {
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recognize_wardrobe_item_images_api_v1_wardrobe_recognitions_batch_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-User-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WardrobeImageBatchRecognitionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WardrobeImageBatchRecognitionResponse"];
+                };
+            };
             422: {
                 headers: {
                     [name: string]: unknown;

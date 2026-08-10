@@ -153,6 +153,20 @@ URL。前端不得缓存永久 URL；React Query 缓存中只保存当前页面�
 - 用户删除账户时立即标记全部资产，后台任务优先清理对象，再清理元数据；
 - 清理任务必须幂等、可重试，并记录匿名资产 ID、结果和耗时，不记录 URL 或图片。
 
+当前版本提供批处理清理命令 `scripts/cleanup_wardrobe_images.py`：
+
+```powershell
+# 默认只预览候选数量，不修改文件或数据库
+python -m scripts.cleanup_wardrobe_images --dry-run --limit 100
+
+# 明确指定后才执行物理删除和数据库状态更新
+python -m scripts.cleanup_wardrobe_images --execute --limit 100
+```
+
+命令默认采用 24 小时孤儿保留期和 7 天删除保留期，单次最多处理 100 个资产；
+`--limit` 可设置为 1–1000。清理服务先删除对象，再将资产标记为 `deleted`；
+对象删除失败时保留原状态，下一次任务可重试。`--dry-run` 不会写入数据库。
+
 ## 7. 安全与可靠性要求
 
 - Bucket 私有、服务端加密，生产环境使用最小权限的读写角色；
@@ -168,7 +182,9 @@ URL。前端不得缓存永久 URL；React Query 缓存中只保存当前页面�
 
 1. **已完成**：资产实体、PostgreSQL 表、本地文件卷适配器、上传/完成/读取
    接口，以及前端直传和 `image_asset_id` 识别；Base64 保留为兼容路径；
-2. **下一阶段**：补充资产过期、孤儿图片和衣橱删除后的异步清理任务；
+2. **已完成**：提供资产过期、孤儿图片和衣橱删除后的幂等清理服务与安全预览命令；
+   前端通过带 `X-User-ID` 的 API 读取私有图片 Blob，并在组件卸载或切换图片时
+   释放 Object URL；
 3. **生产阶段**：增加 S3-compatible Provider，并在需要时接入 MinIO；
 4. **迁移阶段**：逐步停止新业务写入永久外部 `image_url`，再移除旧兼容路径。
 

@@ -24,6 +24,7 @@ class WardrobeImageAssetRepository(Protocol):
         now: datetime,
         orphan_uploaded_before: datetime,
         deletion_pending_before: datetime,
+        limit: int | None = None,
     ) -> tuple[WardrobeImageAsset, ...]:
         """查询已过期、长期未关联或等待删除的图片资产。"""
         ...

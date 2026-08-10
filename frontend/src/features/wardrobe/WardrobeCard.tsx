@@ -1,4 +1,5 @@
 import type { components } from "@/api/generated/schema";
+import { useWardrobeImageUrl } from "@/features/wardrobe/api";
 import { Shirt, MoreVertical, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 
 type WardrobeItem = components["schemas"]["WardrobeItemResponse"];
@@ -12,14 +13,22 @@ type Props = {
 
 export default function WardrobeCard({ item, onEdit, onDelete, onToggleStatus }: Props) {
   const isAvailable = item.status === "available";
+  const imageSource = item.image_url ?? (
+    item.image_asset_id
+      ? `/api/v1/wardrobe/images/${encodeURIComponent(item.image_asset_id)}/content`
+      : null
+  );
+  const { resolvedUrl, isLoading: imageLoading } = useWardrobeImageUrl(imageSource);
 
   return (
     <div className="rounded-card border border-border bg-surface overflow-hidden flex flex-col">
       {/* 图片区 */}
       <div className="aspect-[4/5] bg-surface-subtle relative flex items-center justify-center">
-        {item.image_url ? (
+        {imageLoading ? (
+          <div className="w-full h-full bg-surface-subtle animate-pulse" aria-label="正在加载图片" />
+        ) : resolvedUrl ? (
           <img
-            src={item.image_url}
+            src={resolvedUrl}
             alt={item.name}
             loading="lazy"
             className={`w-full h-full object-cover ${isAvailable ? "" : "grayscale opacity-60"}`}

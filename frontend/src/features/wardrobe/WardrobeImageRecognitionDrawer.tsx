@@ -2,11 +2,8 @@ import { useRef, useState } from "react";
 import { X, Upload, Scan, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  completeWardrobeImageUpload,
-  createWardrobeImageUpload,
-    recognizeWardrobeImage,
-  uploadWardrobeImage,
-  validateWardrobeImageFile,
+  uploadAndRecognizeWardrobeImages,
+  WARDROBE_BATCH_IMAGE_MAX_COUNT,
   readFileAsDataUrl,
   useCreateWardrobeItem,
 } from "@/features/wardrobe/api";
@@ -38,24 +35,22 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
   const createMutation = useCreateWardrobeItem();
 
   // 阶段 1：选图与预览
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [imageAssetId, setImageAssetId] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<Array<{ name: string; url: string }>>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [activeDraftIndex, setActiveDraftIndex] = useState(0);
   const [fileError, setFileError] = useState<string | null>(null);
 
   // 阶段 2：识别结果草稿（可编辑）
-  const [draft, setDraft] = useState<Draft | null>(null);
   const [recognizing, setRecognizing] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
   if (!open) return null;
 
   const reset = () => {
-    setPreviewUrl(null);
-    setFileName(null);
-    setImageAssetId(null);
+    setPreviews([]);
+    setDrafts([]);
+    setActiveDraftIndex(0);
     setFileError(null);
-    setDraft(null);
     setRecognizing(false);
     setPageError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -66,38 +61,31 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
     onClose();
   };
 
-  const handleFileChange = async (file: File | undefined) => {
-    if (!file) return;
+  const handleFileChange = async (fileList: FileList | undefined) => {
+    if (!fileList?.length) return;
+    const files = Array.from(fileList);
     setFileError(null);
     setPageError(null);
-
-    const err = validateWardrobeImageFile(file);
-    if (err) {
-      setFileError(err);
-      setPreviewUrl(null);
-      setDraft(null);
+    if (files.length > WARDROBE_BATCH_IMAGE_MAX_COUNT) {
+      setFileError(`一次最多选择 ${WARDROBE_BATCH_IMAGE_MAX_COUNT} 张照片。`);
       return;
     }
 
-    const dataUrl = await readFileAsDataUrl(file);
-    setPreviewUrl(dataUrl);
-    setFileName(file.name);
-    setDraft(null);
+    const nextPreviews = await Promise.all(
+      files.map(async (file) => ({ name: file.name, url: await readFileAsDataUrl(file) })),
+    );
+    setPreviews(nextPreviews);
+    setDrafts([]);
+    setActiveDraftIndex(0);
 
     // 先直传到本地文件卷，再用资产 ID 发起识别，避免 Base64 放大请求体。
     setRecognizing(true);
     try {
-      const upload = await createWardrobeImageUpload({
-        contentType: file.type as components["schemas"]["WardrobeImageContentType"],
-        byteSize: file.size,
-      });
-      await uploadWardrobeImage(upload.upload_url, file);
-      const completed = await completeWardrobeImageUpload(upload.image_asset_id);
-      setImageAssetId(completed.image_asset_id);
-      const result = await recognizeWardrobeImage({
-        imageAssetId: completed.image_asset_id,
-      });
-      setDraft(result);
+      const result = await uploadAndRecognizeWardrobeImages(files);
+      setDrafts(result.items);
+      if (result.failures.length > 0) {
+        setPageError(`${result.failures.length} 张图片识别失败，可稍后重试或手动录入。`);
+      }
     } catch (err) {
       setPageError(
         isAppError(err)
@@ -109,8 +97,12 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
     }
   };
 
+  const draft = drafts[activeDraftIndex] ?? null;
+
   const setDraftField = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    setDraft((d) => (d ? { ...d, [key]: value } : d));
+    setDrafts((items) =>
+      items.map((item, index) => (index === activeDraftIndex ? { ...item, [key]: value } : item)),
+    );
   };
 
   const handleConfirm = async () => {
@@ -132,12 +124,14 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
         seasons: draft.seasons,
         scenarios: draft.scenarios,
         image_url: draft.image_url ?? null,
-        image_asset_id: draft.image_asset_id ?? imageAssetId,
+        image_asset_id: draft.image_asset_id,
         status: "available",
         notes: draft.notes ?? null,
       });
       qc.invalidateQueries({ queryKey: ["wardrobe"] });
-      handleClose();
+      setDrafts((items) => items.filter((_, index) => index !== activeDraftIndex));
+      setActiveDraftIndex((index) => Math.max(0, Math.min(index, drafts.length - 2)));
+      setPageError(null);
     } catch (err) {
       setPageError(isAppError(err) ? (err as AppError).message : "保存失败，请稍后重试。");
     }
@@ -184,27 +178,34 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png"
+              multiple
               className="hidden"
-              onChange={(e) => handleFileChange(e.target.files?.[0])}
+              onChange={(e) => handleFileChange(e.target.files ?? undefined)}
               aria-label="选择衣物照片"
             />
-            {previewUrl ? (
-              <div className="flex items-center justify-center gap-16">
-                <img
-                  src={previewUrl}
-                  alt={fileName ?? "衣物预览"}
-                  className="w-24 h-30 object-cover rounded-card border border-border"
-                />
-                <div className="text-left">
-                  <p className="text-body text-text-primary">{fileName}</p>
-                  <p className="text-small text-text-secondary mt-4">点击重新选择</p>
+            {previews.length > 0 ? (
+              <div className="space-y-8">
+                <div className="flex flex-wrap justify-center gap-8">
+                  {previews.map((preview) => (
+                    <img
+                      key={preview.name}
+                      src={preview.url}
+                      alt={preview.name}
+                      className="w-16 h-20 object-cover rounded-card border border-border"
+                    />
+                  ))}
                 </div>
+                <p className="text-small text-text-secondary">
+                  已选择 {previews.length} 张，点击重新选择
+                </p>
               </div>
             ) : (
               <div className="space-y-8">
                 <Upload size={28} className="mx-auto text-text-secondary" />
                 <p className="text-body text-text-primary">选择衣物照片</p>
-                <p className="text-small text-text-secondary">JPEG / PNG · 不超过 5MB</p>
+                <p className="text-small text-text-secondary">
+                  JPEG / PNG · 最多 {WARDROBE_BATCH_IMAGE_MAX_COUNT} 张 · 每张不超过 5MB
+                </p>
               </div>
             )}
           </div>
@@ -315,6 +316,31 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
                 </div>
 
                 {/* 置信度 */}
+                {drafts.length > 1 && (
+                  <div className="flex items-center justify-between rounded-card bg-surface-subtle px-12 py-8">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDraftIndex((index) => Math.max(0, index - 1))}
+                      disabled={activeDraftIndex === 0}
+                      className="text-small text-brand disabled:text-text-secondary"
+                    >
+                      上一张
+                    </button>
+                    <span className="text-small text-text-secondary">
+                      第 {activeDraftIndex + 1} / {drafts.length} 张
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActiveDraftIndex((index) => Math.min(drafts.length - 1, index + 1))
+                      }
+                      disabled={activeDraftIndex === drafts.length - 1}
+                      className="text-small text-brand disabled:text-text-secondary"
+                    >
+                      下一张
+                    </button>
+                  </div>
+                )}
                 <p className="text-caption text-text-secondary">
                   识别置信度：{Math.round(draft.confidence * 100)}%
                   {draft.requires_confirmation ? " · 需要确认后才能加入衣橱" : ""}

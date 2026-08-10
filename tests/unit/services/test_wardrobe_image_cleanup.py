@@ -92,3 +92,26 @@ async def test_cleanup_keeps_asset_when_storage_delete_fails() -> None:
     assert result.deleted_count == 0
     assert result.failed_count == 1
     repository.save.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_cleanup_dry_run_does_not_delete_or_write() -> None:
+    """验证预览模式只查询候选，不修改文件或数据库。"""
+
+    repository = AsyncMock(spec=WardrobeImageAssetRepository)
+    repository.list_cleanup_candidates.return_value = (
+        create_asset("preview", WardrobeImageAssetStatus.PENDING),
+    )
+    storage = Mock(spec=WardrobeImageStorage)
+
+    result = await cleanup_wardrobe_image_assets(
+        repository,
+        storage,
+        dry_run=True,
+    )
+
+    assert result.candidate_count == 1
+    assert result.deleted_count == 0
+    assert result.failed_count == 0
+    storage.delete.assert_not_called()
+    repository.save.assert_not_awaited()

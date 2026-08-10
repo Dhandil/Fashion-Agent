@@ -30,6 +30,12 @@ let userId: string | null = null;
 type UserChangeHandler = (previous: string | null, next: string) => void;
 let userChangeHandlers: UserChangeHandler[] = [];
 
+function resolveRequestUrl(path: string): string {
+  // 后端返回的私有图片地址已经包含 /api/v1，不能再次拼接 API 前缀。
+  if (/^https?:\/\//.test(path) || path.startsWith(BASE_URL)) return path;
+  return `${BASE_URL}${path}`;
+}
+
 export function setUserId(id: string): void {
   if (userId === id) return;
   const previous = userId;
@@ -145,7 +151,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(resolveRequestUrl(path), {
       ...init,
       method: init.method,
       headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
@@ -178,6 +184,63 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T;
 }
 
+async function requestBlob(
+  path: string,
+  options: Omit<RequestOptions, "body" | "rawBody"> = {},
+): Promise<Blob> {
+  const { xUserId, timeoutMs, signal, anonymous, ...init } = options;
+  const effectiveUserId = anonymous ? null : (xUserId ?? userId);
+  if (!effectiveUserId && !anonymous) {
+    throw buildError(401, "unauthorized", "用户身份未配置。", false);
+  }
+
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (effectiveUserId) headers["X-User-ID"] = effectiveUserId;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener("abort", onExternalAbort);
+
+  try {
+    const response = await fetch(resolveRequestUrl(path), {
+      ...init,
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+      throw normalizeError(response, payload);
+    }
+
+    return await response.blob();
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err) throw err;
+    if (signal?.aborted) {
+      throw buildError(null, "aborted", "请求已取消。", false);
+    }
+    if (controller.signal.aborted) {
+      throw buildError(null, "timeout", "请求超时，请稍后重试。", true);
+    }
+    throw buildError(null, "network_error", "网络连接失败，请稍后重试。", true);
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", onExternalAbort);
+  }
+}
+
 export const api = {
   get<T>(path: string, options?: RequestOptions) {
     return request<T>(path, { ...options, method: "GET" });
@@ -201,6 +264,9 @@ export const api = {
         "Content-Type": contentType,
       },
     });
+  },
+  getBlob(path: string, options?: Omit<RequestOptions, "body" | "rawBody">) {
+    return requestBlob(path, options);
   },
   delete<T>(path: string, options?: RequestOptions) {
     return request<T>(path, { ...options, method: "DELETE" });

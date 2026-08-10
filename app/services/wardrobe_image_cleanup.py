@@ -29,6 +29,8 @@ async def cleanup_wardrobe_image_assets(
     now: datetime | None = None,
     orphan_retention: timedelta = timedelta(hours=24),
     deletion_retention: timedelta = timedelta(days=7),
+    limit: int | None = 100,
+    dry_run: bool = False,
 ) -> WardrobeImageCleanupResult:
     """清理过期、孤儿和已进入删除保留期的图片资产。
 
@@ -41,7 +43,15 @@ async def cleanup_wardrobe_image_assets(
         now=cleanup_time,
         orphan_uploaded_before=cleanup_time - orphan_retention,
         deletion_pending_before=cleanup_time - deletion_retention,
+        limit=limit,
     )
+
+    if dry_run:
+        return WardrobeImageCleanupResult(
+            candidate_count=len(candidates),
+            deleted_count=0,
+            failed_count=0,
+        )
 
     deleted_count = 0
     failed_count = 0

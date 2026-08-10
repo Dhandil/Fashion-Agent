@@ -26,6 +26,9 @@ from app.api.dependencies.vision import (
 )
 from app.api.schemas.wardrobe import (
     WardrobeImageAssetResponse,
+    WardrobeImageBatchRecognitionFailure,
+    WardrobeImageBatchRecognitionRequest,
+    WardrobeImageBatchRecognitionResponse,
     WardrobeImageRecognitionRequest,
     WardrobeImageUploadRequest,
     WardrobeImageUploadResponse,
@@ -37,8 +40,11 @@ from app.api.schemas.wardrobe import (
     WardrobeItemStatusUpdate,
 )
 from app.core.exceptions import (
+    FashionAgentError,
     WardrobeImageAssetNotFoundError,
     WardrobeImageError,
+    WardrobeImageStorageError,
+    WardrobeVisionProviderError,
 )
 from app.domain.entities.wardrobe_image import WardrobeImage
 from app.domain.entities.wardrobe_image_asset import (
@@ -408,6 +414,77 @@ async def recognize_wardrobe_item_image(
 
     return WardrobeItemDraftResponse.model_validate(
         draft,
+    )
+
+
+@router.post(
+    "/recognitions/batch",
+    response_model=WardrobeImageBatchRecognitionResponse,
+    summary="批量识别衣物图片",
+)
+async def recognize_wardrobe_item_images(
+    request: WardrobeImageBatchRecognitionRequest,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    recognizer: WardrobeImageRecognizerDependency,
+    settings: SettingsDependency,
+    storage: WardrobeImageStorageDependency,
+) -> WardrobeImageBatchRecognitionResponse:
+    """逐张读取已上传图片；单张失败不会阻断同批其他结果。"""
+
+    items: list[WardrobeItemDraftResponse] = []
+    failures: list[WardrobeImageBatchRecognitionFailure] = []
+    image_assets = _get_image_asset_repository(repositories)
+
+    for image_asset_id in request.image_asset_ids:
+        try:
+            asset = await image_assets.get_by_id(
+                current_user.user_id,
+                image_asset_id,
+            )
+            if asset is None or asset.status not in {
+                WardrobeImageAssetStatus.UPLOADED,
+                WardrobeImageAssetStatus.ATTACHED,
+            }:
+                raise WardrobeImageAssetNotFoundError(
+                    "图片资产不存在或尚未完成上传。",
+                )
+
+            image = WardrobeImage(
+                content=storage.read(asset.object_key),
+                content_type=asset.content_type,
+            )
+            draft = await recognize_wardrobe_image_content(
+                recognizer=recognizer,
+                user_id=current_user.user_id,
+                image=image,
+                max_image_bytes=settings.wardrobe_image_max_bytes,
+                min_confidence=settings.wardrobe_draft_min_confidence,
+                image_url=_image_content_url(asset.image_asset_id),
+                image_asset_id=asset.image_asset_id,
+                hint=request.hint,
+            )
+            items.append(WardrobeItemDraftResponse.model_validate(draft))
+        except FashionAgentError as exc:
+            if isinstance(exc, WardrobeImageAssetNotFoundError):
+                code = "image_asset_not_found"
+            elif isinstance(exc, WardrobeImageStorageError):
+                code = "image_storage_error"
+            elif isinstance(exc, WardrobeVisionProviderError):
+                code = "wardrobe_vision_error"
+            else:
+                code = "wardrobe_image_invalid"
+            failures.append(
+                WardrobeImageBatchRecognitionFailure(
+                    image_asset_id=image_asset_id,
+                    code=code,
+                    message="该图片识别失败，请稍后重试或手动录入。",
+                ),
+            )
+
+    return WardrobeImageBatchRecognitionResponse(
+        items=tuple(items),
+        failures=tuple(failures),
     )
 
 

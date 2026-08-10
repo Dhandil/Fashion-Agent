@@ -3,6 +3,7 @@
  * Query Keys: ['wardrobe', filters] / ['wardrobe-item', id]
  */
 
+import { useEffect, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -104,11 +105,80 @@ export function useDeleteWardrobeItem() {
 
 export const WARDROBE_PAGE_SIZE = PAGE_SIZE;
 
+/** 鐢ㄥ甫韬唤鐨 API 璇诲彇绉佹湁鍥剧墖锛屽苟杩斿洖涓存椂 Object URL。 */
+export function useWardrobeImageUrl(imageUrl: string | null | undefined): {
+  resolvedUrl: string | null;
+  isLoading: boolean;
+} {
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(Boolean(imageUrl));
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+
+    if (!imageUrl) {
+      setResolvedUrl(null);
+      setIsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    // 旧数据可能仍是外部托管 URL；只有本地私有图片需要带身份读取 Blob。
+    if (!imageUrl.startsWith("/api/v1/wardrobe/images/")) {
+      setResolvedUrl(imageUrl);
+      setIsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setResolvedUrl(null);
+    setIsLoading(true);
+    void api.getBlob(imageUrl).then(
+      (blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (active) {
+          setResolvedUrl(objectUrl);
+          setIsLoading(false);
+        } else {
+          URL.revokeObjectURL(objectUrl);
+        }
+      },
+      () => {
+        if (active) {
+          setResolvedUrl(null);
+          setIsLoading(false);
+        }
+      },
+    );
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [imageUrl]);
+
+  return { resolvedUrl, isLoading };
+}
+
 // ── 图片识别 · frontend §6.3 ──
 
 type DraftResponse = components["schemas"]["WardrobeItemDraftResponse"];
 
 type ImageUploadResponse = components["schemas"]["WardrobeImageUploadResponse"];
+
+export type WardrobeBatchRecognitionFailure = {
+  image_asset_id: string;
+  code: string;
+  message: string;
+};
+
+export type WardrobeBatchRecognitionResponse = {
+  items: DraftResponse[];
+  failures: WardrobeBatchRecognitionFailure[];
+};
 
 /** 创建本地图片上传凭证。 */
 export function createWardrobeImageUpload(input: {
@@ -153,12 +223,27 @@ export async function recognizeWardrobeImage(input: {
   });
 }
 
+/** 批量识别已完成上传的图片；单张失败不会阻断其他草稿。 */
+export function recognizeWardrobeImagesBatch(input: {
+  imageAssetIds: string[];
+  hint?: string | null;
+}): Promise<WardrobeBatchRecognitionResponse> {
+  return api.post<WardrobeBatchRecognitionResponse>(
+    "/wardrobe/recognitions/batch",
+    {
+      image_asset_ids: input.imageAssetIds,
+      hint: input.hint ?? null,
+    },
+  );
+}
+
 /**
  * 客户端图片校验：格式 + 大小
  * 注意：当前视觉 Provider（GLM-4V-Flash）仅支持 JPEG/PNG，
  * 格式白名单必须与 Provider 能力一致（见 docs/roadmap 图片识别限制）。
  */
 export const WARDROBE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const WARDROBE_BATCH_IMAGE_MAX_COUNT = 5;
 
 export function validateWardrobeImageFile(file: File): string | null {
   const allowed = new Set([
@@ -172,6 +257,33 @@ export function validateWardrobeImageFile(file: File): string | null {
     return "图片不能超过 5MB。";
   }
   return null;
+}
+
+/** 批量上传图片并提交批量识别，返回逐图片草稿和失败摘要。 */
+export async function uploadAndRecognizeWardrobeImages(
+  files: File[],
+  hint?: string | null,
+): Promise<WardrobeBatchRecognitionResponse> {
+  if (files.length === 0) {
+    throw new Error("请至少选择一张衣物照片。");
+  }
+  if (files.length > WARDROBE_BATCH_IMAGE_MAX_COUNT) {
+    throw new Error(`一次最多选择 ${WARDROBE_BATCH_IMAGE_MAX_COUNT} 张照片。`);
+  }
+
+  const imageAssetIds: string[] = [];
+  for (const file of files) {
+    const validationError = validateWardrobeImageFile(file);
+    if (validationError) throw new Error(validationError);
+    const upload = await createWardrobeImageUpload({
+      contentType: file.type as components["schemas"]["WardrobeImageContentType"],
+      byteSize: file.size,
+    });
+    await uploadWardrobeImage(upload.upload_url, file);
+    const completed = await completeWardrobeImageUpload(upload.image_asset_id);
+    imageAssetIds.push(completed.image_asset_id);
+  }
+  return recognizeWardrobeImagesBatch({ imageAssetIds, hint });
 }
 
 /** 读取文件为 Data URL */

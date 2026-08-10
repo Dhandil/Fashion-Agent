@@ -73,11 +73,11 @@ class PostgresWardrobeImageAssetRepository:
         now: datetime,
         orphan_uploaded_before: datetime,
         deletion_pending_before: datetime,
+        limit: int | None = None,
     ) -> tuple[WardrobeImageAsset, ...]:
         """查询需要由清理服务处理的图片资产。"""
 
-        result = await self._session.execute(
-            select(WardrobeImageAssetModel).where(
+        statement = select(WardrobeImageAssetModel).where(
                 or_(
                     and_(
                         WardrobeImageAssetModel.status == WardrobeImageAssetStatus.PENDING.value,
@@ -95,6 +95,9 @@ class PostgresWardrobeImageAssetRepository:
                         WardrobeImageAssetModel.deleted_at <= deletion_pending_before,
                     ),
                 ),
-            ),
-        )
+            ).order_by(WardrobeImageAssetModel.created_at)
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        result = await self._session.execute(statement)
         return tuple(_to_entity(model) for model in result.scalars().all())
