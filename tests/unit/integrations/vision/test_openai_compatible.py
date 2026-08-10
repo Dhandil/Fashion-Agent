@@ -365,3 +365,43 @@ async def test_recognizer_parses_json_with_surrounding_text() -> None:
 
     assert result.name == "深灰色直筒西裤"
     assert result.colors == ("深灰色",)
+
+
+@pytest.mark.anyio
+async def test_recognizer_many_parses_multiple_garments() -> None:
+    """验证同一张照片可以返回多个独立衣物结果。"""
+
+    recognitions = [
+        {"name": "浅蓝色衬衫", "category": "衬衫", "confidence": 0.9},
+        {"name": "深灰色长裤", "category": "长裤", "confidence": 0.8},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode("utf-8"))
+        assert "JSON 数组" in payload["messages"][0]["content"]
+        return create_completion_response_content(
+            json.dumps(recognitions, ensure_ascii=False),
+        )
+
+    recognizer = create_recognizer(handler)
+
+    results = await recognizer.recognize_many(TEST_IMAGE)
+
+    assert [result.category for result in results] == ["衬衫", "长裤"]
+
+
+@pytest.mark.anyio
+async def test_recognizer_many_wraps_single_object_for_compatibility() -> None:
+    """验证模型未遵循数组格式时仍能兼容单个对象。"""
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return create_completion_response(
+            {"name": "白色衬衫", "category": "衬衫", "confidence": 0.9},
+        )
+
+    recognizer = create_recognizer(handler)
+
+    results = await recognizer.recognize_many(TEST_IMAGE)
+
+    assert len(results) == 1
+    assert results[0].name == "白色衬衫"

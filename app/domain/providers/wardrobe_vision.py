@@ -19,3 +19,16 @@ class WardrobeImageRecognizer(Protocol):
         """识别一张衣物照片，返回等待用户确认的候选特征。"""
 
         ...
+
+
+class WardrobeImageMultiRecognizer(Protocol):
+    """可从一张照片返回多个衣物候选的视觉能力接口。"""
+
+    async def recognize_many(
+        self,
+        image: WardrobeImage,
+        hint: str | None = None,
+    ) -> tuple[WardrobeItemRecognition, ...]:
+        """识别照片中的多件衣物，每件返回一个候选特征对象。"""
+
+        ...

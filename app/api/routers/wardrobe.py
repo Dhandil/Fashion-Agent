@@ -68,6 +68,7 @@ from app.services.wardrobe import (
 from app.services.wardrobe_draft import (
     recognize_wardrobe_image,
     recognize_wardrobe_image_content,
+    recognize_wardrobe_image_content_many,
 )
 from app.services.wardrobe_image_assets import (
     mark_wardrobe_image_asset_deletion_pending,
@@ -454,7 +455,7 @@ async def recognize_wardrobe_item_images(
                 content=storage.read(asset.object_key),
                 content_type=asset.content_type,
             )
-            draft = await recognize_wardrobe_image_content(
+            drafts = await recognize_wardrobe_image_content_many(
                 recognizer=recognizer,
                 user_id=current_user.user_id,
                 image=image,
@@ -464,7 +465,10 @@ async def recognize_wardrobe_item_images(
                 image_asset_id=asset.image_asset_id,
                 hint=request.hint,
             )
-            items.append(WardrobeItemDraftResponse.model_validate(draft))
+            items.extend(
+                WardrobeItemDraftResponse.model_validate(draft)
+                for draft in drafts
+            )
         except FashionAgentError as exc:
             if isinstance(exc, WardrobeImageAssetNotFoundError):
                 code = "image_asset_not_found"

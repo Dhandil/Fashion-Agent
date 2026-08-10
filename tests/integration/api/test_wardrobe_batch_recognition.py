@@ -15,6 +15,10 @@ from app.domain.entities.wardrobe_image_asset import (
     WardrobeImageAsset,
     WardrobeImageAssetStatus,
 )
+from app.domain.providers.wardrobe_vision import (
+    WardrobeImageMultiRecognizer,
+    WardrobeImageRecognizer,
+)
 from app.domain.repositories.wardrobe import WardrobeRepository
 from app.domain.repositories.wardrobe_image_asset import (
     WardrobeImageAssetRepository,
@@ -51,7 +55,7 @@ def test_batch_recognition_isolates_single_asset_failure(tmp_path) -> None:
             else None
         )
     )
-    recognizer = AsyncMock()
+    recognizer = AsyncMock(spec=WardrobeImageRecognizer)
     recognizer.recognize.return_value = WardrobeItemRecognition(
         name="浅蓝色衬衫",
         category="衬衫",
@@ -98,3 +102,77 @@ def test_batch_recognition_isolates_single_asset_failure(tmp_path) -> None:
         },
     ]
     recognizer.recognize.assert_awaited_once()
+
+
+def test_batch_recognition_splits_multiple_garments_from_one_asset(
+    tmp_path,
+) -> None:
+    """验证一张图片的多个识别结果会分别返回为衣物草稿。"""
+
+    user_id = "multi-garment-user"
+    asset_id = "asset-shared"
+    image_bytes = b"\xff\xd8\xff" + b"multi-garment-image"
+    storage = LocalWardrobeImageStorage(tmp_path)
+    storage.write("asset-shared.jpg", image_bytes)
+    asset = WardrobeImageAsset(
+        image_asset_id=asset_id,
+        user_id=user_id,
+        object_key="asset-shared.jpg",
+        content_type=WardrobeImageContentType.JPEG,
+        byte_size=len(image_bytes),
+        sha256="b" * 64,
+        status=WardrobeImageAssetStatus.UPLOADED,
+        created_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+
+    image_assets = AsyncMock(spec=WardrobeImageAssetRepository)
+    image_assets.get_by_id.return_value = asset
+    recognizer = AsyncMock(spec=WardrobeImageMultiRecognizer)
+    recognizer.recognize_many.return_value = (
+        WardrobeItemRecognition(
+            name="浅蓝色衬衫",
+            category="衬衫",
+            confidence=0.9,
+        ),
+        WardrobeItemRecognition(
+            name="深灰色长裤",
+            category="长裤",
+            confidence=0.8,
+        ),
+    )
+
+    repositories = FashionRepositories(
+        style_profiles=Mock(),
+        preference_memories=Mock(),
+        wardrobe=AsyncMock(spec=WardrobeRepository),
+        wardrobe_image_assets=image_assets,
+        outfits=Mock(),
+        outfit_feedback=Mock(),
+    )
+
+    async def override_repositories() -> FashionRepositories:
+        return repositories
+
+    application = create_app()
+    application.dependency_overrides[get_fashion_repositories] = override_repositories
+    application.dependency_overrides[get_wardrobe_image_storage] = lambda: storage
+    application.dependency_overrides[get_wardrobe_image_recognizer] = lambda: recognizer
+
+    try:
+        with TestClient(application) as client:
+            response = client.post(
+                "/api/v1/wardrobe/recognitions/batch",
+                headers={"X-User-ID": user_id},
+                json={"image_asset_ids": [asset_id]},
+            )
+    finally:
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["category"] for item in payload["items"]] == ["衬衫", "长裤"]
+    assert len({item["draft_id"] for item in payload["items"]}) == 2
+    assert {item["image_asset_id"] for item in payload["items"]} == {asset_id}
+    assert payload["failures"] == []
+    recognizer.recognize_many.assert_awaited_once()

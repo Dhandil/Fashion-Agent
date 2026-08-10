@@ -35,10 +35,14 @@ _SYSTEM_PROMPT = """你是服装识别助手，只负责描述照片中这一件
 5. 全部文本使用简体中文。"""
 
 _DEFAULT_USER_PROMPT = "请识别这张照片中的衣物。"
+_MULTI_SYSTEM_PROMPT = _SYSTEM_PROMPT.replace(
+    "严格输出一个 JSON 对象",
+    "严格输出一个 JSON 数组；数组中的每个元素都是一个衣物 JSON 对象",
+) + "\n6. 如果照片中有多件衣物，每件衣物分别输出一个元素；只能确认一件时数组只包含一个元素。"
 
 
-def _extract_json_object(content: str) -> object:
-    """从模型输出中提取 JSON 对象。
+def _extract_json_value(content: str) -> object:
+    """从模型输出中提取 JSON 对象或数组。
 
     优先直接解析；同时兼容常见的模型输出形态：
     - Markdown 代码块包裹（```json ... ```）
@@ -57,22 +61,34 @@ def _extract_json_object(content: str) -> object:
             candidate = block.strip()
             if candidate.startswith("json"):
                 candidate = candidate[4:].strip()
-            if candidate.startswith("{"):
+            if candidate.startswith(("{", "[")):
                 try:
                     return json.loads(candidate)
                 except ValueError:
                     continue
 
-    # 提取第一个 { 到最后一个 } 之间的内容
-    first = text.find("{")
-    last = text.rfind("}")
-    if first != -1 and last > first:
-        try:
-            return json.loads(text[first : last + 1])
-        except ValueError:
-            pass
+    # 提取第一个对象或数组到对应结尾之间的内容
+    starts = [index for index in (text.find("{"), text.find("[")) if index != -1]
+    if starts:
+        first = min(starts)
+        end_char = "}" if text[first] == "{" else "]"
+        last = text.rfind(end_char)
+        if last > first:
+            try:
+                return json.loads(text[first : last + 1])
+            except ValueError:
+                pass
 
-    raise ValueError("模型输出中未找到 JSON 对象")
+    raise ValueError("模型输出中未找到 JSON 对象或数组")
+
+
+def _extract_json_object(content: str) -> object:
+    """从模型输出中提取 JSON 对象，并拒绝数组。"""
+
+    value = _extract_json_value(content)
+    if isinstance(value, Mapping):
+        return value
+    raise ValueError("模型输出不是 JSON 对象")
 
 
 class OpenAICompatibleWardrobeImageRecognizer:
@@ -122,11 +138,32 @@ class OpenAICompatibleWardrobeImageRecognizer:
                 payload=payload,
             )
 
+    async def recognize_many(
+        self,
+        image: WardrobeImage,
+        hint: str | None = None,
+    ) -> tuple[WardrobeItemRecognition, ...]:
+        """识别同一张照片中的一件或多件衣物。"""
+
+        payload = self._build_payload(image=image, hint=hint, multiple=True)
+        if self._client is not None:
+            return await self._recognize_many_with_client(
+                client=self._client,
+                payload=payload,
+            )
+
+        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+            return await self._recognize_many_with_client(
+                client=client,
+                payload=payload,
+            )
+
     def _build_payload(
         self,
         *,
         image: WardrobeImage,
         hint: str | None,
+        multiple: bool = False,
     ) -> dict[str, object]:
         """构造多模态请求体，照片以 Data URI 随请求发送。"""
 
@@ -136,10 +173,15 @@ class OpenAICompatibleWardrobeImageRecognizer:
         data_uri = f"data:{image.content_type.value};base64,{encoded_image}"
 
         normalized_hint = hint.strip() if hint is not None else ""
-        user_text = (
-            f"{_DEFAULT_USER_PROMPT}用户补充说明：{normalized_hint}"
-            if normalized_hint
+        user_prompt = (
+            "请识别这张照片中的一件或多件衣物，并按要求返回 JSON 数组。"
+            if multiple
             else _DEFAULT_USER_PROMPT
+        )
+        user_text = (
+            f"{user_prompt}用户补充说明：{normalized_hint}"
+            if normalized_hint
+            else user_prompt
         )
 
         return {
@@ -151,7 +193,7 @@ class OpenAICompatibleWardrobeImageRecognizer:
             "messages": [
                 {
                     "role": "system",
-                    "content": _SYSTEM_PROMPT,
+                    "content": _MULTI_SYSTEM_PROMPT if multiple else _SYSTEM_PROMPT,
                 },
                 {
                     "role": "user",
@@ -179,29 +221,41 @@ class OpenAICompatibleWardrobeImageRecognizer:
     ) -> WardrobeItemRecognition:
         """统一处理网络、HTTP 状态码和响应结构错误。"""
 
+        body = await self._request_body(client=client, payload=payload)
+        return self._parse_recognition(body)
+
+    async def _recognize_many_with_client(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        payload: Mapping[str, object],
+    ) -> tuple[WardrobeItemRecognition, ...]:
+        """请求并解析一张照片中的多件衣物。"""
+
+        body = await self._request_body(client=client, payload=payload)
+        return self._parse_recognitions(body)
+
+    async def _request_body(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        payload: Mapping[str, object],
+    ) -> object:
+        """发送请求并统一转换网络错误。"""
+
         try:
             response = await client.post(
                 f"{self._base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                },
+                headers={"Authorization": f"Bearer {self._api_key}"},
                 json=payload,
                 timeout=self._timeout_seconds,
             )
             response.raise_for_status()
-            body: object = response.json()
-        except (
-            httpx.HTTPError,
-            ValueError,
-        ) as exc:
-            # 错误信息不包含请求体、照片和模型原文
+            return response.json()
+        except (httpx.HTTPError, ValueError) as exc:
             raise WardrobeVisionProviderError(
                 "衣物照片识别服务暂时不可用，请稍后重试或手动录入。",
             ) from exc
-
-        return self._parse_recognition(
-            body,
-        )
 
     @staticmethod
     def _parse_recognition(
@@ -258,6 +312,41 @@ class OpenAICompatibleWardrobeImageRecognizer:
                 recognition_payload,
             )
         except ValueError as exc:
+            raise WardrobeVisionProviderError(
+                "衣物照片识别结果不符合约定结构。",
+            ) from exc
+
+    @staticmethod
+    def _parse_recognitions(
+        body: object,
+    ) -> tuple[WardrobeItemRecognition, ...]:
+        """解析多结果响应；兼容模型误返回单个对象的情况。"""
+
+        if not isinstance(body, Mapping):
+            raise WardrobeVisionProviderError("衣物照片识别服务返回了无效数据。")
+        choices = body.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise WardrobeVisionProviderError("衣物照片识别服务没有返回识别结果。")
+        first_choice = choices[0]
+        message = first_choice.get("message") if isinstance(first_choice, Mapping) else None
+        content = message.get("content") if isinstance(message, Mapping) else None
+        if not isinstance(content, str) or not content.strip():
+            raise WardrobeVisionProviderError("衣物照片识别服务返回了空结果。")
+
+        try:
+            payload = _extract_json_value(content)
+            values = [payload] if isinstance(payload, Mapping) else payload
+            if not isinstance(values, list) or not values:
+                raise ValueError("结果数组为空")
+            recognitions = tuple(
+                WardrobeItemRecognition.model_validate(value)
+                for value in values
+                if isinstance(value, Mapping)
+            )
+            if not recognitions or len(recognitions) != len(values):
+                raise ValueError("结果数组包含无效元素")
+            return recognitions
+        except (TypeError, ValueError) as exc:
             raise WardrobeVisionProviderError(
                 "衣物照片识别结果不符合约定结构。",
             ) from exc
