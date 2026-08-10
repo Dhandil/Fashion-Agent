@@ -142,3 +142,32 @@ def test_upload_complete_read_and_attach_private_image(tmp_path) -> None:
         )
         assert deleted.status_code == 204
         assert assets[asset_id].status.value == "deletion_pending"
+
+
+def test_cancel_unattached_image_deletes_private_asset(tmp_path) -> None:
+    """验证用户取消识别时，未关联图片可以立即清理。"""
+
+    image_bytes = b"\xff\xd8\xff" + b"cancel-image"
+    headers = {"X-User-ID": "lifecycle-user"}
+
+    with lifecycle_client(tmp_path) as (client, assets, _wardrobe):
+        upload = client.post(
+            "/api/v1/wardrobe/images/uploads",
+            headers=headers,
+            json={"content_type": "image/jpeg", "byte_size": len(image_bytes)},
+        )
+        asset_id = upload.json()["image_asset_id"]
+        client.put(
+            upload.json()["upload_url"],
+            headers={**headers, "Content-Type": "image/jpeg"},
+            content=image_bytes,
+        )
+
+        discarded = client.delete(
+            f"/api/v1/wardrobe/images/{asset_id}",
+            headers=headers,
+        )
+
+        assert discarded.status_code == 204
+        assert assets[asset_id].status.value == "deleted"
+        assert not (tmp_path / assets[asset_id].object_key).exists()

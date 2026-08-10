@@ -4,6 +4,7 @@ import logging
 from uuid import uuid4
 
 from app.core.exceptions import (
+    WardrobeVisionProviderError,
     WardrobeVisionUnavailableError,
 )
 from app.core.observability import (
@@ -157,6 +158,7 @@ async def recognize_wardrobe_image_content_many(
     image: WardrobeImage,
     max_image_bytes: int,
     min_confidence: float,
+    max_detected_items: int = 8,
     image_url: str | None = None,
     image_asset_id: str | None = None,
     hint: str | None = None,
@@ -186,6 +188,15 @@ async def recognize_wardrobe_image_content_many(
                 recognitions = await recognize_many(image, hint)
             else:
                 recognitions = (await recognizer.recognize(image, hint),)
+
+        if not recognitions:
+            raise WardrobeVisionProviderError(
+                "衣物照片识别服务没有返回任何衣物结果。",
+            )
+        if len(recognitions) > max_detected_items:
+            raise WardrobeVisionProviderError(
+                "衣物照片识别结果超过单张照片允许的衣物数量。",
+            )
 
         drafts = tuple(
             build_wardrobe_item_draft(

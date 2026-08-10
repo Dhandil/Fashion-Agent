@@ -15,6 +15,84 @@ class VisionEvaluationError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class VisionContractResult:
+    """一次无需人工标注的结构化输出契约检查结果。"""
+
+    passed: bool
+    item_count: int
+    errors: tuple[str, ...]
+
+
+def validate_vision_contract(
+    payload: Mapping[str, object],
+    *,
+    max_items: int = 8,
+) -> VisionContractResult:
+    """检查单件或批量识别响应的安全边界，不判断穿衣识别准确率。"""
+
+    raw_items = payload.get("items", payload)
+    if isinstance(raw_items, Mapping):
+        items: list[object] = [raw_items]
+    elif isinstance(raw_items, list):
+        items = raw_items
+    else:
+        return VisionContractResult(False, 0, ("items 必须是对象或数组",))
+
+    errors: list[str] = []
+    if not items:
+        errors.append("识别结果不能为空")
+    if len(items) > max_items:
+        errors.append("识别结果超过单张照片数量上限")
+
+    draft_ids: set[str] = set()
+    for index, item in enumerate(items):
+        if not isinstance(item, Mapping):
+            errors.append(f"第 {index + 1} 项不是对象")
+            continue
+        draft_id = item.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id:
+            errors.append(f"第 {index + 1} 项缺少 draft_id")
+        elif draft_id in draft_ids:
+            errors.append(f"draft_id 重复：{draft_id}")
+        else:
+            draft_ids.add(draft_id)
+
+        if item.get("requires_confirmation") is not True:
+            errors.append(f"第 {index + 1} 项必须要求用户确认")
+        confidence = item.get("confidence")
+        if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+            errors.append(f"第 {index + 1} 项 confidence 无效")
+
+        missing_fields = _as_values(item.get("missing_fields"))
+        uncertain_fields = _as_values(item.get("uncertain_fields"))
+        for field_name, values in (
+            ("missing_fields", missing_fields),
+            ("uncertain_fields", uncertain_fields),
+        ):
+            raw_value = item.get(field_name)
+            if not isinstance(raw_value, list) or any(
+                not isinstance(value, str) for value in raw_value
+            ):
+                errors.append(f"第 {index + 1} 项 {field_name} 格式无效")
+
+        for field_name in ("name", "category"):
+            value = item.get(field_name)
+            if (
+                (not isinstance(value, str) or not value.strip())
+                and field_name not in missing_fields
+            ):
+                errors.append(
+                    f"第 {index + 1} 项 {field_name} 为空但未声明缺失",
+                )
+
+    return VisionContractResult(
+        passed=not errors,
+        item_count=len(items),
+        errors=tuple(errors),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class VisionEvaluationCase:
     """一张照片和人工标注的可评测字段。"""
 

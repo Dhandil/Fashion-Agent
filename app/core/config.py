@@ -128,6 +128,13 @@ class Settings(BaseSettings):
         le=20 * 1024 * 1024,
     )
 
+    # 单张照片最多拆分出的衣物数量，防止模型异常输出导致草稿爆炸
+    wardrobe_image_max_detected_items: int = Field(
+        default=8,
+        ge=1,
+        le=20,
+    )
+
     # 低于该置信度时，草稿中已识别的字段全部标记为需要用户确认
     wardrobe_draft_min_confidence: float = Field(
         default=0.5,

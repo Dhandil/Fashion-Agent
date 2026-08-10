@@ -1,11 +1,14 @@
 """衣物图片资产状态转换服务测试。"""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from app.core.exceptions import WardrobeImageAssetNotFoundError
+from app.core.exceptions import (
+    WardrobeImageAssetNotFoundError,
+    WardrobeImageError,
+)
 from app.domain.entities.wardrobe_image import WardrobeImageContentType
 from app.domain.entities.wardrobe_image_asset import (
     WardrobeImageAsset,
@@ -15,6 +18,7 @@ from app.domain.repositories.wardrobe_image_asset import (
     WardrobeImageAssetRepository,
 )
 from app.services.wardrobe_image_assets import (
+    discard_unattached_wardrobe_image_asset,
     mark_wardrobe_image_asset_deletion_pending,
 )
 
@@ -88,4 +92,47 @@ async def test_mark_asset_deletion_pending_rejects_missing_asset() -> None:
             repository,
             "user-001",
             "missing",
+        )
+
+
+@pytest.mark.anyio
+async def test_discard_unattached_asset_deletes_file_and_marks_deleted() -> None:
+    """验证取消识别会删除文件并立即结束资产生命周期。"""
+
+    repository = AsyncMock(spec=WardrobeImageAssetRepository)
+    asset = create_attached_asset().model_copy(
+        update={
+            "status": WardrobeImageAssetStatus.UPLOADED,
+            "attached_at": None,
+        },
+    )
+    repository.get_by_id.return_value = asset
+    repository.save.side_effect = lambda saved: saved
+    storage = Mock()
+
+    result = await discard_unattached_wardrobe_image_asset(
+        repository,
+        storage,
+        "user-001",
+        "asset-001",
+    )
+
+    assert result.status is WardrobeImageAssetStatus.DELETED
+    storage.delete.assert_called_once_with(asset.object_key)
+    repository.save.assert_awaited_once_with(result)
+
+
+@pytest.mark.anyio
+async def test_discard_attached_asset_is_rejected() -> None:
+    """验证已关联衣橱单品的图片不能绕过衣橱删除流程。"""
+
+    repository = AsyncMock(spec=WardrobeImageAssetRepository)
+    repository.get_by_id.return_value = create_attached_asset()
+
+    with pytest.raises(WardrobeImageError):
+        await discard_unattached_wardrobe_image_asset(
+            repository,
+            Mock(),
+            "user-001",
+            "asset-001",
         )

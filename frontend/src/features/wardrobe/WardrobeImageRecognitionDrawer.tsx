@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   uploadAndRecognizeWardrobeImages,
   WARDROBE_BATCH_IMAGE_MAX_COUNT,
+  discardWardrobeImageAsset,
+  recognizeWardrobeImagesBatch,
   readFileAsDataUrl,
   useCreateWardrobeItem,
 } from "@/features/wardrobe/api";
@@ -37,6 +39,9 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
   // 阶段 1：选图与预览
   const [previews, setPreviews] = useState<Array<{ name: string; url: string }>>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
+  const [confirmedAssetIds, setConfirmedAssetIds] = useState<string[]>([]);
+  const [failedAssetIds, setFailedAssetIds] = useState<string[]>([]);
   const [activeDraftIndex, setActiveDraftIndex] = useState(0);
   const [fileError, setFileError] = useState<string | null>(null);
 
@@ -49,6 +54,9 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
   const reset = () => {
     setPreviews([]);
     setDrafts([]);
+    setUploadedAssetIds([]);
+    setConfirmedAssetIds([]);
+    setFailedAssetIds([]);
     setActiveDraftIndex(0);
     setFileError(null);
     setRecognizing(false);
@@ -57,6 +65,10 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
   };
 
   const handleClose = () => {
+    const disposableAssetIds = uploadedAssetIds.filter(
+      (id) => !confirmedAssetIds.includes(id),
+    );
+    void Promise.allSettled(disposableAssetIds.map(discardWardrobeImageAsset));
     reset();
     onClose();
   };
@@ -74,8 +86,15 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
     const nextPreviews = await Promise.all(
       files.map(async (file) => ({ name: file.name, url: await readFileAsDataUrl(file) })),
     );
+    const disposableAssetIds = uploadedAssetIds.filter(
+      (id) => !confirmedAssetIds.includes(id),
+    );
+    void Promise.allSettled(disposableAssetIds.map(discardWardrobeImageAsset));
     setPreviews(nextPreviews);
     setDrafts([]);
+    setUploadedAssetIds([]);
+    setConfirmedAssetIds([]);
+    setFailedAssetIds([]);
     setActiveDraftIndex(0);
 
     // 先直传到本地文件卷，再用资产 ID 发起识别，避免 Base64 放大请求体。
@@ -83,6 +102,16 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
     try {
       const result = await uploadAndRecognizeWardrobeImages(files);
       setDrafts(result.items);
+      setUploadedAssetIds([
+        ...new Set([
+          ...result.items
+            .map((item) => item.image_asset_id)
+            .filter((id): id is string => Boolean(id)),
+          ...result.failures.map((failure) => failure.image_asset_id),
+        ]),
+      ]);
+      setConfirmedAssetIds([]);
+      setFailedAssetIds(result.failures.map((failure) => failure.image_asset_id));
       if (result.failures.length > 0) {
         setPageError(`${result.failures.length} 张图片识别失败，可稍后重试或手动录入。`);
       }
@@ -91,6 +120,30 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
         isAppError(err)
           ? (err as AppError).message
           : "识别失败，请稍后重试或手动录入。",
+      );
+    } finally {
+      setRecognizing(false);
+    }
+  };
+
+  const handleRetryFailures = async () => {
+    if (failedAssetIds.length === 0) return;
+    setRecognizing(true);
+    setPageError(null);
+    try {
+      const result = await recognizeWardrobeImagesBatch({
+        imageAssetIds: failedAssetIds,
+      });
+      setDrafts((items) => [...items, ...result.items]);
+      setFailedAssetIds(result.failures.map((failure) => failure.image_asset_id));
+      if (result.failures.length > 0) {
+        setPageError(`${result.failures.length} 张图片仍识别失败，可再次重试。`);
+      }
+    } catch (err) {
+      setPageError(
+        isAppError(err)
+          ? (err as AppError).message
+          : "重试失败，请稍后再试。",
       );
     } finally {
       setRecognizing(false);
@@ -128,6 +181,13 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
         status: "available",
         notes: draft.notes ?? null,
       });
+      if (draft.image_asset_id) {
+        setConfirmedAssetIds((ids) =>
+          ids.includes(draft.image_asset_id!)
+            ? ids
+            : [...ids, draft.image_asset_id!],
+        );
+      }
       qc.invalidateQueries({ queryKey: ["wardrobe"] });
       setDrafts((items) => items.filter((_, index) => index !== activeDraftIndex));
       setActiveDraftIndex((index) => Math.max(0, Math.min(index, drafts.length - 2)));
@@ -135,6 +195,13 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
     } catch (err) {
       setPageError(isAppError(err) ? (err as AppError).message : "保存失败，请稍后重试。");
     }
+  };
+
+  const handleSkip = () => {
+    if (!draft) return;
+    setDrafts((items) => items.filter((_, index) => index !== activeDraftIndex));
+    setActiveDraftIndex((index) => Math.max(0, Math.min(index, drafts.length - 2)));
+    setPageError(null);
   };
 
   return (
@@ -156,9 +223,18 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
             </p>
           )}
           {pageError && (
-            <p className="rounded-card bg-danger/10 border border-danger/30 px-16 py-12 text-small text-danger" role="alert">
-              {pageError}
-            </p>
+            <div className="rounded-card bg-danger/10 border border-danger/30 px-16 py-12 text-small text-danger" role="alert">
+              <p>{pageError}</p>
+              {failedAssetIds.length > 0 && !recognizing && (
+                <button
+                  type="button"
+                  onClick={() => void handleRetryFailures()}
+                  className="mt-8 text-brand underline"
+                >
+                  重试失败图片
+                </button>
+              )}
+            </div>
           )}
 
           {/* 选图区 */}
@@ -327,7 +403,7 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
                       上一张
                     </button>
                     <span className="text-small text-text-secondary">
-                      第 {activeDraftIndex + 1} / {drafts.length} 张
+                      第 {activeDraftIndex + 1} / {drafts.length} 件
                     </span>
                     <button
                       type="button"
@@ -355,6 +431,13 @@ export default function WardrobeImageRecognitionDrawer({ open, onClose }: Props)
                   className="px-16 py-8 rounded-input border border-border text-text-secondary hover:bg-surface-subtle transition-colors"
                 >
                   取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="px-16 py-8 rounded-input border border-border text-text-secondary hover:bg-surface-subtle transition-colors"
+                >
+                  跳过此件
                 </button>
                 <button
                   type="button"

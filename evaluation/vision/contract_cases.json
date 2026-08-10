@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "case_id": "single-valid",
+      "expected_valid": true,
+      "payload": {
+        "draft_id": "draft-single",
+        "name": "白色T恤",
+        "category": "T恤",
+        "confidence": 0.9,
+        "missing_fields": [],
+        "uncertain_fields": [],
+        "requires_confirmation": true
+      }
+    },
+    {
+      "case_id": "multi-valid",
+      "expected_valid": true,
+      "payload": {
+        "items": [
+          {
+            "draft_id": "draft-top",
+            "name": "白色T恤",
+            "category": "T恤",
+            "confidence": 0.9,
+            "missing_fields": [],
+            "uncertain_fields": [],
+            "requires_confirmation": true,
+            "image_asset_id": "asset-shared"
+          },
+          {
+            "draft_id": "draft-bottom",
+            "name": "深色长裤",
+            "category": "长裤",
+            "confidence": 0.8,
+            "missing_fields": [],
+            "uncertain_fields": ["materials"],
+            "requires_confirmation": true,
+            "image_asset_id": "asset-shared"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "missing-confirmation",
+      "expected_valid": false,
+      "payload": {
+        "draft_id": "draft-invalid",
+        "name": "未知衣物",
+        "category": "上衣",
+        "confidence": 0.5,
+        "missing_fields": [],
+        "uncertain_fields": [],
+        "requires_confirmation": false
+      }
+    }
+  ]
+}

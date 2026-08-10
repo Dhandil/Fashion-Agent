@@ -71,6 +71,7 @@ from app.services.wardrobe_draft import (
     recognize_wardrobe_image_content_many,
 )
 from app.services.wardrobe_image_assets import (
+    discard_unattached_wardrobe_image_asset,
     mark_wardrobe_image_asset_deletion_pending,
 )
 
@@ -217,6 +218,28 @@ async def complete_wardrobe_image_upload(
         status=asset.status.value,
         content_url=_image_content_url(asset.image_asset_id),
     )
+
+
+@router.delete(
+    "/images/{image_asset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="丢弃未关联的衣物图片",
+)
+async def discard_wardrobe_image_asset(
+    image_asset_id: str,
+    current_user: CurrentUserDependency,
+    repositories: FashionRepositoriesDependency,
+    storage: WardrobeImageStorageDependency,
+) -> Response:
+    """清理用户取消或识别失败后仍未关联衣橱单品的图片。"""
+
+    await discard_unattached_wardrobe_image_asset(
+        repository=_get_image_asset_repository(repositories),
+        storage=storage,
+        user_id=current_user.user_id,
+        image_asset_id=image_asset_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -461,6 +484,7 @@ async def recognize_wardrobe_item_images(
                 image=image,
                 max_image_bytes=settings.wardrobe_image_max_bytes,
                 min_confidence=settings.wardrobe_draft_min_confidence,
+                max_detected_items=settings.wardrobe_image_max_detected_items,
                 image_url=_image_content_url(asset.image_asset_id),
                 image_asset_id=asset.image_asset_id,
                 hint=request.hint,

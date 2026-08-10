@@ -208,6 +208,13 @@ export function completeWardrobeImageUpload(
   );
 }
 
+/** 丢弃尚未关联衣橱单品的图片资产。 */
+export function discardWardrobeImageAsset(imageAssetId: string): Promise<void> {
+  return api.delete<void>(
+    `/wardrobe/images/${encodeURIComponent(imageAssetId)}`,
+  );
+}
+
 /** 识别一张衣物照片，返回待确认草稿 */
 export async function recognizeWardrobeImage(input: {
   imageBase64?: string;
@@ -272,18 +279,24 @@ export async function uploadAndRecognizeWardrobeImages(
   }
 
   const imageAssetIds: string[] = [];
-  for (const file of files) {
-    const validationError = validateWardrobeImageFile(file);
-    if (validationError) throw new Error(validationError);
-    const upload = await createWardrobeImageUpload({
-      contentType: file.type as components["schemas"]["WardrobeImageContentType"],
-      byteSize: file.size,
-    });
-    await uploadWardrobeImage(upload.upload_url, file);
-    const completed = await completeWardrobeImageUpload(upload.image_asset_id);
-    imageAssetIds.push(completed.image_asset_id);
+  try {
+    for (const file of files) {
+      const validationError = validateWardrobeImageFile(file);
+      if (validationError) throw new Error(validationError);
+      const upload = await createWardrobeImageUpload({
+        contentType: file.type as components["schemas"]["WardrobeImageContentType"],
+        byteSize: file.size,
+      });
+      imageAssetIds.push(upload.image_asset_id);
+      await uploadWardrobeImage(upload.upload_url, file);
+      await completeWardrobeImageUpload(upload.image_asset_id);
+    }
+    return await recognizeWardrobeImagesBatch({ imageAssetIds, hint });
+  } catch (error) {
+    // 上传或识别请求失败时，尽力回收本次尚未确认的图片资产。
+    await Promise.allSettled(imageAssetIds.map(discardWardrobeImageAsset));
+    throw error;
   }
-  return recognizeWardrobeImagesBatch({ imageAssetIds, hint });
 }
 
 /** 读取文件为 Data URL */
