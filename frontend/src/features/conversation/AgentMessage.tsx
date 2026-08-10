@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react";
 import type { ChatMessage } from "@/stores/chat";
 import OutfitCard from "@/features/outfit/OutfitCard";
 import OutfitGapCard from "@/features/outfit/OutfitGapCard";
@@ -16,46 +17,55 @@ export default function AgentMessage({ message, onSaveOutfit, savingOutfit }: Pr
     message.outfit || message.outfitGap || (message.outfitIssues && message.outfitIssues.length > 0);
 
   return (
-    <div className="space-y-16">
-      {/* 正文 */}
-      {message.text && (
-        <div className="text-body text-text-primary whitespace-pre-wrap break-words leading-relaxed">
-          {message.text}
-        </div>
-      )}
+    <div className="flex items-start gap-12">
+      <div
+        className="mt-2 flex h-32 w-32 shrink-0 items-center justify-center rounded-card bg-brand text-surface shadow-sm"
+        aria-hidden="true"
+      >
+        <Sparkles size={16} strokeWidth={1.8} />
+      </div>
 
-      {message.weather && <WeatherCard weather={message.weather} />}
+      <div className="min-w-0 flex-1 space-y-16">
+        {/* 正文 */}
+        {message.text && (
+          <div className="text-body text-text-primary whitespace-pre-wrap break-words leading-relaxed">
+            {message.text}
+          </div>
+        )}
 
-      {/* 结构化 Outfit */}
-      {message.outfit && (
-        <OutfitCard
-          outfit={message.outfit}
-          onSave={onSaveOutfit}
-          saving={savingOutfit}
-        />
-      )}
+        {message.weather && <WeatherCard weather={message.weather} />}
 
-      {/* 衣橱缺口 */}
-      {message.outfitGap && !message.outfit && (
-        <OutfitGapCard gap={message.outfitGap} />
-      )}
+        {/* 结构化 Outfit */}
+        {message.outfit && (
+          <OutfitCard
+            outfit={message.outfit}
+            onSave={onSaveOutfit}
+            saving={savingOutfit}
+          />
+        )}
 
-      {/* 可执行性问题 */}
-      {message.outfitIssues && message.outfitIssues.length > 0 && !message.outfit && (
-        <OutfitIssueList issues={message.outfitIssues} />
-      )}
+        {/* 衣橱缺口 */}
+        {message.outfitGap && !message.outfit && (
+          <OutfitGapCard gap={message.outfitGap} />
+        )}
 
-      {/* 知识来源 */}
-      {message.sources && message.sources.length > 0 && (
-        <KnowledgeSources sources={message.sources} />
-      )}
+        {/* 可执行性问题 */}
+        {message.outfitIssues && message.outfitIssues.length > 0 && !message.outfit && (
+          <OutfitIssueList issues={message.outfitIssues} />
+        )}
 
-      {/* 混合情景:有 Outfit 但也有 Issues */}
-      {message.outfit && message.outfitIssues && message.outfitIssues.length > 0 && (
-        <OutfitIssueList issues={message.outfitIssues} />
-      )}
+        {/* 知识来源 */}
+        {message.sources && message.sources.length > 0 && (
+          <KnowledgeSources sources={message.sources} />
+        )}
 
-      {hasStructured && <hr className="border-border mt-8" />}
+        {/* 混合情景:有 Outfit 但也有 Issues */}
+        {message.outfit && message.outfitIssues && message.outfitIssues.length > 0 && (
+          <OutfitIssueList issues={message.outfitIssues} />
+        )}
+
+        {hasStructured && <hr className="border-border mt-8" />}
+      </div>
     </div>
   );
 }

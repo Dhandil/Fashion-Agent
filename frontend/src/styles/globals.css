@@ -10,9 +10,25 @@
   }
 
   body {
-    @apply bg-canvas text-body text-text-primary;
+    @apply min-h-dvh bg-canvas text-body text-text-primary;
+    background-image:
+      radial-gradient(circle at 92% -8%, rgba(72, 86, 200, 0.12), transparent 30rem),
+      radial-gradient(circle at -8% 86%, rgba(255, 118, 87, 0.09), transparent 26rem),
+      radial-gradient(rgba(72, 86, 200, 0.045) 1px, transparent 1px);
+    background-size: auto, auto, 24px 24px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    @apply bg-brand/20 text-text-primary;
   }
 
   /* 内容区最大宽度 */
@@ -46,6 +62,46 @@
     @apply source-tag border text-text-secondary;
   }
 
+  /* 页面级容器：让不同功能页共享相同的编辑式留白。 */
+  .page-frame {
+    @apply mx-auto w-full max-w-[96rem];
+  }
+
+  .page-header {
+    @apply relative flex items-end justify-between gap-16 border-b border-border/70 pb-20;
+  }
+
+  .page-header::after {
+    content: "";
+    @apply absolute -bottom-2 left-0 h-4 w-48 rounded-tag bg-accent;
+  }
+
+  .soft-card {
+    @apply rounded-card-lg border border-border/80 bg-surface;
+  }
+
+  .soft-card-hover {
+    @apply transition-all duration-200 hover:-translate-y-2 hover:border-brand/25 hover:shadow-[0_14px_32px_rgba(50,57,115,0.11)];
+  }
+
+  /* 衣物标签：用于少量品牌识别，不作为所有卡片的通用装饰。 */
+  .closet-label {
+    @apply relative rounded-card border border-brand/15 bg-surface;
+    box-shadow: 5px 5px 0 rgba(72, 86, 200, 0.08);
+  }
+
+  .closet-label::before {
+    content: "";
+    @apply absolute h-6 w-6 rounded-full border border-brand/25 bg-canvas;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .gentle-float {
+    animation: gentle-float 6s ease-in-out infinite;
+  }
+
   /* 状态标签 */
   .status-available {
     @apply text-success;
@@ -69,5 +125,15 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+@keyframes gentle-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-3deg);
   }
 }

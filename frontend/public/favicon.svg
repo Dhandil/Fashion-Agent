@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#315E52"/>
+  <rect width="32" height="32" rx="6" fill="#4856C8"/>
+  <circle cx="25" cy="7" r="2" fill="#FF7657"/>
   <text x="16" y="22" text-anchor="middle" font-family="Inter, sans-serif"
         font-weight="600" font-size="18" fill="#FFFFFF">F</text>
 </svg>

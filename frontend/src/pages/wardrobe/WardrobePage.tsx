@@ -103,8 +103,10 @@ export default function WardrobePage() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* 页面标题 */}
-      <div className="px-16 md:px-32 pt-24 pb-16 flex items-center justify-between flex-wrap gap-12">
+      <div className="page-frame px-16 pb-20 pt-32 md:px-32">
+        <div className="page-header flex-wrap">
         <div>
+          <p className="mb-8 text-caption font-medium uppercase tracking-[0.18em] text-brand">My closet / 02</p>
           <h1 className="text-h1 text-text-primary">我的衣橱</h1>
           <p className="text-small text-text-secondary mt-8">管理可以参与穿搭的衣物。</p>
         </div>
@@ -133,10 +135,11 @@ export default function WardrobePage() {
             新增衣物
           </button>
         </div>
+        </div>
       </div>
 
       {/* 筛选栏 */}
-      <div className="px-16 md:px-32 pb-16 flex flex-wrap items-center gap-8">
+      <div className="page-frame flex flex-wrap items-center gap-8 px-16 pb-16 md:px-32">
         <select
           value={filters.category ?? ""}
           onChange={(e) => {
@@ -179,7 +182,7 @@ export default function WardrobePage() {
       )}
 
       {/* 内容区 */}
-      <div className="flex-1 overflow-y-auto px-16 md:px-32 pb-24">
+      <div className="page-frame flex-1 overflow-y-auto px-16 pb-24 md:px-32">
         {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-16" aria-busy="true">
             {Array.from({ length: 8 }).map((_, i) => (

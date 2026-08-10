@@ -41,13 +41,18 @@ export default function OutfitsPage() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* 页面标题 */}
-      <div className="px-16 md:px-32 pt-24 pb-16">
+      <div className="page-frame px-16 pb-20 pt-32 md:px-32">
+        <div className="page-header">
+        <div>
+        <p className="mb-8 text-caption font-medium uppercase tracking-[0.18em] text-brand">My looks / 03</p>
         <h1 className="text-h1 text-text-primary">我的穿搭</h1>
         <p className="text-small text-text-secondary mt-8">查看已保存、收藏和反馈过的穿搭方案。</p>
+        </div>
+        </div>
       </div>
 
       {/* 筛选栏 */}
-      <div className="px-16 md:px-32 pb-16 flex flex-wrap items-center gap-8">
+      <div className="page-frame flex flex-wrap items-center gap-8 px-16 pb-16 md:px-32">
         <select
           value={filters.scenario ?? ""}
           onChange={(e) => {
@@ -81,7 +86,7 @@ export default function OutfitsPage() {
       </div>
 
       {/* 内容区 */}
-      <div className="flex-1 overflow-y-auto px-16 md:px-32 pb-24">
+      <div className="page-frame flex-1 overflow-y-auto px-16 pb-24 md:px-32">
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16" aria-busy="true">
             {Array.from({ length: 6 }).map((_, i) => (

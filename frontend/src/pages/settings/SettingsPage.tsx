@@ -49,9 +49,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-16 md:px-32 py-24">
+    <div className="flex-1 overflow-y-auto px-16 py-32 md:px-32">
       <div className="max-w-content mx-auto space-y-24">
         <div>
+          <p className="mb-8 text-caption font-medium uppercase tracking-[0.18em] text-brand">Settings / 05</p>
           <h1 className="text-h1 text-text-primary">设置与隐私</h1>
           <p className="text-small text-text-secondary mt-8">管理会话、数据和隐私偏好。</p>
         </div>

@@ -18,8 +18,7 @@ export default function OutfitListCard({ outfit, onClick }: Props) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-card border border-border bg-surface p-16
-                 hover:border-brand/40 hover:shadow-sm transition-all space-y-12 group"
+      className="soft-card soft-card-hover group w-full space-y-12 p-20 text-left"
     >
       {/* 标题行 */}
       <div className="flex items-start justify-between gap-8">

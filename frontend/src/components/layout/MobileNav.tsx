@@ -10,7 +10,7 @@ export default function MobileNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 bg-surface border-t border-border safe-area-bottom"
+      className="fixed inset-x-0 bottom-0 border-t border-border/80 bg-surface/95 backdrop-blur-md safe-area-bottom md:hidden"
       aria-label="主导航"
     >
       <ul className="flex justify-around py-8" role="list">
@@ -22,9 +22,12 @@ export default function MobileNav() {
             <li key={item.to}>
               <NavLink
                 to={item.to}
-                className={`flex flex-col items-center gap-2 px-12 py-4 text-caption transition-colors touch-target
-                  ${isActive ? "text-brand font-medium" : "text-text-secondary"}`}
+                className={`relative flex flex-col items-center gap-2 rounded-card px-12 py-4 text-caption transition-all touch-target
+                  ${isActive ? "bg-brand/[0.08] text-brand font-medium" : "text-text-secondary"}`}
               >
+                {isActive && (
+                  <span className="absolute -top-4 h-4 w-20 rounded-tag bg-accent" aria-hidden="true" />
+                )}
                 {Icon && <Icon size={20} aria-hidden="true" />}
                 <span>{item.label}</span>
               </NavLink>
