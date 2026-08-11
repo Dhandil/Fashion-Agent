@@ -11,10 +11,20 @@ from pydantic import (
 
 
 class WeatherQueryInput(BaseModel):
-    """前端请求实时天气时提供的地点和日期。"""
+    """前端请求实时天气时提供的地点、日期和可选设备坐标。"""
 
     location: str = Field(min_length=1, max_length=200)
     target_date: date
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def validate_coordinates(self) -> Self:
+        """经纬度必须成对出现，避免把不完整坐标交给天气服务。"""
+
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("纬度和经度必须同时提供")
+        return self
 
 
 class WeatherContextInput(BaseModel):

@@ -79,10 +79,12 @@ def _build_graph_input(
         # 每轮都明确写入天气；None 会清除 Checkpointer 中的过期天气。
         "weather_context": weather_context,
         "weather_query": (
-            request.weather_query.model_dump(mode="json")
+            request.weather_query.model_dump(mode="json", exclude_none=True)
             if request.weather_query is not None
             else None
         ),
+        # 衣橱优先是本轮请求选项，不依赖对话历史隐式猜测。
+        "wardrobe_preference_requested": request.wardrobe_preferred,
     }
 
 

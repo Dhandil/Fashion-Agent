@@ -720,3 +720,65 @@ def test_chat_passes_structured_weather_query_to_graph() -> None:
         "location": "上海",
         "target_date": "2026-08-09",
     }
+
+
+def test_chat_passes_device_coordinates_to_graph() -> None:
+    """验证浏览器定位坐标只进入本轮 Agent 天气查询状态。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={"messages": [AIMessage(content="已收到当前位置")]},
+    )
+
+    with patch(
+        "app.api.dependencies.agent.create_user_shopping_graph",
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={"X-User-ID": "user-001"},
+            json={
+                "message": "按当前位置天气推荐穿搭",
+                "weather_query": {
+                    "location": "当前位置",
+                    "target_date": "2026-08-11",
+                    "latitude": 31.2304,
+                    "longitude": 121.4737,
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    input_state = fake_graph.ainvoke.call_args.args[0]
+    assert input_state["weather_query"] == {
+        "location": "当前位置",
+        "target_date": "2026-08-11",
+        "latitude": 31.2304,
+        "longitude": 121.4737,
+    }
+
+
+def test_chat_passes_wardrobe_preference_to_graph() -> None:
+    """验证衣橱优先选项作为本轮状态进入 Agent。"""
+
+    fake_graph = Mock()
+    fake_graph.ainvoke = AsyncMock(
+        return_value={"messages": [AIMessage(content="已优先查询衣橱")]},
+    )
+
+    with patch(
+        "app.api.dependencies.agent.create_user_shopping_graph",
+        return_value=fake_graph,
+    ):
+        response = client.post(
+            "/api/v1/chat",
+            headers={"X-User-ID": "user-001"},
+            json={
+                "message": "周末约会帮我搭一套",
+                "wardrobe_preferred": True,
+            },
+        )
+
+    assert response.status_code == 200
+    input_state = fake_graph.ainvoke.call_args.args[0]
+    assert input_state["wardrobe_preference_requested"] is True

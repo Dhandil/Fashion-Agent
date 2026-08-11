@@ -55,8 +55,8 @@ async def test_weather_tool_returns_provider_result() -> None:
     assert records[0]["target_date"] == "2026-08-01"
 
 
-def test_weather_tool_exposes_only_location_and_date() -> None:
-    """验证模型不能指定天气来源或伪造观测字段。"""
+def test_weather_tool_exposes_query_location_date_and_optional_coordinates() -> None:
+    """验证工具只暴露查询条件，不能伪造天气观测字段。"""
 
     provider = AsyncMock(
         spec=WeatherProvider,
@@ -71,7 +71,39 @@ def test_weather_tool_exposes_only_location_and_date() -> None:
     ) == {
         "location",
         "target_date",
+        "latitude",
+        "longitude",
     }
+
+
+@pytest.mark.anyio
+async def test_weather_tool_passes_device_coordinates_to_provider() -> None:
+    """验证前端设备定位坐标会原样交给天气 Provider。"""
+
+    provider = AsyncMock(spec=WeatherProvider)
+    provider.get_forecast.return_value = WeatherContext(
+        location="当前位置",
+        target_date="2026-08-11",
+        condition="晴",
+        source="api",
+    )
+    weather_tool = create_weather_lookup_tool(provider)
+
+    await weather_tool.ainvoke(
+        {
+            "location": "当前位置",
+            "target_date": "2026-08-11",
+            "latitude": 31.2304,
+            "longitude": 121.4737,
+        },
+    )
+
+    provider.get_forecast.assert_awaited_once_with(
+        location="当前位置",
+        target_date=date(2026, 8, 11),
+        latitude=31.2304,
+        longitude=121.4737,
+    )
 
 
 @pytest.mark.anyio

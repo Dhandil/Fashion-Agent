@@ -56,3 +56,32 @@ def test_weather_query_node_is_noop_without_tool() -> None:
 
     node = create_weather_query_node(None)
     assert node({"messages": []}) == {}
+
+
+def test_weather_query_node_forwards_device_coordinates() -> None:
+    """验证结构化天气节点不会丢失浏览器提供的经纬度。"""
+
+    weather_tool = Mock(spec=BaseTool)
+    weather_tool.ainvoke = AsyncMock(
+        return_value=json.dumps(
+            [
+                {
+                    "location": "当前位置",
+                    "target_date": "2026-08-11",
+                    "condition": "晴",
+                    "source": "api",
+                },
+            ],
+        ),
+    )
+    node = create_weather_query_node(weather_tool)
+    query = {
+        "location": "当前位置",
+        "target_date": "2026-08-11",
+        "latitude": 31.2304,
+        "longitude": 121.4737,
+    }
+
+    asyncio.run(node({"messages": [], "weather_query": query}))
+
+    weather_tool.ainvoke.assert_awaited_once_with(query)

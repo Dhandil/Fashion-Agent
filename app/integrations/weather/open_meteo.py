@@ -90,8 +90,11 @@ class OpenMeteoWeatherProvider:
         self,
         location: str,
         target_date: date,
+        *,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> WeatherContext:
-        """把地点转换为坐标，并查询目标日期的每日预报。"""
+        """按地点名称或设备坐标查询目标日期的每日预报。"""
 
         normalized_location = location.strip()
         if not normalized_location:
@@ -99,11 +102,18 @@ class OpenMeteoWeatherProvider:
                 "天气查询地点不能为空。",
             )
 
+        if (latitude is None) != (longitude is None):
+            raise WeatherProviderError(
+                "天气查询的纬度和经度必须同时提供。",
+            )
+
         if self._client is not None:
             return await self._get_forecast_with_client(
                 client=self._client,
                 location=normalized_location,
                 target_date=target_date,
+                latitude=latitude,
+                longitude=longitude,
             )
 
         # 默认每次调用使用独立客户端，避免 Provider 缓存后遗漏关闭连接
@@ -114,6 +124,8 @@ class OpenMeteoWeatherProvider:
                 client=client,
                 location=normalized_location,
                 target_date=target_date,
+                latitude=latitude,
+                longitude=longitude,
             )
 
     async def _get_forecast_with_client(
@@ -122,13 +134,23 @@ class OpenMeteoWeatherProvider:
         client: httpx.AsyncClient,
         location: str,
         target_date: date,
+        latitude: float | None,
+        longitude: float | None,
     ) -> WeatherContext:
         """使用指定客户端完成两次请求并转换领域实体。"""
 
-        resolved_location = await self._resolve_location(
-            client=client,
-            location=location,
-        )
+        if latitude is not None and longitude is not None:
+            resolved_location = _ResolvedLocation(
+                display_name=location,
+                latitude=latitude,
+                longitude=longitude,
+                timezone_name="auto",
+            )
+        else:
+            resolved_location = await self._resolve_location(
+                client=client,
+                location=location,
+            )
         forecast = await self._request_json(
             client=client,
             url=f"{self._forecast_base_url}/v1/forecast",

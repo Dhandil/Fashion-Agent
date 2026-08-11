@@ -34,6 +34,10 @@ class ChatRequest(BaseModel):
     # 只提供地点和日期时，由 Agent 的天气工具查询实时天气。
     weather_query: WeatherQueryInput | None = None
 
+    # 开启后，穿搭类请求优先使用用户当前可用的衣橱单品。
+    # 默认保持 False 以兼容没有这个字段的旧客户端。
+    wardrobe_preferred: bool = False
+
 
 class ChatResponse(BaseModel):
     """聊天接口的响应模型。"""

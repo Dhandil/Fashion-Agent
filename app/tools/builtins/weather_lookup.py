@@ -3,9 +3,10 @@
 import json
 import logging
 from datetime import date
+from typing import Self
 
 from langchain_core.tools import BaseTool, tool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.core.exceptions import WeatherProviderError
 from app.core.observability import observe_operation
@@ -28,6 +29,26 @@ class WeatherLookupInput(BaseModel):
     target_date: date = Field(
         description="需要查询的日期，格式为 YYYY-MM-DD",
     )
+    latitude: float | None = Field(
+        default=None,
+        ge=-90,
+        le=90,
+        description="设备定位提供的纬度；必须与经度同时提供",
+    )
+    longitude: float | None = Field(
+        default=None,
+        ge=-180,
+        le=180,
+        description="设备定位提供的经度；必须与纬度同时提供",
+    )
+
+    @model_validator(mode="after")
+    def validate_coordinates(self) -> Self:
+        """拒绝只有纬度或只有经度的不完整设备定位。"""
+
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("纬度和经度必须同时提供")
+        return self
 
 
 def create_weather_lookup_tool(
@@ -41,6 +62,8 @@ def create_weather_lookup_tool(
     async def get_weather(
         location: str,
         target_date: date,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> str:
         """查询指定地点和日期的天气事实。"""
 
@@ -55,10 +78,18 @@ def create_weather_lookup_tool(
                     "provider.weather",
                     provider_type=(type(provider).__name__),
                 ):
-                    weather = await provider.get_forecast(
-                        location=location,
-                        target_date=target_date,
-                    )
+                    if latitude is not None and longitude is not None:
+                        weather = await provider.get_forecast(
+                            location=location,
+                            target_date=target_date,
+                            latitude=latitude,
+                            longitude=longitude,
+                        )
+                    else:
+                        weather = await provider.get_forecast(
+                            location=location,
+                            target_date=target_date,
+                        )
             except WeatherProviderError as exc:
                 # 外部服务失败不应中断整次穿搭对话；对象结构也不会被当成天气记录
                 logger.warning(

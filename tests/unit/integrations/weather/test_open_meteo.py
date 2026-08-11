@@ -137,6 +137,49 @@ async def test_provider_resolves_location_and_maps_daily_forecast() -> None:
 
 
 @pytest.mark.anyio
+async def test_provider_uses_device_coordinates_without_geocoding() -> None:
+    """验证设备定位坐标会跳过地点搜索并直接查询预报。"""
+
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "daily": {
+                    "time": ["2026-08-11"],
+                    "weather_code": [1],
+                    "temperature_2m_max": [31.0],
+                    "temperature_2m_min": [24.0],
+                    "apparent_temperature_mean": [28.0],
+                    "precipitation_probability_max": [10],
+                    "wind_speed_10m_max": [12.0],
+                },
+            },
+        )
+
+    provider, client = _create_provider(handler, api_key=None)
+    try:
+        weather = await provider.get_forecast(
+            location="当前位置",
+            target_date=date(2026, 8, 11),
+            latitude=31.2304,
+            longitude=121.4737,
+        )
+    finally:
+        await client.aclose()
+
+    assert weather.location == "当前位置"
+    assert weather.condition == "大致晴朗"
+    assert len(requests) == 1
+    assert requests[0].url.host == "forecast.example.test"
+    assert requests[0].url.params["latitude"] == "31.2304"
+    assert requests[0].url.params["longitude"] == "121.4737"
+    assert requests[0].url.params["timezone"] == "auto"
+
+
+@pytest.mark.anyio
 async def test_provider_rejects_unknown_location() -> None:
     """验证地点搜索没有结果时返回明确领域异常。"""
 

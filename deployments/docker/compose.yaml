@@ -200,7 +200,8 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         # 仅本地开发需要演示身份；生产构建必须显式留空并接入真实认证。
-        VITE_DEV_USER_ID: ${VITE_DEV_USER_ID:-}
+        # 本地 Compose 默认使用独立的演示身份；生产构建应显式传空并接入真实认证。
+        VITE_DEV_USER_ID: ${VITE_DEV_USER_ID:-dev-user-001}
 
     restart: unless-stopped
 

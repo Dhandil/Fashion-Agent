@@ -171,6 +171,7 @@ def _is_currently_mentioned(
 
 def _fallback_analysis(
     current_request: str,
+    wardrobe_preference_requested: bool = False,
 ) -> OutfitRequirementAnalysis:
     """结构化模型不可用时提供不阻断旧链路的保守分析。"""
 
@@ -183,6 +184,9 @@ def _fallback_analysis(
     outfit_is_explicit = _has_outfit_request_signal(
         current_request,
     )
+    wardrobe_required = wardrobe_is_explicit or (
+        wardrobe_preference_requested and outfit_is_explicit
+    )
     return OutfitRequirementAnalysis(
         intent=(
             RequestIntent.SHOPPING
@@ -193,8 +197,8 @@ def _fallback_analysis(
                 else RequestIntent.OTHER
             )
         ),
-        wardrobe_preferred=wardrobe_is_explicit,
-        needs_wardrobe=wardrobe_is_explicit,
+        wardrobe_preferred=wardrobe_required,
+        needs_wardrobe=wardrobe_required,
         shopping_intent=(ShoppingIntent.EXPLICIT if shopping_is_explicit else ShoppingIntent.NONE),
         # 降级时不凭规则阻断请求，由现有 Chat 节点继续回答。
         is_sufficient=True,
@@ -205,6 +209,7 @@ def _apply_deterministic_permissions(
     analysis: OutfitRequirementAnalysis,
     current_request: str,
     history_expresses_wardrobe: bool = False,
+    wardrobe_preference_requested: bool = False,
 ) -> OutfitRequirementAnalysis:
     """以用户原文的确定性信号收紧购物和衣橱工具权限。"""
 
@@ -217,6 +222,17 @@ def _apply_deterministic_permissions(
     wardrobe_required = (
         explicit_wardrobe
         or analysis.intent is RequestIntent.OUTFIT_ADJUSTMENT
+        or (
+            wardrobe_preference_requested
+            and (
+                analysis.intent
+                in (
+                    RequestIntent.OUTFIT,
+                    RequestIntent.OUTFIT_ADJUSTMENT,
+                )
+                or _has_outfit_request_signal(current_request)
+            )
+        )
     )
 
     # 意图延续：用户此前明确要求使用衣橱，本轮正在补全被追问的信息
@@ -430,6 +446,10 @@ def create_requirement_analysis_node(
             state,
         )
         weather_query = state.get("weather_query")
+        wardrobe_preference_requested = state.get(
+            "wardrobe_preference_requested",
+            False,
+        )
         payload = {
             "output_schema": (OutfitRequirementAnalysis.model_json_schema()),
             "current_request": current_request,
@@ -468,6 +488,9 @@ def create_requirement_analysis_node(
                 history_expresses_wardrobe=_history_expresses_wardrobe_intent(
                     recent_conversation,
                 ),
+                wardrobe_preference_requested=(
+                    wardrobe_preference_requested
+                ),
             )
             if weather_query:
                 # 结构化天气查询优先于模型是否成功从自然语言提取地点和日期。
@@ -503,7 +526,12 @@ def create_requirement_analysis_node(
                 "需求结构化分析失败，已使用保守规则降级：%s",
                 type(exc).__name__,
             )
-            analysis = _fallback_analysis(current_request)
+            analysis = _fallback_analysis(
+                current_request,
+                wardrobe_preference_requested=(
+                    wardrobe_preference_requested
+                ),
+            )
             degraded = True
 
         log_event(

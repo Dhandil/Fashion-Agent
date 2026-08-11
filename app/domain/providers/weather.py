@@ -13,7 +13,10 @@ class WeatherProvider(Protocol):
         self,
         location: str,
         target_date: date,
+        *,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> WeatherContext:
-        """查询指定地点和日期的天气。"""
+        """按地点名称或设备坐标查询指定日期的天气。"""
 
         ...

@@ -12,7 +12,7 @@ export default function MessageList({ messages, onSaveOutfit, savingOutfit }: Pr
   if (messages.length === 0) return null;
 
   return (
-    <div className="flex-1 overflow-y-auto px-16 md:px-32">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-16 md:px-32">
       <div className="max-w-chat mx-auto space-y-24 py-24">
         {messages.map((msg) =>
           msg.role === "user" ? (

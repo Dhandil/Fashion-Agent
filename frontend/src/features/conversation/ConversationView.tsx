@@ -15,9 +15,9 @@ export default function ConversationView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {status === "submitting" && (
-        <div className="flex items-center gap-8 px-16 md:px-32 py-8 bg-surface-subtle border-b border-border">
+        <div className="flex shrink-0 items-center gap-8 border-b border-border bg-surface-subtle px-16 py-8 md:px-32">
           <Loader2 size={16} className="text-brand animate-spin" />
           <span className="text-small text-text-secondary">
             {thinkingStage === "working"

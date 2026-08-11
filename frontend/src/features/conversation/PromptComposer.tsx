@@ -2,9 +2,12 @@ import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import {
   CalendarDays,
   CloudSun,
+  LocateFixed,
+  LoaderCircle,
   MapPin,
   Pencil,
   Send,
+  Shirt,
   X,
 } from "lucide-react";
 import type { components } from "@/api/generated/schema";
@@ -13,6 +16,8 @@ type WeatherInput = components["schemas"]["WeatherContextInput"];
 export type WeatherQuery = {
   location: string;
   target_date: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 type Props = {
@@ -20,6 +25,7 @@ type Props = {
     message: string,
     weather?: WeatherInput,
     weatherQuery?: WeatherQuery,
+    wardrobePreferred?: boolean,
   ) => void;
   disabled?: boolean;
   prefillMessage?: string;
@@ -32,6 +38,8 @@ type WeatherDraft = {
   minTemperature: string;
   maxTemperature: string;
   precipitationProbability: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 const EMPTY_WEATHER_DRAFT: WeatherDraft = {
@@ -41,6 +49,8 @@ const EMPTY_WEATHER_DRAFT: WeatherDraft = {
   minTemperature: "",
   maxTemperature: "",
   precipitationProbability: "",
+  latitude: null,
+  longitude: null,
 };
 
 type WeatherMode = "auto" | "manual";
@@ -91,7 +101,11 @@ export default function PromptComposer({
   const [weatherMode, setWeatherMode] = useState<WeatherMode>("auto");
   const [weatherDraft, setWeatherDraft] = useState(EMPTY_WEATHER_DRAFT);
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [wardrobePreferred, setWardrobePreferred] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const weatherPanelRef = useRef<HTMLDivElement>(null);
+  const weatherTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (prefillMessage !== undefined) {
@@ -99,6 +113,22 @@ export default function PromptComposer({
       textareaRef.current?.focus();
     }
   }, [prefillMessage]);
+
+  // 天气设置属于浮层：点击卡片和开关按钮以外的任意区域都应关闭。
+  useEffect(() => {
+    if (!showWeather) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (weatherPanelRef.current?.contains(target)) return;
+      if (weatherTriggerRef.current?.contains(target)) return;
+      setShowWeather(false);
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
+  }, [showWeather]);
 
   // 自动调整高度
   useEffect(() => {
@@ -123,6 +153,7 @@ export default function PromptComposer({
     const hasWeatherDraft = Object.values(draft).some(Boolean);
     if (hasWeatherDraft && (!draft.location || !draft.targetDate)) {
       setWeatherError("填写天气信息时，需要同时提供地点和日期。\n");
+      setShowWeather(true);
       return;
     }
     if (
@@ -131,6 +162,7 @@ export default function PromptComposer({
       Number(draft.minTemperature) > Number(draft.maxTemperature)
     ) {
       setWeatherError("最低温度不能高于最高温度。\n");
+      setShowWeather(true);
       return;
     }
 
@@ -158,10 +190,19 @@ export default function PromptComposer({
       : undefined;
     const weatherQuery =
       hasWeatherDraft && !hasManualFact
-        ? { location: draft.location, target_date: draft.targetDate }
+        ? {
+            location: draft.location,
+            target_date: draft.targetDate,
+            ...(weatherDraft.latitude !== null && weatherDraft.longitude !== null
+              ? {
+                  latitude: weatherDraft.latitude,
+                  longitude: weatherDraft.longitude,
+                }
+              : {}),
+          }
         : undefined;
 
-    onSubmit(trimmed, weather, weatherQuery);
+    onSubmit(trimmed, weather, weatherQuery, wardrobePreferred);
     setValue("");
     setWeatherDraft(EMPTY_WEATHER_DRAFT);
     setWeatherMode("auto");
@@ -174,6 +215,40 @@ export default function PromptComposer({
     setWeatherMode("auto");
     setWeatherError(null);
     setShowWeather(false);
+  };
+
+  const useCurrentLocation = () => {
+    setWeatherError(null);
+    if (!("geolocation" in navigator)) {
+      setWeatherError("当前浏览器不支持定位，请手动填写地点。");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setWeatherDraft((draft) => ({
+          ...draft,
+          location: "当前位置",
+          latitude: Number(coords.latitude.toFixed(6)),
+          longitude: Number(coords.longitude.toFixed(6)),
+        }));
+        setWeatherError(null);
+        setIsLocating(false);
+      },
+      (error) => {
+        const message = error.code === error.PERMISSION_DENIED
+          ? "定位权限未开启，请允许访问位置或手动填写地点。"
+          : "暂时无法获取当前位置，请稍后重试或手动填写地点。";
+        setWeatherError(message);
+        setIsLocating(false);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10_000,
+        maximumAge: 300_000,
+      },
+    );
   };
 
   const finishWeather = () => {
@@ -221,11 +296,29 @@ export default function PromptComposer({
   );
 
   return (
-    <div className="sticky bottom-0 bg-canvas/95 pt-12 pb-24 backdrop-blur-sm md:pb-32">
-      <div className="mb-8 flex min-h-[2rem] items-center justify-between gap-8">
+    <div className="relative z-20 shrink-0 bg-canvas/95 pb-24 pt-12 md:pb-32">
+      <div className="mb-8 flex min-h-[2rem] flex-wrap items-center gap-8">
+        <button
+          type="button"
+          onClick={() => setWardrobePreferred((current) => !current)}
+          disabled={disabled}
+          aria-label="衣橱优先"
+          aria-pressed={wardrobePreferred}
+          title="开启后，穿搭请求会先查询你当前可用的衣物"
+          className={`inline-flex items-center gap-6 rounded-tag border px-10 py-6 text-caption font-medium transition-colors disabled:opacity-50 ${
+            wardrobePreferred
+              ? "border-brand/25 bg-brand/[0.09] text-brand"
+              : "border-border text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
+          }`}
+        >
+          <Shirt size={14} aria-hidden="true" />
+          {wardrobePreferred ? "衣橱优先" : "自由灵感"}
+        </button>
+
         {hasWeatherSelection && !showWeather ? (
           <div className="inline-flex max-w-full items-center rounded-tag border border-brand/20 bg-brand/[0.06] text-caption text-brand">
             <button
+              ref={weatherTriggerRef}
               type="button"
               onClick={() => setShowWeather(true)}
               disabled={disabled}
@@ -250,6 +343,7 @@ export default function PromptComposer({
           </div>
         ) : (
           <button
+            ref={weatherTriggerRef}
             type="button"
             onClick={() => {
               setShowWeather((current) => !current);
@@ -270,12 +364,14 @@ export default function PromptComposer({
       {showWeather && (
         <>
           <div
-            className="fixed inset-0 z-30 bg-text-primary/20 backdrop-blur-[1px] md:hidden"
+            className="fixed inset-0 z-30 bg-text-primary/20 backdrop-blur-[1px] md:bg-transparent md:backdrop-blur-none"
+            data-testid="weather-backdrop"
             aria-hidden="true"
           />
           <div
+            ref={weatherPanelRef}
             id="weather-input-panel"
-            className="fixed inset-x-12 bottom-[5.25rem] z-40 max-h-[72dvh] space-y-12 overflow-y-auto rounded-card-lg border border-brand/15 bg-surface p-16 shadow-[0_18px_48px_rgba(37,40,58,0.20)] md:static md:mb-8 md:max-h-none md:overflow-visible md:shadow-[0_14px_36px_rgba(50,57,115,0.10)]"
+            className="fixed inset-x-12 bottom-[5.25rem] z-40 max-h-[72dvh] space-y-12 overflow-y-auto rounded-card-lg border border-brand/15 bg-surface p-16 shadow-[0_18px_48px_rgba(37,40,58,0.20)] md:absolute md:bottom-full md:left-1/2 md:right-auto md:mb-0 md:max-h-[70dvh] md:w-[42rem] md:max-w-[calc(100%-4rem)] md:-translate-x-1/2 md:shadow-[0_14px_36px_rgba(50,57,115,0.14)]"
           >
           <div className="flex items-start justify-between gap-12 border-b border-dashed border-border pb-12">
             <div>
@@ -312,19 +408,36 @@ export default function PromptComposer({
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            <label className="space-y-4">
-              <span className="inline-flex items-center gap-4 text-caption text-text-secondary"><MapPin size={12} aria-hidden="true" />地点</span>
+            <div className="space-y-4">
+              <span className="flex items-center justify-between gap-8 text-caption text-text-secondary">
+                <span className="inline-flex items-center gap-4"><MapPin size={12} aria-hidden="true" />地点</span>
+                <button
+                  type="button"
+                  onClick={useCurrentLocation}
+                  disabled={disabled || isLocating}
+                  className="inline-flex items-center gap-4 rounded-tag px-6 py-2 text-brand hover:bg-brand/[0.07] disabled:opacity-50"
+                  aria-label="使用当前位置"
+                >
+                  {isLocating ? <LoaderCircle size={12} className="animate-spin" aria-hidden="true" /> : <LocateFixed size={12} aria-hidden="true" />}
+                  {isLocating ? "定位中…" : weatherDraft.latitude !== null ? "已定位" : "使用当前位置"}
+                </button>
+              </span>
               <div className="relative">
                 <input
                   value={weatherDraft.location}
-                  onChange={(event) => setWeatherDraft((draft) => ({ ...draft, location: event.target.value }))}
+                  onChange={(event) => setWeatherDraft((draft) => ({
+                    ...draft,
+                    location: event.target.value,
+                    latitude: null,
+                    longitude: null,
+                  }))}
                   placeholder="例如：上海"
                   disabled={disabled}
                   className="w-full rounded-input border border-border bg-canvas px-10 py-8 text-small outline-none focus:border-brand"
                   aria-label="天气地点"
                 />
               </div>
-            </label>
+            </div>
             <label className="space-y-4">
               <span className="inline-flex items-center gap-4 text-caption text-text-secondary"><CalendarDays size={12} aria-hidden="true" />日期</span>
               <input

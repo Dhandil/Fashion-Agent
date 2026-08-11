@@ -551,6 +551,8 @@ export interface components {
             message: string;
             weather?: components["schemas"]["WeatherContextInput"] | null;
             weather_query?: components["schemas"]["WeatherQueryInput"] | null;
+            /** @default false */
+            wardrobe_preferred?: boolean;
         };
         /**
          * ChatResponse
@@ -1503,7 +1505,7 @@ export interface components {
         };
         /**
          * WeatherQueryInput
-         * @description 前端请求实时天气时提供的地点和日期。
+         * @description 前端请求实时天气时提供的地点、日期和可选设备坐标。
          */
         WeatherQueryInput: {
             /** Location */
@@ -1513,6 +1515,10 @@ export interface components {
              * Format: date
              */
             target_date: string;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
         };
         /**
          * WeatherDataSource

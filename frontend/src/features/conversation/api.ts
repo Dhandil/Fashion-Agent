@@ -29,6 +29,7 @@ type PendingRequest = {
   message: string;
   weather?: WeatherInput;
   weatherQuery?: WeatherQuery;
+  wardrobePreferred: boolean;
   conversationId: string | null;
 };
 
@@ -64,6 +65,7 @@ export function useSendMessage() {
           conversation_id: activeConversationId,
           weather: request.weather ?? null,
           weather_query: request.weatherQuery ?? null,
+          wardrobe_preferred: request.wardrobePreferred,
         };
         const streamResult: { value: ChatResponseWithWeather | null } = {
           value: null,
@@ -131,7 +133,12 @@ export function useSendMessage() {
   );
 
   const send = useCallback(
-    (message: string, weather?: WeatherInput, weatherQuery?: WeatherQuery) => {
+    (
+      message: string,
+      weather?: WeatherInput,
+      weatherQuery?: WeatherQuery,
+      wardrobePreferred = true,
+    ) => {
       const trimmedMessage = message.trim();
       if (!trimmedMessage || sendingRef.current) return;
       void execute(
@@ -139,6 +146,7 @@ export function useSendMessage() {
           message: trimmedMessage,
           weather,
           weatherQuery,
+          wardrobePreferred,
           conversationId,
         },
         true,

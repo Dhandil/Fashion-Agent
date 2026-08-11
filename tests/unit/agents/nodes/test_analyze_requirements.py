@@ -461,3 +461,50 @@ def test_analysis_does_not_continue_wardrobe_on_shopping() -> None:
     assert analysis.shopping_intent is ShoppingIntent.EXPLICIT
     # 历史衣橱意图不延续到购物请求
     assert analysis.needs_wardrobe is False
+
+
+def test_analysis_uses_wardrobe_preference_for_outfit_request() -> None:
+    """验证衣橱优先开启时，普通穿搭请求会查询衣橱。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.OUTFIT,
+            shopping_intent=ShoppingIntent.NONE,
+            needs_wardrobe=False,
+            wardrobe_preferred=False,
+            is_sufficient=True,
+            scenario="约会",
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [HumanMessage(content="周末约会帮我搭一套")],
+        "wardrobe_preference_requested": True,
+    }
+
+    analysis = node(state)["requirement_analysis"]
+
+    assert analysis.needs_wardrobe is True
+    assert analysis.wardrobe_preferred is True
+
+
+def test_analysis_does_not_use_wardrobe_preference_for_knowledge() -> None:
+    """验证衣橱优先不会扩大到普通服装知识问答。"""
+
+    _, _, node = _create_node(
+        OutfitRequirementAnalysis(
+            intent=RequestIntent.KNOWLEDGE,
+            shopping_intent=ShoppingIntent.NONE,
+            needs_wardrobe=False,
+            wardrobe_preferred=False,
+            is_sufficient=True,
+        ),
+    )
+    state: ShoppingAgentState = {
+        "messages": [HumanMessage(content="亚麻面料有什么优点？")],
+        "wardrobe_preference_requested": True,
+    }
+
+    analysis = node(state)["requirement_analysis"]
+
+    assert analysis.needs_wardrobe is False
+    assert analysis.wardrobe_preferred is False

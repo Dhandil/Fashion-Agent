@@ -8,10 +8,12 @@ export default function Sidebar() {
       {/* 像衣物吊牌一样的品牌标识，建立个人衣橱辨识度。 */}
       <div className="px-16 pb-20 pt-20">
         <div className="closet-label flex items-center gap-10 px-24 py-12">
-          <span className="relative flex h-36 w-36 items-center justify-center rounded-card bg-brand text-h3 font-semibold text-surface">
-            FA
-            <span className="absolute -right-3 -top-3 h-8 w-8 rotate-12 rounded-sm border-2 border-surface bg-accent" aria-hidden="true" />
-          </span>
+          <img
+            src="/favicon.svg"
+            alt=""
+            className="h-40 w-40 shrink-0"
+            aria-hidden="true"
+          />
           <div className="min-w-0">
             <span className="block truncate text-body font-semibold tracking-tight text-text-primary">Fashion-Agent</span>
             <span className="text-caption text-text-secondary">我的衣橱 · 我的搭配</span>

@@ -51,16 +51,15 @@ export default function ChatPage() {
   }, [conversationId, ending, endSession]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {/* 顶栏：会话操作 */}
       {hasMessages && (
-        <div className="flex items-center justify-between border-b border-border/70 bg-surface/80 px-16 py-12 backdrop-blur-sm md:px-32">
+        <div className="shrink-0 flex items-center justify-between border-b border-border/70 bg-surface/80 px-16 py-12 backdrop-blur-sm md:px-32">
           <div>
             <span className="block text-small font-medium text-text-primary">智能搭配</span>
             <span className="text-caption text-text-secondary">本轮建议只基于当前对话和已确认信息</span>
           </div>
           <div className="flex items-center gap-8">
-            <span className="hidden rounded-tag bg-brand/[0.08] px-10 py-4 text-caption text-brand sm:inline-flex">衣橱优先</span>
             <button
               onClick={handleEndSession}
               disabled={ending}
